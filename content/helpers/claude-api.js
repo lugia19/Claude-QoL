@@ -1460,6 +1460,7 @@ async function isLikelyTextFile(file) {
 }
 
 const CLAUDE_MODELS = [
+	{ value: 'claude-opus-4-6', label: 'Opus 4.6' },
 	{ value: 'claude-opus-4-5-20251101', label: 'Opus 4.5' },
 	{ value: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5' },
 	{ value: 'claude-opus-4-1-20250805', label: 'Opus 4.1' },
