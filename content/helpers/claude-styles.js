@@ -1081,6 +1081,7 @@ const ButtonBar = {
 	BUTTON_PRIORITY: [
 		'search-button',
 		'navigation-button',
+		'prompt-templates-button',
 		'style-selector-button',
 		'preset-switcher-button',
 		'export-button',
