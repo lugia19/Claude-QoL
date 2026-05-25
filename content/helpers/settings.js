@@ -45,6 +45,9 @@ const SETTINGS_KEYS = {
 	PREF_SWITCHER: {
 		PRESETS: { key: 'preference_presets', default: {}, type: 'object' },
 	},
+	TEMPLATES: {
+		LIBRARY: { key: 'prompt_templates', default: {}, type: 'object' },
+	},
 };
 
 // ======== WORLD DETECTION ========

@@ -32,6 +32,7 @@
 				"content/isolated/navigation.js",
 				"content/isolated/pref-switcher.js",
 				"content/isolated/perchat-styles.js",
+				"content/isolated/prompt-templates.js",
 				"content/isolated/tts.js",
 				"content/isolated/exporter.js",
 				"content/isolated/notifications.js",
