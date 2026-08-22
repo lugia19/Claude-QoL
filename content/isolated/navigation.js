@@ -378,11 +378,97 @@
 	// #endregion
 	// #region  USER NAVIGATION BUTTONS (MessageButtonBar)
 	function findMessageFromButton(button) {
-		const actionsGroup = button.closest('[role="group"][aria-label="Message actions"]');
+		const actionsGroup = button.closest('[role="toolbar"][aria-label="Message actions"], [role="group"][aria-label="Message actions"]');
 		if (!actionsGroup) return null;
 		const messageContainer = actionsGroup.closest('.group');
 		if (!messageContainer) return null;
 		return messageContainer.querySelector('[data-testid="user-message"], .font-user-message, .\\!font-user-message');
+	}
+
+	// Is the neighbouring user message already rendered? The virtualizer tags each row with
+	// a data-index, so "is this really the adjacent one" is a structural question — compare
+	// indices, no pixel thresholds. Indices are only ever compared against each other here,
+	// never mapped onto the API list, so the phantom offset doesn't come into it.
+	function findRenderedNeighbourUserMessage(messageElement, direction) {
+		const indexOf = el => {
+			const wrapper = el.closest('[data-index]');
+			const value = wrapper && Number(wrapper.getAttribute('data-index'));
+			return Number.isInteger(value) ? value : null;
+		};
+
+		const from = indexOf(messageElement);
+		if (from === null) return null;
+
+		let best = null;
+		for (const candidate of getUIMessages().userMessages) {
+			if (candidate === messageElement) continue;
+			const at = indexOf(candidate);
+			if (at === null) continue;
+			const delta = (at - from) * direction;
+			// Wrong side, or too far to be the neighbour — this is what excludes the
+			// permanently pinned tail rows, which sit hundreds of entries away.
+			if (delta <= 0 || delta > 3) continue;
+			if (!best || delta < best.delta) best = { element: candidate, delta };
+		}
+		return best?.element ?? null;
+	}
+
+	// Reused across clicks: a fresh ClaudeConversation costs ~1.7s in getData (cache hit,
+	// but still a freshness check on the whole payload), while a warm instance answers in
+	// ~18ms. Rebuilt when the conversation changes, or when the branch turns out stale.
+	let _navConversation = null;
+	let _navConversationId = null;
+
+	async function getCachedConversation(refresh = false) {
+		const conversationId = getConversationId();
+		if (refresh || !_navConversation || _navConversationId !== conversationId) {
+			_navConversation = await getConversation();
+			_navConversationId = conversationId;
+		}
+		return _navConversation;
+	}
+
+	// Jump to the previous (-1) or next (+1) user message.
+	//
+	// Jump to the previous (-1) or next (+1) user message. Usually the neighbour is already
+	// on screen and this is a plain scroll with no API call at all. Only when it isn't do we
+	// consult the branch and let revealMessageByUuid walk there ('step', since the target is
+	// by definition adjacent — no reason to bracket the whole conversation).
+	//
+	// getRenderedMessages, not getMessages: positions must match what's on screen, which in
+	// a forked chat includes the phantom history.
+	async function navigateToAdjacentUserMessage(button, direction) {
+		const messageElement = findMessageFromButton(button);
+		if (!messageElement) return;
+
+		const alreadyRendered = findRenderedNeighbourUserMessage(messageElement, direction);
+		if (alreadyRendered) {
+			alreadyRendered.scrollIntoView({ block: 'center' });
+			return;
+		}
+
+		let conversation = await getCachedConversation();
+		let messages = await conversation.getRenderedMessages();
+		let clickedUuid = resolveUserMessageUuid(messageElement, messages);
+
+		// A cached branch goes stale as soon as new messages are sent — if the clicked
+		// message isn't in it, rebuild once and retry.
+		if (!clickedUuid) {
+			conversation = await getCachedConversation(true);
+			messages = await conversation.getRenderedMessages();
+			clickedUuid = resolveUserMessageUuid(messageElement, messages);
+		}
+		if (!clickedUuid) return;
+
+		let cursor = messages.findIndex(msg => msg.uuid === clickedUuid);
+		if (cursor === -1) return;
+		do { cursor += direction; }
+		while (cursor >= 0 && cursor < messages.length && messages[cursor].sender !== 'human');
+
+		const target = messages[cursor];
+		if (!target || target.sender !== 'human') return;
+
+		await revealMessageByUuid(target.uuid, { highlight: false, conversation, strategy: 'step' });
 	}
 
 	function createNavUpButton() {
@@ -403,15 +489,7 @@
 		button.onclick = (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			const msg = findMessageFromButton(button);
-			if (!msg) return;
-			const { userMessages } = getUIMessages();
-			const idx = Array.from(userMessages).indexOf(msg);
-			if (idx > 0) {
-				const target = userMessages[idx - 1];
-				target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-				setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 10);
-			}
+			navigateToAdjacentUserMessage(button, -1);
 		};
 
 		return button;
@@ -435,15 +513,7 @@
 		button.onclick = (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			const msg = findMessageFromButton(button);
-			if (!msg) return;
-			const { userMessages } = getUIMessages();
-			const idx = Array.from(userMessages).indexOf(msg);
-			if (idx < userMessages.length - 1) {
-				const target = userMessages[idx + 1];
-				target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-				setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 10);
-			}
+			navigateToAdjacentUserMessage(button, 1);
 		};
 
 		return button;

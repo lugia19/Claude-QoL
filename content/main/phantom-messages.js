@@ -243,22 +243,9 @@ function injectPhantomMessages(data, phantomMessages) {
 		phantomJson = phantomJson.map(msg => reorderKeys(msg, referenceMsg));
 	}
 
-	// Update root messages to point to last phantom
-	const rootMessages = data.chat_messages.filter(
-		msg => msg.parent_message_uuid === "00000000-0000-4000-8000-000000000000"
-	);
-
-	if (rootMessages.length > 0 && lastPhantom) {
-		rootMessages.forEach(msg => {
-			msg.parent_message_uuid = lastPhantom.uuid;
-		});
-	}
-
-	data.chat_messages = [...phantomJson, ...data.chat_messages];
-	// Set correct index values
-	data.chat_messages.forEach((msg, idx) => {
-		msg.index = idx;
-	});
+	// Rewire roots onto the last phantom, prepend, reindex. Shared with
+	// ClaudeConversation.getRenderedMessages so both views of the list agree.
+	stitchPhantomMessages(data, phantomJson);
 
 	console.log('Updated chat messages with phantom messages:', data.chat_messages);
 }
@@ -398,7 +385,52 @@ navigator.clipboard.write = async (data) => {
 	}
 };
 
-setInterval(() => {
+// The message list is virtualized, so rows mount continuously while scrolling and
+// each one arrives with its raw ====UUID:...==== marker visible. A poll can only
+// hide it a tick later, which shows up as flashing text on every scroll; observer
+// callbacks are delivered before paint, so they hide it in the same frame.
+//
+// The observer is a latency optimisation only. The interval below stays as the
+// supervisor and reattaches it after SPA navigation replaces the container, so a
+// dead observer degrades to the old polling behaviour rather than to broken.
+let _observedContainer = null;
+let _messageObserver = null;
+let _passScheduled = false;
+
+function runTaggingPass() {
 	stylePhantomMessages();
 	extractAndStoreUUIDs();
+}
+
+function schedulePass() {
+	if (_passScheduled) return;
+	_passScheduled = true;
+	requestAnimationFrame(() => {
+		_passScheduled = false;
+		runTaggingPass();
+	});
+}
+
+function syncMessageObserver() {
+	// Scoped to the conversation scroll container (claude-styles.js) rather than
+	// document.body, so streaming text elsewhere on the page can't churn it.
+	const container = getMessageScroller();
+	if (!container || container === _observedContainer) {
+		if (_observedContainer && !_observedContainer.isConnected) {
+			_messageObserver?.disconnect();
+			_observedContainer = null;
+		}
+		return;
+	}
+
+	_messageObserver?.disconnect();
+	_messageObserver = new MutationObserver(schedulePass);
+	_messageObserver.observe(container, { childList: true, subtree: true });
+	_observedContainer = container;
+	runTaggingPass();
+}
+
+setInterval(() => {
+	syncMessageObserver();
+	runTaggingPass();
 }, 300);

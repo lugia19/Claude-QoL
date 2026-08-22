@@ -2,7 +2,7 @@
 (function () {
 	'use strict';
 
-	const { searchDB } = window.ClaudeSearchShared;
+	const { searchDB, compileQuery, findMatches } = window.ClaudeSearchShared;
 
 	// ======== STATE ========
 	let isFirstSyncOnRecents = true;
@@ -29,6 +29,7 @@
 
 		const storedMetadata = await searchDB.getAllMetadata();
 		const storedMap = new Map(storedMetadata.map(m => [m.uuid, m]));
+		const convIdsWithMessages = new Set(await searchDB.getAllConversationIdsWithMessages());
 
 		const toUpdate = [];
 		for (const conv of allConversations) {
@@ -36,17 +37,12 @@
 
 			if (!stored) {
 				toUpdate.push(conv);
-			} else {
-				// Check if messages exist
-				const messages = await searchDB.getMessages(conv.uuid);
-
-				if (messages === null) {
-					// Metadata exists but no messages - needs update
-					toUpdate.push(conv);
-				} else if (new Date(conv.updated_at) > new Date(stored.updated_at)) {
-					// Timestamp changed - needs update
-					toUpdate.push(conv);
-				}
+			} else if (!convIdsWithMessages.has(conv.uuid)) {
+				// Metadata exists but no messages - needs update
+				toUpdate.push(conv);
+			} else if (new Date(conv.updated_at) > new Date(stored.updated_at)) {
+				// Timestamp changed - needs update
+				toUpdate.push(conv);
 			}
 		}
 
@@ -405,12 +401,21 @@
 			throw new Error(`Manifest fetch failed: ${manifestResult ? manifestResult.error : 'no response'}`);
 		}
 
-		const dataFiles = (manifestResult.manifest.data_files || [])
+		// The signed URL either points at a manifest listing per-batch nonces, or straight at the
+		// archive. In the latter case there is nothing to resolve — the URL we hold is the only batch.
+		const zipUrls = [];
+		if (manifestResult.isZip) {
+			console.log('[QOL-GDPRExport] Export is a single archive, no manifest indirection');
+			zipUrls.push(manifestSignedUrl);
+		}
+
+		const dataFiles = manifestResult.isZip ? [] : (manifestResult.manifest.data_files || [])
 			.slice()
 			.sort((a, b) => a.batch_index - b.batch_index);
-		console.log('[QOL-GDPRExport] Manifest lists', dataFiles.length, 'batch file(s)');
+		if (!manifestResult.isZip) {
+			console.log('[QOL-GDPRExport] Manifest lists', dataFiles.length, 'batch file(s)');
+		}
 
-		const zipUrls = [];
 		for (const file of dataFiles) {
 			const batchNonce = file.export_url.split('/').pop();
 			let resolved = await resolveExportSignedUrl(orgId, batchNonce);
@@ -425,6 +430,10 @@
 				throw new Error(`Batch ${file.batch_index} unavailable: ${resolved.message || resolved.status}`);
 			}
 			zipUrls.push(resolved.signedUrl);
+		}
+
+		if (zipUrls.length === 0) {
+			throw new Error('The export contained no data files');
 		}
 
 		// Phase 4: Hand the ZIP URLs to the background to download, unzip and stream back.
@@ -512,37 +521,26 @@
 		}
 	});
 
-	// All case-insensitive occurrences of `lowerQuery` within `text`, as {start, end} offsets.
-	function findMatches(text, lowerQuery) {
-		if (!text || !lowerQuery) return [];
-		const lowerText = text.toLowerCase();
-		const out = [];
-		let from = 0;
-		while (true) {
-			const i = lowerText.indexOf(lowerQuery, from);
-			if (i === -1) break;
-			out.push({ start: i, end: i + lowerQuery.length });
-			from = i + lowerQuery.length;
-		}
-		return out;
-	}
-
-	// Build a ~snippetSize preview centred on the first occurrence of the query, with leading/
+	// Build a ~snippetSize preview centred on `first` (the first match in `text`), with leading/
 	// trailing ellipses when truncated. Returns { text, matches } with matches as offsets into text.
-	function buildSnippet(text, lowerQuery, snippetSize = 160) {
+	function buildSnippet(text, first, matcher, snippetSize = 160) {
 		if (!text) return { text: '', matches: [] };
-		const idx = text.toLowerCase().indexOf(lowerQuery);
-		if (idx === -1) {
+		// `first` is a single {start, end}, not a list - guard on the shape so a caller passing an
+		// array can't silently fall through and produce a garbage window.
+		if (!first || typeof first.start !== 'number') {
 			return { text: text.slice(0, snippetSize) + (text.length > snippetSize ? '…' : ''), matches: [] };
 		}
-		const pad = Math.max(0, Math.floor((snippetSize - lowerQuery.length) / 2));
-		const start = Math.max(0, idx - pad);
-		const end = Math.min(text.length, idx + lowerQuery.length + pad);
+		// Match widths vary under a regex query, so centre on this match's actual span.
+		const matchLength = first.end - first.start;
+		const pad = Math.max(0, Math.floor((snippetSize - matchLength) / 2));
+		const start = Math.max(0, first.start - pad);
+		const end = Math.min(text.length, first.end + pad);
 		const prefix = start > 0 ? '…' : '';
 		const suffix = end < text.length ? '…' : '';
 		const body = text.slice(start, end);
-		// Re-find occurrences within the visible window, offset by the leading ellipsis.
-		const matches = findMatches(body, lowerQuery).map(m => ({
+		// Re-find occurrences within the visible window, offset by the leading ellipsis. Scanning
+		// the window rather than keeping every match keeps memory flat across a big result set.
+		const matches = findMatches(body, matcher).map(m => ({
 			start: m.start + prefix.length,
 			end: m.end + prefix.length
 		}));
@@ -559,7 +557,10 @@
 		console.log('========================================');
 		console.log('[QOL-Search] Query:', query);
 
-		const lowerQuery = query.toLowerCase();
+		const matcher = compileQuery(query);
+		if (matcher.regex) {
+			console.log('[QOL-Search] Regex mode:', matcher.regex.source);
+		}
 
 		// Load everything
 		const loadStart = performance.now();
@@ -575,11 +576,12 @@
 		const matches = [];
 
 		for (const entry of allMessages) {
-			const lowerText = entry.searchableText.toLowerCase();
-			const matchCount = (lowerText.match(new RegExp(lowerQuery, 'gi')) || []).length;
+			const textMatches = findMatches(entry.searchableText, matcher);
 
-			if (matchCount > 0) {
-				matches.push({ uuid: entry.uuid, matchCount });
+			if (textMatches.length > 0) {
+				// Only the first match is retained - it's all the snippet needs to centre itself,
+				// and holding every offset for every hit adds up fast on a common query.
+				matches.push({ uuid: entry.uuid, matchCount: textMatches.length, firstMatch: textMatches[0] });
 			}
 		}
 		const searchTime = performance.now() - searchStart;
@@ -592,14 +594,14 @@
 			const entry = messagesByUuid.get(match.uuid);
 
 			// title_matches must reference the ORIGINAL name, before we append the count suffix.
-			const titleMatches = findMatches(metadata.name, lowerQuery);
+			const titleMatches = findMatches(metadata.name, matcher);
 
 			return {
 				conversation: {
 					...metadata,
 					name: `${metadata.name} (${match.matchCount} match${match.matchCount > 1 ? 'es' : ''})`
 				},
-				matched_snippet: buildSnippet(entry ? entry.searchableText : '', lowerQuery),
+				matched_snippet: buildSnippet(entry ? entry.searchableText : '', match.firstMatch, matcher),
 				title_matches: titleMatches
 			};
 		});

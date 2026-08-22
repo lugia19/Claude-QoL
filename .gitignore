@@ -1,4 +1,5 @@
 manifest.json
+debug/
 userscripts/UNUSED-claude-tree.user.js
 web-ext-artifacts
 .vscode
@@ -11,3 +12,5 @@ icon_svgs/*
 promo_*
 screenshot_*
 nul
+*.swp
+*.swo

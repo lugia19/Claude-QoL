@@ -94,6 +94,40 @@ async function getPhantomMessages(conversationId) {
 	return result?.messages || null;
 }
 
+const ROOT_MESSAGE_UUID = "00000000-0000-4000-8000-000000000000";
+
+// Splice phantom (forked-in) messages onto the front of conversation data, the way the
+// page sees them. Rewiring the real root messages to hang off the last phantom is what
+// makes a parent-chain walk return the whole thing in order.
+//
+// `mutate: false` leaves the input untouched, which matters when the input is a cached
+// conversation payload — see ClaudeConversation.getRenderedMessages.
+function stitchPhantomMessages(data, phantomJson, { mutate = true } = {}) {
+	if (!phantomJson?.length) return data;
+
+	const lastPhantom = phantomJson[phantomJson.length - 1];
+	const isRoot = msg => msg.parent_message_uuid === ROOT_MESSAGE_UUID;
+
+	const realMessages = (data.chat_messages || []).map(msg => {
+		if (!isRoot(msg)) return msg;
+		const rewired = mutate ? msg : { ...msg };
+		rewired.parent_message_uuid = lastPhantom.uuid;
+		return rewired;
+	});
+
+	const chat_messages = [...phantomJson, ...realMessages];
+
+	if (!mutate) {
+		// Array order is all the copy's callers need. `index` is only meaningful for the
+		// page-facing payload, and rewriting it here would touch shared message objects.
+		return { ...data, chat_messages };
+	}
+
+	data.chat_messages = chat_messages;
+	data.chat_messages.forEach((msg, idx) => { msg.index = idx; });
+	return data;
+}
+
 async function clearPhantomMessages(conversationId) {
 	const clear = window.ClaudeSearchShared?.clearPhantomMessages;
 	if (clear) { await clear(conversationId); return; }
@@ -123,7 +157,8 @@ async function bustReactQueryCache() {
 bustReactQueryCache();
 
 // Shared streaming freshness check.
-// Fetches apiUrl, reads first ~8KB to find updated_at, compares with cachedEntry.
+// Fetches apiUrl, reads the conversation header (everything before "chat_messages") and
+// compares updated_at *and* current_leaf_message_uuid with cachedEntry.
 // Returns { data, fromCache } on success, null on failure.
 // fetchFn allows callers to pass in the real (unpatched) fetch.
 async function streamingFreshnessCheck(apiUrl, cachedEntry, fetchFn = fetch) {
@@ -133,28 +168,38 @@ async function streamingFreshnessCheck(apiUrl, cachedEntry, fetchFn = fetch) {
 	const reader = response.body.getReader();
 	const decoder = new TextDecoder();
 	let accumulated = '';
-	const MAX_BYTES = 8192;
+	// The header is normally ~1KB, but the settings blob (enabled_mcp_tools) can push it past
+	// 12KB. This cap is only a safety valve: overshoot it and we fall through to the full read.
+	const MAX_HEADER_BYTES = 131072;
 
 	try {
-		while (accumulated.length < MAX_BYTES) {
+		let chatMsgIdx = -1;
+		while (accumulated.length < MAX_HEADER_BYTES) {
 			const { done, value } = await reader.read();
 			if (done) break;
 			accumulated += decoder.decode(value, { stream: true });
 
-			const chatMsgIdx = accumulated.indexOf('"chat_messages"');
-			const searchRegion = chatMsgIdx !== -1 ? accumulated.substring(0, chatMsgIdx) : accumulated;
-			const match = searchRegion.match(/"updated_at"\s*:\s*"([^"]+)"/);
-			if (match) {
-				if (cachedEntry.updated_at >= match[1]) {
-					reader.cancel();
-					return { data: cachedEntry.data, fromCache: true };
-				}
-				break;
-			}
+			chatMsgIdx = accumulated.indexOf('"chat_messages"');
 			if (chatMsgIdx !== -1) break;
 		}
 
-		// Cache stale or updated_at not found — read remaining stream
+		if (chatMsgIdx !== -1) {
+			const header = accumulated.substring(0, chatMsgIdx);
+			const updatedAt = header.match(/"updated_at"\s*:\s*"([^"]+)"/)?.[1];
+			const leaf = header.match(/"current_leaf_message_uuid"\s*:\s*"([^"]+)"/)?.[1];
+
+			// The leaf has to match too. Switching branches does not bump updated_at, so a
+			// timestamp check on its own keeps serving whichever branch was selected when the
+			// entry was cached — which is the branch a linear export then walks.
+			if (updatedAt && leaf &&
+				cachedEntry.updated_at >= updatedAt &&
+				cachedEntry.data?.current_leaf_message_uuid === leaf) {
+				reader.cancel();
+				return { data: cachedEntry.data, fromCache: true };
+			}
+		}
+
+		// Cache stale, or the header didn't yield both fields — read remaining stream
 		const chunks = [accumulated];
 		while (true) {
 			const { done, value } = await reader.read();
@@ -466,8 +511,13 @@ class ClaudeConversation {
 	}
 
 	// Lazy load conversation data (always fetches full tree)
-	// Uses IndexedDB cache with streaming freshness check to avoid downloading large payloads
-	async getData(forceRefresh = false) {
+	// Uses IndexedDB cache with streaming freshness check to avoid downloading large payloads.
+	//
+	// freshnessHint is { updated_at, current_leaf_message_uuid } for this conversation as the
+	// server currently has it. chat_conversations_v2 carries both fields for every conversation
+	// in one response, so a caller working through a list already knows them and we can settle
+	// freshness locally instead of spending a request per conversation.
+	async getData(forceRefresh = false, freshnessHint = null) {
 		if (!this.created) {
 			return this.conversationData;
 		}
@@ -482,13 +532,23 @@ class ClaudeConversation {
 		if (!forceRefresh) {
 			try {
 				const cachedEntry = await _convCacheGet(this.conversationId);
-				console.log('Cache entry:', cachedEntry);
 				if (cachedEntry) {
-					const freshData = await this._streamingFreshnessCheck(apiUrl, cachedEntry);
-					if (freshData) {
-						this.conversationData = freshData;
-						this._syncAccountFeatureSettings();
-						return this.conversationData;
+					if (freshnessHint) {
+						if (cachedEntry.updated_at >= freshnessHint.updated_at &&
+							cachedEntry.data?.current_leaf_message_uuid === freshnessHint.current_leaf_message_uuid) {
+							this.lastGetDataFromCache = true;
+							this.conversationData = cachedEntry.data;
+							this._syncAccountFeatureSettings();
+							return this.conversationData;
+						}
+						// Hint says stale — no point checking again over the wire.
+					} else {
+						const freshData = await this._streamingFreshnessCheck(apiUrl, cachedEntry);
+						if (freshData) {
+							this.conversationData = freshData;
+							this._syncAccountFeatureSettings();
+							return this.conversationData;
+						}
 					}
 				}
 			} catch (e) {
@@ -524,22 +584,14 @@ class ClaudeConversation {
 		return result.data;
 	}
 
-	// Get messages - when tree=false, reconstructs the current trunk from full tree data
-	async getMessages(tree = false, forceRefresh = false) {
-		const data = await this.getData(forceRefresh);
+	// Reconstruct the current trunk from full tree data: walk from current leaf to root
+	_trunkFrom(data) {
 		const allMessages = data.chat_messages || [];
-
-		if (tree) {
-			return allMessages.map(msg => ClaudeMessage.fromHistoryJSON(this, msg));
-		}
-
-		// Reconstruct trunk: walk from current leaf to root
 		const messageMap = new Map(allMessages.map(msg => [msg.uuid, msg]));
-		const rootId = "00000000-0000-4000-8000-000000000000";
 		const trunk = [];
 		let currentId = data.current_leaf_message_uuid;
 
-		while (currentId && currentId !== rootId) {
+		while (currentId && currentId !== ROOT_MESSAGE_UUID) {
 			const msg = messageMap.get(currentId);
 			if (!msg) break;
 			trunk.push(msg);
@@ -548,6 +600,42 @@ class ClaudeConversation {
 
 		trunk.reverse();
 		return trunk.map(msg => ClaudeMessage.fromHistoryJSON(this, msg));
+	}
+
+	// Get messages - when tree=false, reconstructs the current trunk from full tree data.
+	// Never includes phantom messages: getData passes skip_uuid_injection=true, so the
+	// phantom interceptor leaves our own requests alone. Use getRenderedMessages() when you
+	// need the list the UI is actually showing.
+	async getMessages(tree = false, forceRefresh = false) {
+		const data = await this.getData(forceRefresh);
+
+		if (tree) {
+			return (data.chat_messages || []).map(msg => ClaudeMessage.fromHistoryJSON(this, msg));
+		}
+
+		return this._trunkFrom(data);
+	}
+
+	// The current branch as the UI renders it: phantom (forked-in) history first, then the
+	// real messages. Anything that has to line up with what's on screen — locating a row,
+	// counting positions — needs this rather than getMessages().
+	async getRenderedMessages(forceRefresh = false) {
+		const data = await this.getData(forceRefresh);
+
+		let phantoms = null;
+		try {
+			phantoms = await getPhantomMessages(this.conversationId);
+		} catch (error) {
+			console.error('[QOL-API] Failed to load phantom messages:', error);
+		}
+		if (!phantoms?.length) return this._trunkFrom(data);
+
+		// MAIN world hands back hydrated ClaudeMessages, ISOLATED raw history JSON.
+		const phantomJson = phantoms.map(msg => msg.toHistoryJSON ? msg.toHistoryJSON() : msg);
+
+		// Non-mutating: `data` is cached on this instance and in IndexedDB, and must stay
+		// phantom-free so getMessages() keeps returning the real branch.
+		return this._trunkFrom(stitchPhantomMessages(data, phantomJson, { mutate: false }));
 	}
 
 	// Find longest leaf from a message ID
@@ -1735,8 +1823,11 @@ class ClaudeProject {
 
 /**
  * Fetches account settings from the API.
- * WARNING: Only LIMITED settings are returned (artifacts, code execution).
- * To get complete settings, use conversation.getData().settings instead.
+ * Returns the full set of feature flags under `.settings` — this is the superset.
+ * conversation.getData().settings is only a ~10-key subset and is missing flags like
+ * enabled_melange entirely, so don't rely on it alone to detect enabled features.
+ * Note the conversation-level values still win where they exist: they're a snapshot of
+ * what the chat was created with, and a feature off at creation can't be enabled later.
  */
 async function getAccountSettings() {
 	const response = await fetch('/api/account');
@@ -1748,7 +1839,6 @@ async function getAccountSettings() {
 
 /**
  * Updates account settings via the API (PATCH).
- * Can modify ALL settings (not just the limited ones returned by getAccountSettings).
  * Changes are account-wide and affect all new conversations until changed again.
  * @param {Object} settings - Settings to update
  */
@@ -1968,6 +2058,7 @@ async function isLikelyTextFile(file) {
 }
 
 const CLAUDE_MODELS = [
+	{ value: 'claude-opus-5', label: 'Opus 5' },
 	{ value: 'claude-fable-5', label: 'Fable 5' },
 	{ value: 'claude-sonnet-5', label: 'Sonnet 5' },
 	{ value: 'claude-opus-4-8', label: 'Opus 4.8' },
@@ -1978,5 +2069,5 @@ const CLAUDE_MODELS = [
 	{ value: 'claude-3-opus-20240229', label: 'Opus 3' },
 ]
 
-const DEFAULT_CLAUDE_MODEL = 'claude-opus-4-8';
+const DEFAULT_CLAUDE_MODEL = 'claude-opus-5';
 const FAST_MODEL = 'claude-haiku-4-5-20251001';

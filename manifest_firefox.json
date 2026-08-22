@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "Claude QoL - Export, Fork, Search, and more",
-	"version": "2.8.1",
+	"version": "2.8.9",
 	"description": "Collection of Claude enhancements: Exporting/Importing chats, Forking, Text Search, Bookmarks, TTS, and more.",
 	"permissions": [
 		"storage"
@@ -86,7 +86,7 @@
 	},
 	"action": {
 		"default_icon": "icon128.png",
-		"default_title": "Claude Toolbox - Support development"
+		"default_title": "Claude QoL - Support development"
 	},
 	"web_accessible_resources": [
 		{

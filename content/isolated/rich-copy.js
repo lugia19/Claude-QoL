@@ -17,7 +17,7 @@
 
 		for (const btn of copyButtons) {
 			if (btn.dataset.testid === 'action-bar-copy') continue;
-			if (btn.closest('[role="group"][aria-label="Message actions"]')) continue;
+			if (btn.closest('[role="toolbar"][aria-label="Message actions"], [role="group"][aria-label="Message actions"]')) continue;
 			if (btn.nextElementSibling?.classList.contains(RICH_COPY_CLASS)) continue;
 
 			results.push(btn);

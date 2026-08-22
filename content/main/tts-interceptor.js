@@ -59,6 +59,17 @@
 
 		// Intercept completion requests
 		if (url && (url.includes('/completion') || url.includes('/retry_completion')) && config?.method === 'POST') {
+			// DIAGNOSTIC kill-switch: set localStorage['claude_qol_tts_noclone']='1' to skip the
+			// TTS response.clone()+background read. Teeing the completion body and draining the
+			// clone in a tight loop can make Claude's renderer receive data in bursts (streaming
+			// jank). This lets us confirm that live with no rebuild.
+			try {
+				if (localStorage.getItem('claude_qol_tts_noclone') === '1') {
+					console.log('[QOL-DIAG] TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
+					return originalFetch(...args);
+				}
+			} catch (e) { /* ignore */ }
+
 			// Extract org ID and conversation ID from URL
 			const urlParts = url.split('/');
 			const orgIndex = urlParts.indexOf('organizations');

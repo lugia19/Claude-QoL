@@ -68,6 +68,59 @@
                 },
                 hard_limit: 190000
             }
+        },
+        {
+            // No legacy bootstrap entry — 4.6 only ever shipped in the new shape.
+            selector: {
+                id: 'claude-opus-4-6',
+                name: 'Opus 4.6',
+                short_name: 'Opus',
+                notice_text: 'Opus consumes usage limits faster than other models',
+                section: TARGET_SECTION,
+                capabilities: {
+                    compass: true,
+                    gsuite_tools: true,
+                    mm_images: true,
+                    mm_pdf: true,
+                    web_search: true
+                },
+                thinking: {
+                    type: 'effort_and_mode',
+                    description: 'Higher effort means more thorough responses, but takes longer and uses your limits faster.',
+                    effort_options: [
+                        { id: 'low', name: 'Low', description: 'Quick replies to simple questions' },
+                        {
+                            id: 'medium',
+                            name: 'Medium',
+                            description: 'Balanced for everyday work',
+                            recommended: true,
+                            badge: { message: 'Default', variant: 'neutral' }
+                        },
+                        { id: 'high', name: 'High', description: 'Complex, detailed work' },
+                        {
+                            id: 'max',
+                            name: 'Max',
+                            description: 'The hardest problems. Takes longest.',
+                            tooltip: {
+                                content: 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.'
+                            }
+                        }
+                    ],
+                    mode_options: [
+                        { id: 'extended', name: 'Extended', description: 'Always uses deep reasoning' },
+                        { id: 'off', name: 'Off' }
+                    ]
+                },
+                hard_limit: 449000,
+                supports_fast_mode: true,
+                voice_model: 'claude-opus-4-8',
+                notice: {
+                    title: null,
+                    text: 'Opus consumes usage limits faster than other models',
+                    cta: null,
+                    is_dismissible: false
+                }
+            }
         }
     ];
 
@@ -79,6 +132,7 @@
             if (!Array.isArray(config)) continue;
             for (const extra of EXTRA_MODELS) {
                 const entry = extra.bootstrap;
+                if (!entry) continue;
                 const existing = config.find(e => e.model === entry.model);
                 if (existing) {
                     existing.inactive = false;

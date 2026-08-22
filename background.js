@@ -15,7 +15,8 @@ if (chrome.action) {
 // storage.googleapis.com signed URLs — those are CORS-blocked from the page but allowed here via
 // host_permissions — fetching the manifest JSON and unzipping each batch ZIP with JSZip.
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-	// Fetch a (CORS-restricted) GCS signed URL and return the parsed manifest JSON.
+	// Fetch a (CORS-restricted) GCS signed URL and report what came back: either the parsed
+	// manifest JSON, or a flag saying the URL is the export archive itself.
 	if (message.type === 'GDPR_FETCH_MANIFEST') {
 		(async () => {
 			try {
@@ -23,8 +24,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 				if (!response.ok) {
 					throw new Error(`Manifest download failed: ${response.status}`);
 				}
-				const manifest = JSON.parse(await response.text());
-				sendResponse({ success: true, manifest });
+
+				const reader = response.body.getReader();
+				const chunks = [];
+				const first = await reader.read();
+				if (first.value) chunks.push(first.value);
+
+				// Peek into the response to check whether we got a ZIP as a response instead of
+				// JSON. 'PK\x03\x04' is the local file header every ZIP starts with.
+				const head = first.value || new Uint8Array();
+				if (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) {
+					await reader.cancel();
+					console.log('[Background] Export URL resolved to a ZIP, not a manifest');
+					sendResponse({ success: true, isZip: true });
+					return;
+				}
+
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					chunks.push(value);
+				}
+
+				const total = chunks.reduce((n, c) => n + c.length, 0);
+				const joined = new Uint8Array(total);
+				let offset = 0;
+				for (const c of chunks) { joined.set(c, offset); offset += c.length; }
+				const text = new TextDecoder().decode(joined);
+
+				try {
+					sendResponse({ success: true, manifest: JSON.parse(text) });
+				} catch (parseError) {
+					throw new Error(`Manifest is not JSON nor ZIP (${parseError.message}); response began: ${text.slice(0, 120)}`);
+				}
 			} catch (error) {
 				console.error('[Background] Manifest fetch failed:', error);
 				sendResponse({ success: false, error: error.message });
@@ -49,9 +81,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 						throw new Error(`Batch ${i} download failed: ${zipResponse.status}`);
 					}
 					const zip = await JSZip.loadAsync(await zipResponse.arrayBuffer());
-					const conversationsFile = zip.file('conversations.json');
+					// Matched by pattern rather than by exact name: a batch archive has it at the
+					// root, a whole-account export nests it under a directory.
+					const conversationsFile = zip.file(/(^|\/)conversations\.json$/i)[0];
 					if (!conversationsFile) {
-						throw new Error(`conversations.json not found in batch ${i}`);
+						const names = Object.keys(zip.files).slice(0, 10).join(', ');
+						throw new Error(`conversations.json not found in batch ${i} (archive contains: ${names || 'nothing'})`);
 					}
 					const batch = JSON.parse(await conversationsFile.async('text'));
 					conversations.push(...batch);

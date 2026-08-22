@@ -209,13 +209,18 @@
 			row.style.borderColor = '#0084ff';
 		}
 
+		// Apply on the whole row, not just the label: LIST_ITEM already paints the row as clickable
+		// (p-3, hover highlight, cursor-pointer), so a click landing on the padding or on the space
+		// beside the text has to count. The Edit/Delete buttons stop propagation below.
+		if (onApply) {
+			row.onclick = onApply;
+		} else {
+			row.style.cursor = 'default';
+		}
+
 		const nameSpan = document.createElement('span');
 		nameSpan.className = 'flex-1 text-sm';
 		nameSpan.textContent = name;
-		if (onApply) {
-			nameSpan.style.cursor = 'pointer';
-			nameSpan.onclick = onApply;
-		}
 		row.appendChild(nameSpan);
 
 		if (onEdit) {

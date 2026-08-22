@@ -1,2 +1,2 @@
-Added copying exports to clipboard
-Added mid-stream image injection to make it more responsive
+Fixed buttons to match new UI
+Fixed HTML export bugs

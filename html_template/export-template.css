@@ -508,6 +508,77 @@ pre.thinking-content {
 	color: hsl(var(--text-400))
 }
 
+/* ── Tool call blocks ── */
+details.tool-block {
+	margin-bottom: 8px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	border: 1px solid hsl(var(--border-400) / 15%)
+}
+
+details.tool-block summary {
+	cursor: pointer;
+	font-size: 0.85rem;
+	color: hsl(var(--text-500));
+	font-family: anthropicSans, system-ui, sans-serif;
+	font-weight: 430
+}
+
+details.tool-block .tool-name {
+	font-family: jetbrains, ui-monospace, monospace;
+	font-size: 0.78em;
+	opacity: 0.6;
+	margin-left: 6px
+}
+
+details.tool-block .tool-failed {
+	color: hsl(var(--danger-000));
+	font-size: 0.78em;
+	margin-left: 6px
+}
+
+details.tool-block.tool-error {
+	border-color: hsl(var(--danger-000) / 40%)
+}
+
+pre.tool-args,
+pre.tool-output {
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	font-family: jetbrains, ui-monospace, monospace;
+	font-size: 0.8rem;
+	margin: 8px 0 4px;
+	color: hsl(var(--text-400))
+}
+
+.tool-empty {
+	font-size: 0.8rem;
+	font-style: italic;
+	margin: 8px 0 4px;
+	color: hsl(var(--text-400))
+}
+
+ul.tool-sources {
+	margin: 8px 0 4px;
+	padding-left: 1.2em;
+	font-size: 0.85rem
+}
+
+ul.tool-sources li {
+	margin: 3px 0
+}
+
+ul.tool-sources .tool-source-site {
+	color: hsl(var(--text-400));
+	font-size: 0.85em;
+	margin-left: 6px
+}
+
+/* Generated images sit outside the collapsed block, on their own line */
+img.tool-image {
+	display: block
+}
+
 /* ── Theme toggle ── */
 #theme-toggle {
 	position: fixed;

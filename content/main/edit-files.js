@@ -6,6 +6,10 @@
 
 	let pendingEditData = null;
 
+	// True from the moment the advanced edit button is clicked until the session ends,
+	// so a second click can't start a competing edit.
+	let editSessionActive = false;
+
 	// Working message for the current edit session
 	let editMessage = null;
 	// Map DOM elements to file instances for tracking
@@ -32,19 +36,41 @@
 		return btn;
 	}
 
+	function messageUuidOf(element) {
+		let el = element;
+		while (el && !el.hasAttribute('data-message-uuid')) el = el.parentElement;
+		return el?.getAttribute('data-message-uuid') ?? null;
+	}
+
+	// User messages carry no uuid of their own, so identify the clicked one through
+	// the assistant message next to it. Pairing the two selector lists by array
+	// index does NOT work: the list is virtualized, so the rendered window is an
+	// arbitrary slice that can start with either sender.
 	function findExistingMessage(controlsContainer, messages) {
 		const { userMessages, assistantMessages } = getUIMessages();
-		const userIndex = userMessages.findIndex(msg => findMessageControls(msg) === controlsContainer);
-		if (userIndex === -1 || userIndex >= assistantMessages.length) return null;
+		const userElement = userMessages.find(msg => findMessageControls(msg) === controlsContainer);
+		if (!userElement) return null;
 
-		let el = assistantMessages[userIndex];
-		while (el && !el.hasAttribute('data-message-uuid')) el = el.parentElement;
-		const assistantUuid = el?.getAttribute('data-message-uuid');
-		if (!assistantUuid) return null;
+		// The reply below it: its parent_message_uuid is the message we want.
+		const reply = assistantMessages.find(el =>
+			userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+		if (reply && areMessagesAdjacent(userElement, reply)) {
+			const apiReply = messages.find(m => m.uuid === messageUuidOf(reply));
+			const existing = apiReply && messages.find(m => m.uuid === apiReply.parent_message_uuid);
+			if (existing) return existing;
+		}
 
-		const apiAssistant = messages.find(m => m.uuid === assistantUuid);
-		if (!apiAssistant) return null;
-		return messages.find(m => m.uuid === apiAssistant.parent_message_uuid);
+		// The window can end on a user message, in which case the "next" assistant
+		// element is the pinned tail of the conversation rather than the reply.
+		// Fall back to the message above and take its child on this branch.
+		const preceding = assistantMessages.filter(el =>
+			userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING).pop();
+		if (preceding && areMessagesAdjacent(preceding, userElement)) {
+			const parentUuid = messageUuidOf(preceding);
+			if (parentUuid) return messages.find(m => m.parent_message_uuid === parentUuid && m.sender === 'human');
+		}
+
+		return null;
 	}
 
 	function insertAdvancedEditButton(button, controlsContainer) {
@@ -73,6 +99,14 @@
 			e.preventDefault();
 			e.stopPropagation();
 
+			if (editSessionActive) return;
+			editSessionActive = true;
+
+			// Fetching the conversation takes a moment; the modal both tells the user
+			// something is happening and blocks a second click on the button.
+			const loadingModal = createLoadingModal('Loading message...');
+			loadingModal.show();
+
 			try {
 				const orgId = getOrgId();
 				const conversationId = getConversationId();
@@ -81,10 +115,12 @@
 
 				const existingMessage = findExistingMessage(controlsContainer, messages);
 				if (!existingMessage) {
+					loadingModal.destroy();
 					showClaudeAlert('Error', 'Could not find the message to edit.');
 					return;
 				}
 
+				loadingModal.destroy();
 				await createEditModal(orgId, conversationId, existingMessage);
 
 				pendingEditData = {};
@@ -96,6 +132,9 @@
 				} else {
 					console.error('Advanced edit error:', error);
 				}
+			} finally {
+				loadingModal.destroy();
+				editSessionActive = false;
 			}
 		};
 
@@ -113,34 +152,50 @@
 		}
 	}
 
-	function autoSubmitEditWithText(newText) {
+	// The native edit UI is no longer a <form> with a submit button: it swaps the
+	// message body for a bare textarea and the message toolbar for [Cancel, Save].
+	function findNativeEditControls() {
+		const textarea = document.querySelector('textarea[aria-label="Edit message"]');
+		const row = textarea?.closest('[data-cds="UserMessage"]');
+		if (!row) return null;
+
+		// Neither button carries an aria-label or a type we can key off, but Save is
+		// always the confirming one at the end of the pair.
+		const buttons = row.querySelectorAll('button');
+		if (buttons.length < 2) return null;
+
+		return { textarea, saveButton: buttons[buttons.length - 1] };
+	}
+
+	// Give up after ~5s rather than retrying forever: a stuck pendingEditData would
+	// hijack the next unrelated completion request.
+	const AUTO_SUBMIT_MAX_ATTEMPTS = 100;
+
+	function autoSubmitEditWithText(newText, attempt = 0) {
 		if (!pendingEditData) return;
 
-		const saveButton = document.querySelector('button[type="submit"]');
-		if (saveButton) {
-			const form = saveButton.closest('form');
-			if (!form) {
-				setTimeout(() => autoSubmitEditWithText(newText), 50);
+		const controls = findNativeEditControls();
+		if (!controls) {
+			if (attempt >= AUTO_SUBMIT_MAX_ATTEMPTS) {
+				console.error('Advanced edit: never found the native edit textarea, aborting');
+				pendingEditData = null;
+				cleanupEditState();
+				showClaudeAlert('Error', 'Could not open the message editor. The claude.ai UI may have changed.');
 				return;
 			}
-
-			const textarea = form.querySelector('textarea');
-			if (!textarea) {
-				setTimeout(() => autoSubmitEditWithText(newText), 50);
-				return;
-			}
-
-			textarea.focus();
-			textarea.select();
-			// Always append a space to guarantee the UI detects a change — the fetch interceptor overwrites the text anyway
-			document.execCommand('insertText', false, newText + ' ');
-
-			setTimeout(() => {
-				saveButton.click();
-			}, 100);
-		} else {
-			setTimeout(() => autoSubmitEditWithText(newText), 50);
+			setTimeout(() => autoSubmitEditWithText(newText, attempt + 1), 50);
+			return;
 		}
+
+		const { textarea, saveButton } = controls;
+		textarea.focus();
+		textarea.select();
+		// Always append a space to guarantee the UI detects a change — the fetch interceptor overwrites the text anyway
+		document.execCommand('insertText', false, newText + ' ');
+
+		setTimeout(() => {
+			saveButton.click();
+		}, 100);
 	}
 	//#endregion
 

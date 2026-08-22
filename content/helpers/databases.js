@@ -36,6 +36,64 @@
 			.trim();
 	};
 
+	// ======== QUERY MATCHING ========
+	// A query wrapped in slashes (`/pattern/`) is treated as a case-insensitive regex, everything
+	// else is scanned literally. Slashes are the only in-band syntax available to us - global search
+	// runs inside claude.ai's own search box, so there's nowhere to put a "regex" toggle.
+	// Anything trailing the closing slash means "not regex", so `/foo/i` searches for that literally.
+	window.ClaudeSearchShared.compileQuery = function (query) {
+		const literal = { regex: null, lower: (query || '').toLowerCase() };
+		if (!query || query.length <= 2) return literal;
+		if (!query.startsWith('/') || !query.endsWith('/')) return literal;
+
+		try {
+			// 'm' so ^ and $ anchor to lines rather than to the whole conversation blob, which is
+			// what anyone typing ^ in a search box means.
+			return { regex: new RegExp(query.slice(1, -1), 'gim'), lower: null };
+		} catch {
+			// Half-typed or invalid pattern - fall back to a literal search rather than throwing.
+			// Throwing here is what made the old code silently drop to title-only results.
+			return literal;
+		}
+	};
+
+	// Max matches counted in a single text, so a pattern like /\s/ can't pile up a million
+	// offset objects per conversation across the whole corpus.
+	const MAX_MATCHES_PER_TEXT = 10000;
+
+	// All occurrences of `matcher` within `text`, as {start, end} offsets.
+	window.ClaudeSearchShared.findMatches = function (text, matcher) {
+		if (!text || !matcher) return [];
+		const out = [];
+
+		if (matcher.regex) {
+			// The compiled regex is stateful and gets reused across every conversation in a search.
+			matcher.regex.lastIndex = 0;
+			let m;
+			while ((m = matcher.regex.exec(text)) !== null) {
+				if (m[0].length > 0) {
+					out.push({ start: m.index, end: m.index + m[0].length });
+					if (out.length >= MAX_MATCHES_PER_TEXT) break;
+				}
+				// Zero-width matches (/x*/, /(?:)/) never advance lastIndex on their own.
+				if (m.index === matcher.regex.lastIndex) matcher.regex.lastIndex++;
+			}
+			return out;
+		}
+
+		if (!matcher.lower) return [];
+		const lowerText = text.toLowerCase();
+		let from = 0;
+		while (true) {
+			const i = lowerText.indexOf(matcher.lower, from);
+			if (i === -1) break;
+			out.push({ start: i, end: i + matcher.lower.length });
+			if (out.length >= MAX_MATCHES_PER_TEXT) break;
+			from = i + matcher.lower.length;
+		}
+		return out;
+	};
+
 	window.ClaudeSearchShared.fuzzyMatch = function (searchText, targetText) {
 		// Get words from search text (ignore very short words)
 		const searchWords = searchText
@@ -299,6 +357,13 @@
 				await db.messages.delete(conversationId);
 				return null;
 			}
+		}
+
+		// Which conversations have message text stored. The keys of `messages` are conversation
+		// uuids, one row per conversation, so this answers the existence question without reading
+		// (and decrypting) a single value.
+		async getAllConversationIdsWithMessages() {
+			return await db.messages.toCollection().primaryKeys();
 		}
 
 		async getAllMessages() {

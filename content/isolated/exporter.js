@@ -11,13 +11,13 @@
 			apiName: "human",
 			exportDelimiter: "User",
 			librechatName: "User",
-			jsonlName: "user"
+			tavernName: "User"
 		},
 		ASSISTANT: {
 			apiName: "assistant",
 			exportDelimiter: "Assistant",
 			librechatName: "Claude",
-			jsonlName: "assistant"
+			tavernName: "Claude"
 		}
 	};
 	const EXPORT_TAG_PREFIX = 'CLEXP:';
@@ -30,6 +30,15 @@
 		const lastDot = filename.lastIndexOf('.');
 		if (lastDot === -1) return `${filename}-${uuid}`;
 		return `${filename.substring(0, lastDot)}-${uuid}${filename.substring(lastDot)}`;
+	}
+
+	// Replicates SillyTavern's own humanizedDateTime(): YYYY-MM-DD@HHhMMmSSsMSms, local time.
+	function humanizedDateTime(timestamp) {
+		const parsed = timestamp ? new Date(timestamp) : new Date();
+		const date = isNaN(parsed.getTime()) ? new Date() : parsed;
+		const pad = (value, length = 2) => String(value).padStart(length, '0');
+		return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+			`@${pad(date.getHours())}h${pad(date.getMinutes())}m${pad(date.getSeconds())}s${pad(date.getMilliseconds(), 3)}ms`;
 	}
 
 	//#region Export format handlers
@@ -125,18 +134,213 @@
 		return output;
 	}
 
+	// SillyTavern chat file: JSONL, first line a header, one message per line after it.
+	// Field names follow SillyTavern's own writer. Its importer copies the file verbatim into the
+	// character's chat folder, so the shape has to be right on the way out - it only checks that the
+	// header carries user_name, name or chat_metadata, and rejects the file outright otherwise.
+	// No BOM either: it runs JSON.parse on the first line, which throws on a leading U+FEFF.
 	function formatJsonlExport(conversationData, messages, conversationId) {
-		// Simple JSONL - just role and text
-		return messages.map(msg => {
-			return JSON.stringify({
-				role: msg.sender === ROLES.USER.apiName ? ROLES.USER.jsonlName : ROLES.ASSISTANT.jsonlName,
-				content: ClaudeConversation.extractMessageText(msg)
-			});
-		}).join('\n');
+		const header = {
+			user_name: ROLES.USER.tavernName,
+			character_name: ROLES.ASSISTANT.tavernName,
+			create_date: humanizedDateTime(conversationData.created_at),
+			chat_metadata: {}
+		};
+
+		const lines = messages.map(msg => {
+			const isUser = msg.sender === ROLES.USER.apiName;
+			const text = ClaudeConversation.extractMessageText(msg);
+
+			// Always carried: SillyTavern renders extra.reasoning as a collapsed block separate from
+			// the message body, so it costs nothing the way inlined thinking does in markdown.
+			const extra = {};
+			const reasoning = msg.content
+				.filter(c => c.type === 'thinking')
+				.map(c => c.thinking || '')
+				.filter(Boolean)
+				.join('\n');
+			if (reasoning) {
+				extra.reasoning = reasoning;
+				extra.reasoning_type = 'model';
+			}
+
+			const isoTimestamp = msg.created_at || msg.updated_at;
+			const sendDate = isoTimestamp ? new Date(isoTimestamp) : new Date();
+
+			return {
+				name: isUser ? ROLES.USER.tavernName : ROLES.ASSISTANT.tavernName,
+				is_user: isUser,
+				is_system: false,
+				send_date: (isNaN(sendDate.getTime()) ? new Date() : sendDate).toISOString(),
+				mes: text,
+				// A SillyTavern swipe is alternate text for one message, not a branch: the messages
+				// after it stay put. Our regenerations are real subtrees, so they cannot round-trip
+				// as swipes; we export the same single path the other formats do.
+				swipe_id: 0,
+				swipes: [text],
+				extra
+			};
+		});
+
+		return [header, ...lines].map(entry => JSON.stringify(entry)).join('\n') + '\n';
 	}
 
-	function formatLibrechatExport(conversationData, messages, conversationId) {
-		const processedMessages = messages.map((msg) => {
+	//#region Tool call helpers (shared by the LibreChat and HTML exports)
+
+	// Claude emits a tool_use and its tool_result as sibling blocks in the same message, so results
+	// pair up by id without having to look at neighbouring messages.
+	function mapToolResultsById(content) {
+		const byId = new Map();
+		for (const item of content || []) {
+			if (item.type === 'tool_result' && item.tool_use_id) {
+				byId.set(item.tool_use_id, item);
+			}
+		}
+		return byId;
+	}
+
+	function blobToDataUri(blob) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onloadend = () => resolve(reader.result);
+			reader.onerror = () => reject(reader.error || new Error('Failed to read blob'));
+			reader.readAsDataURL(blob);
+		});
+	}
+
+	// Resolves to null rather than throwing — callers treat unknown dimensions as "not renderable"
+	// instead of failing the whole export.
+	function getImageSize(blob) {
+		return new Promise((resolve) => {
+			const url = URL.createObjectURL(blob);
+			const img = new Image();
+			img.onload = () => {
+				const size = { width: img.naturalWidth, height: img.naturalHeight };
+				URL.revokeObjectURL(url);
+				resolve(size.width && size.height ? size : null);
+			};
+			img.onerror = () => {
+				URL.revokeObjectURL(url);
+				resolve(null);
+			};
+			img.src = url;
+		});
+	}
+
+	// Tool-generated images never appear in msg.files (that only carries user uploads), so the
+	// file_uuid on the tool_result is the only handle we get. /preview is the sole endpoint that
+	// serves them — the bare file URL and the usual /document, /content and /download variants all
+	// 404 — and it re-encodes to webp regardless of what the tool originally produced, so callers
+	// should trust the returned mimeType over any filename the tool declared.
+	async function downloadGeneratedImage(orgId, fileUuid) {
+		const file = new ClaudeFile({
+			file_uuid: fileUuid,
+			file_name: fileUuid,
+			file_kind: 'image',
+			preview_url: `https://claude.ai/api/${orgId}/files/${fileUuid}/preview`
+		});
+
+		const blob = await file.download();
+		if (!blob) return null;
+
+		return {
+			blob,
+			mimeType: (blob.type || '').split(';')[0].trim(),
+			dataUri: await blobToDataUri(blob),
+			size: await getImageSize(blob)
+		};
+	}
+	//#endregion
+
+	//#region LibreChat tool calls
+
+	// LibreChat hard-codes these tool names to purpose-built renderers that read from their own
+	// context/schema instead of the tool call's `output` string (see Part.tsx). A Claude tool that
+	// happens to share a name would render as an empty card, so it gets suffixed instead.
+	const LIBRECHAT_RESERVED_TOOL_NAMES = new Set([
+		'web_search', 'bash_tool', 'read_file', 'create_file', 'edit_file',
+		'file_search', 'retrieval', 'skill', 'subagent', 'execute_code'
+	]);
+
+	// Model providers conventionally constrain tool names to [A-Za-z0-9_-], and Claude's MCP server
+	// names can carry spaces and parens ("ComfyUI (Remote)"). Collapse each RUN of anything else to
+	// a single '-'; collapsing rather than substituting per character matters because LibreChat
+	// rewrites '---' to '.' when it renders the server name, and a per-character swap would emit
+	// that run for a name like "ComfyUI (Remote)".
+	function normalizeToolNamePart(part) {
+		return part.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+	}
+
+	// LibreChat names MCP tools `${tool}_mcp_${server}` (its mcp_delimiter is '_mcp_'); Claude names
+	// them `Server:tool`. Translating gets us LibreChat's MCP chip and server icon, and the result
+	// can never collide with the reserved names above.
+	function toLibrechatToolName(name) {
+		const sep = name.indexOf(':');
+		if (sep > 0 && sep < name.length - 1) {
+			return `${normalizeToolNamePart(name.slice(sep + 1))}_mcp_${normalizeToolNamePart(name.slice(0, sep))}`;
+		}
+		const normalized = normalizeToolNamePart(name);
+		return LIBRECHAT_RESERVED_TOOL_NAMES.has(normalized) ? `${normalized}_claude` : normalized;
+	}
+
+	// Claude stores web_search/web_fetch results as `knowledge` stubs — title, url and favicon
+	// metadata, but never the retrieved page text — so there is nothing faithful to export for them.
+	// Gating on the content types we can actually represent (rather than a tool-name blocklist)
+	// drops those automatically and degrades correctly for tools we haven't seen yet.
+	function isExportableToolResult(result) {
+		return (result?.content || []).some(item => item.type === 'text' || item.type === 'image');
+	}
+
+	// LibreChat only renders an image inline when its filename carries one of these extensions
+	// (its imageExtRegex). Anything outside the set degrades to a download chip no matter what we
+	// do, so an unexpected format is better skipped than mislabelled.
+	const LIBRECHAT_IMAGE_EXTENSIONS = {
+		'image/jpeg': 'jpg',
+		'image/png': 'png',
+		'image/gif': 'gif',
+		'image/webp': 'webp',
+		'image/heic': 'heic',
+		'image/heif': 'heif'
+	};
+
+	// The filename is derived from the bytes we actually received rather than any name the tool
+	// declared, since /preview re-encodes (see downloadGeneratedImage).
+	async function buildGeneratedImageAttachment(orgId, fileUuid, toolCallId, messageId, conversationId) {
+		const image = await downloadGeneratedImage(orgId, fileUuid);
+		if (!image) return null;
+
+		// LibreChat needs the filename extension, width, height and filepath ALL present to render
+		// an attachment inline (isImageAttachment); missing any one silently degrades it to a
+		// download chip, so bail out rather than emit a half-populated attachment.
+		const extension = LIBRECHAT_IMAGE_EXTENSIONS[image.mimeType];
+		if (!extension || !image.size) return null;
+
+		return {
+			file_id: fileUuid,
+			filename: `${fileUuid}.${extension}`,
+			filepath: image.dataUri,
+			type: image.mimeType,
+			width: image.size.width,
+			height: image.size.height,
+			bytes: image.blob.size,
+			source: 'local',
+			object: 'file',
+			context: 'image_generation',
+			toolCallId,
+			messageId,
+			conversationId
+		};
+	}
+	//#endregion
+
+	async function formatLibrechatExport(conversationData, messages, conversationId, options = {}, loadingModal = null) {
+		const includeImages = options.includeImages ?? false;
+		// Only needed to build preview URLs; skip the lookup entirely when images are off.
+		const orgId = includeImages ? getOrgId() : null;
+		let imagesDownloaded = 0;
+
+		const processedMessages = [];
+		for (const msg of messages) {
 			// Convert attachments to LibreChat file format
 			const files = [];
 			let attachmentText = '';
@@ -166,8 +370,11 @@
 				}
 			}
 
-			// Build content array with only think and text types
+			const toolResultsById = mapToolResultsById(msg.content);
+
+			// Build content array: think, text, and exportable tool calls
 			const content = [];
+			const imageAttachments = [];
 			for (const item of msg.content) {
 				if (item.type === 'thinking') {
 					content.push({
@@ -179,8 +386,48 @@
 						type: 'text',
 						text: item.text || ''
 					});
+				} else if (item.type === 'tool_use') {
+					// A tool_use with no result (interrupted generation) has nothing to show, and
+					// one whose result we can't represent is dropped wholesale — see
+					// isExportableToolResult.
+					const result = toolResultsById.get(item.id);
+					if (!result || !isExportableToolResult(result)) continue;
+
+					content.push({
+						type: 'tool_call',
+						tool_call: {
+							id: item.id,
+							name: toLibrechatToolName(item.name || ''),
+							args: JSON.stringify(item.input ?? {}),
+							type: 'tool_call',
+							progress: 1,
+							output: (result.content || [])
+								.filter(c => c.type === 'text')
+								.map(c => c.text || '')
+								.join('\n')
+						}
+					});
+
+					if (!includeImages || !orgId) continue;
+					for (const resultItem of result.content || []) {
+						if (resultItem.type !== 'image' || !resultItem.file_uuid) continue;
+						// Sequential with a short gap, matching the HTML export's file downloads,
+						// so a bulk export doesn't trip rate limiting.
+						if (imagesDownloaded > 0) await new Promise(r => setTimeout(r, 200));
+						imagesDownloaded++;
+						loadingModal?.setContent(createLoadingContent(`Downloading generated image ${imagesDownloaded}...`));
+						try {
+							const attachment = await buildGeneratedImageAttachment(
+								orgId, resultItem.file_uuid, item.id, msg.uuid, conversationId
+							);
+							if (attachment) imageAttachments.push(attachment);
+						} catch (e) {
+							// An image that won't download shouldn't sink the whole export.
+							console.error('[Exporter] Failed to embed generated image:', e);
+						}
+					}
 				}
-				// Skip all other types (tool_use, tool_result, etc.)
+				// Skip everything else (tool_result is consumed above)
 			}
 
 
@@ -212,8 +459,12 @@
 				message.files = files;
 			}
 
-			return message;
-		});
+			if (imageAttachments.length > 0) {
+				message.attachments = imageAttachments;
+			}
+
+			processedMessages.push(message);
+		}
 
 		return JSON.stringify({
 			title: conversationData.name,
@@ -260,11 +511,16 @@
 	let _templateCache = null;
 
 	async function extractFontDataUris() {
+		// Family names are compared with every non-alphanumeric character stripped, so
+		// both "Anthropic Sans" and "anthropic-sans" normalise to anthropicsans.
+		// claude.ai renamed these families from spaced to hyphenated; matching on
+		// letters/digits only keeps us working across either spelling.
 		const FONT_KEYS = {
 			'anthropicsans/normal': '{{FONT_SANS_NORMAL}}',
 			'anthropicsans/italic': '{{FONT_SANS_ITALIC}}',
 			'anthropicserif/normal': '{{FONT_SERIF_NORMAL}}',
 			'anthropicserif/italic': '{{FONT_SERIF_ITALIC}}',
+			'anthropicmono/normal': '{{FONT_MONO}}',
 			'jetbrains/normal': '{{FONT_MONO}}'
 		};
 
@@ -290,7 +546,7 @@
 					const urlMatch = block.match(urlRegex);
 					if (!familyMatch || !urlMatch) continue;
 
-					const family = familyMatch[1].trim().toLowerCase();
+					const family = familyMatch[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 					const style = (styleMatch && styleMatch[1]) || 'normal';
 					const key = family + '/' + style;
 					const placeholder = FONT_KEYS[key];
@@ -325,28 +581,100 @@
 		// Embed fonts as data URIs
 		const fontMap = await extractFontDataUris();
 		let processedCss = css;
-		for (const [originalUrl, dataUri] of fontMap) {
-			processedCss = processedCss.replaceAll(originalUrl, dataUri);
+		for (const [placeholder, dataUri] of fontMap) {
+			// Function replacement, not a string: see the note on the template assembly
+			// below. Base64 payloads can contain $& and would otherwise self-splice.
+			processedCss = processedCss.replaceAll(placeholder, () => dataUri);
+		}
+
+		// Any placeholder we couldn't resolve (claude.ai renamed a family, moved the
+		// stylesheet, etc.) would otherwise ship as a literal url("{{FONT_...}}").
+		// Drop those @font-face blocks so the export falls back to the system stack
+		// declared alongside each family instead of emitting broken CSS.
+		const unresolved = processedCss.match(/\{\{FONT_[A-Z_]+\}\}/g);
+		if (unresolved) {
+			console.warn('Export: could not embed fonts', [...new Set(unresolved)].join(', '));
+			processedCss = processedCss.replace(/@font-face\s*\{[^{}]*\{\{FONT_[A-Z_]+\}\}[^{}]*\}\s*/g, '');
 		}
 
 		_templateCache = EXPORT_SCAFFOLD
-			.replace('{{STYLESHEET}}', processedCss)
-			.replace('{{SCRIPT}}', js);
+			.replace('{{STYLESHEET}}', () => processedCss)
+			.replace('{{SCRIPT}}', () => js);
 
 		return _templateCache;
 	}
 
 	const _escEl = document.createElement('span');
 	function esc(str) {
+		// textContent -> innerHTML escapes & < > but NOT the double quote, and we
+		// interpolate this into attributes (alt, download, href). A filename or search
+		// result title containing a quote would otherwise close the attribute early and
+		// spill the rest into stray markup. Escaping it is harmless in text contexts,
+		// where &quot; just renders as a quote.
 		_escEl.textContent = str;
-		return _escEl.innerHTML;
+		return _escEl.innerHTML.replace(/"/g, '&quot;');
 	}
 
 	function safeEmbed(str) {
 		return str.replace(/<\//g, '<\\/');
 	}
 
-	async function formatHtmlExport(conversationData, messages, conversationId) {
+	// Renders one tool call as a collapsible block, mirroring the thinking-block idiom. Images are
+	// deliberately excluded — the caller emits those as always-visible siblings, since a generated
+	// image is primary content rather than a detail worth hiding behind a toggle.
+	function renderToolBlockHtml(toolUse, result) {
+		const name = toolUse.name || 'tool';
+		// `message` is Claude's own human-readable label ("Generate illustrated image"); it is not
+		// always present, and when it is it can repeat the name, so only show both when they differ.
+		const label = toolUse.message || name;
+		const body = [];
+
+		if (toolUse.input && Object.keys(toolUse.input).length > 0) {
+			body.push(`<pre class="tool-args">${esc(JSON.stringify(toolUse.input, null, 2))}</pre>`);
+		}
+
+		if (!result) {
+			// A tool_use with no tool_result means the generation was interrupted. Worth recording
+			// in an archive: it says the call was attempted.
+			body.push(`<div class="tool-empty">No result recorded.</div>`);
+		} else {
+			const texts = (result.content || [])
+				.filter(item => item.type === 'text')
+				.map(item => item.text || '')
+				.filter(Boolean);
+			if (texts.length > 0) {
+				body.push(`<pre class="tool-output">${esc(texts.join('\n'))}</pre>`);
+			}
+
+			// web_search / web_fetch return `knowledge` stubs: title, url and site metadata, never
+			// the retrieved page text. A source list is all that can be shown, but in an archive
+			// that is still real content. Favicon URLs in the metadata are deliberately ignored —
+			// they point at a remote service, and this export must open offline.
+			const sources = (result.content || []).filter(item => item.type === 'knowledge');
+			if (sources.length > 0) {
+				const items = sources.map(source => {
+					const site = source.metadata?.site_name || source.metadata?.site_domain || '';
+					const title = esc(source.title || source.url || 'Untitled');
+					const link = source.url
+						? `<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">${title}</a>`
+						: title;
+					return `<li>${link}${site ? `<span class="tool-source-site">${esc(site)}</span>` : ''}</li>`;
+				}).join('');
+				body.push(`<ul class="tool-sources">${items}</ul>`);
+			}
+		}
+
+		const nameTag = label === name ? '' : `<span class="tool-name">${esc(name)}</span>`;
+		const failedTag = result?.is_error ? `<span class="tool-failed">failed</span>` : '';
+		const errorClass = result?.is_error ? ' tool-error' : '';
+		return `<details class="tool-block${errorClass}"><summary>${esc(label)}${nameTag}${failedTag}</summary>${body.join('')}</details>`;
+	}
+
+	async function formatHtmlExport(conversationData, messages, conversationId, options = {}) {
+		// Defaults ON here, unlike the LibreChat export — HTML's whole point is fidelity, so the
+		// toggle is an escape hatch from size/download time rather than an opt-in.
+		const includeImages = options.includeImages ?? true;
+
 		// Configure marked to use highlight.js for code blocks
 		marked.use({
 			breaks: true,
@@ -386,6 +714,20 @@
 			sender: m.sender
 		}));
 
+		// Needed to build preview URLs for tool-generated images; fail soft so a missing org id
+		// costs us the images rather than the whole export.
+		let orgId = null;
+		try { orgId = getOrgId(); } catch (e) { console.warn('[Exporter] No org id; skipping generated images'); }
+
+		// One pacer shared by generated-image and attachment downloads. Both run per message, so
+		// per-loop delays would let a message carrying an image AND files fire two bursts back to
+		// back — the delay exists to stay under rate limiting, so it has to span every download.
+		let downloadCount = 0;
+		const paceDownload = async () => {
+			if (downloadCount > 0) await new Promise(r => setTimeout(r, 200));
+			downloadCount++;
+		};
+
 		// Render ALL messages as hidden divs
 		let messagesHtml = `<div class="export-meta"><h1>${esc(title)}</h1>`;
 		if (conversationData.model) {
@@ -397,6 +739,14 @@
 			const role = isUser ? 'User' : 'Assistant';
 			const roleClass = isUser ? 'msg-user' : 'msg-assistant';
 
+			const toolResultsById = mapToolResultsById(message.content);
+			// Older conversations list a generated image BOTH in the tool_result and in
+			// message.files; newer ones only in the tool_result. Track what the tool path actually
+			// rendered so the file loop below can skip the duplicate. Recorded only on success, so
+			// a failed download still falls back to the file entry (which resolves via a different
+			// URL and may well work).
+			const renderedImageUuids = new Set();
+
 			let contentHtml = '';
 			for (const content of message.content) {
 				if (content.type === 'thinking') {
@@ -407,13 +757,38 @@
 					contentHtml += `<details class="thinking-block"><summary>${esc(summaryText)}</summary><pre class="thinking-content">${esc(content.thinking || '')}</pre></details>`;
 				} else if (content.type === 'text') {
 					contentHtml += `<div class="text-content">${marked.parse(content.text || '')}</div>`;
+				} else if (content.type === 'tool_use') {
+					const result = toolResultsById.get(content.id);
+					contentHtml += renderToolBlockHtml(content, result);
+
+					// Emitted after (not inside) the block so the image stays visible without the
+					// reader having to expand anything, and lands inline where the tool ran rather
+					// than with the file pills at the end of the message.
+					for (const item of result?.content || []) {
+						if (!includeImages || item.type !== 'image' || !item.file_uuid || !orgId) continue;
+						try {
+							await paceDownload();
+							const image = await downloadGeneratedImage(orgId, item.file_uuid);
+							if (image) {
+								contentHtml += `<img class="tool-image" src="${image.dataUri}" alt="${esc(content.name || 'Generated image')}">`;
+								renderedImageUuids.add(item.file_uuid);
+							}
+						} catch (e) {
+							// One unavailable image shouldn't sink the whole export.
+							console.error('[Exporter] Failed to embed generated image:', e);
+						}
+					}
 				}
+				// tool_result is consumed via its tool_use above
 			}
 
 			// Download files sequentially with delay to avoid rate limiting
 			const fileResults = [];
 			for (let fi = 0; fi < message.files.length; fi++) {
 				const file = message.files[fi];
+				// Already shown inline by the tool-result path above — don't embed it twice
+				// (and don't pay for the download again).
+				if (file.file_uuid && renderedImageUuids.has(file.file_uuid)) continue;
 				if (file instanceof ClaudeAttachment) {
 					const b64 = btoa(unescape(encodeURIComponent(file.extracted_content || '')));
 					const mimeType = mime.getType(file.file_name) || 'text/plain';
@@ -421,26 +796,27 @@
 					continue;
 				}
 
+				// Images dominate an export's size and download time. With them off, keep the record
+				// of what was attached without paying for the bytes — or for the pacing delay.
+				if (!includeImages && file.file_kind === 'image') {
+					fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
+					continue;
+				}
+
 				try {
+					await paceDownload();
 					const blob = await file.download();
 					if (!blob) {
 						fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
 						continue;
 					}
 
-					const dataUri = await new Promise(resolve => {
-						const reader = new FileReader();
-						reader.onloadend = () => resolve(reader.result);
-						reader.readAsDataURL(blob);
-					});
+					const dataUri = await blobToDataUri(blob);
 
 					if (file.file_kind === 'image') {
 						fileResults.push(`<img src="${dataUri}" alt="${esc(file.file_name)}">`);
 					} else {
 						fileResults.push(`<a class="file-pill" href="${dataUri}" download="${esc(file.file_name)}">File: ${esc(file.file_name)}</a>`);
-					}
-					if (fi < message.files.length - 1) {
-						await new Promise(r => setTimeout(r, 200));
 					}
 				} catch (e) {
 					fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
@@ -452,14 +828,26 @@
 			messagesHtml += `<div class="msg ${roleClass}" id="msg-${message.uuid}"${tsAttr} style="display:none"><div class="msg-header">${role}</div><div class="msg-body">${contentHtml}</div></div>\n`;
 		}
 
-		// Assemble from template
+		// Assemble from template in a SINGLE replace pass. Chained .replace() calls
+		// rescan the already-filled string, so a literal "{{RAW_TXT}}" inside the
+		// conversation text (e.g. a chat about this extension quoting the exporter's
+		// source) would steal the substitution from the real scaffold placeholder and
+		// splice raw text into the middle of the messages. One global pass scans only
+		// the template; callback output is never rescanned. The callback also disables
+		// $-pattern processing ($` $' $&), which would otherwise splice the template
+		// around any dollar sequences occurring in conversation text.
 		const template = await getExportTemplate();
-		const templateResult = template
-			.replace('{{TITLE}}', esc(title))
-			.replace('{{DEFAULT_LEAF}}', defaultLeaf)
-			.replace('{{MESSAGES}}', messagesHtml)
-			.replace('{{TREE_JSON}}', safeEmbed(JSON.stringify(treeJson)))
-			.replace('{{RAW_TXT}}', safeEmbed(rawTxt));
+		const templateValues = {
+			TITLE: esc(title),
+			DEFAULT_LEAF: defaultLeaf,
+			MESSAGES: messagesHtml,
+			TREE_JSON: safeEmbed(JSON.stringify(treeJson)),
+			RAW_TXT: safeEmbed(rawTxt),
+		};
+		const templateResult = template.replace(
+			/\{\{(TITLE|DEFAULT_LEAF|MESSAGES|TREE_JSON|RAW_TXT)\}\}/g,
+			(_, key) => templateValues[key]
+		);
 		// console.log(templateResult);
 		return templateResult;
 	}
@@ -566,11 +954,11 @@
 			case 'jsonl':
 				return formatJsonlExport(conversationData, messages, conversationId);
 			case 'librechat':
-				return formatLibrechatExport(conversationData, messages, conversationId);
+				return formatLibrechatExport(conversationData, messages, conversationId, options, loadingModal);
 			case 'raw':
 				return formatRawExport(conversationData, messages, conversationId);
 			case 'html':
-				return formatHtmlExport(conversationData, messages, conversationId);
+				return formatHtmlExport(conversationData, messages, conversationId, options);
 			case 'zip':
 				return formatZipExport(conversationData, messages, conversationId, loadingModal);
 			default:
@@ -1384,9 +1772,14 @@
 	}
 	//#endregion
 
-	async function exportSingleConversation(orgId, conversationId, format, extension, exportTree, exportOptions, loadingModal) {
+	async function exportSingleConversation(orgId, conversationId, format, extension, exportTree, exportOptions, loadingModal, freshnessHint = null) {
 		const conversation = new ClaudeConversation(orgId, conversationId);
-		const conversationData = await conversation.getData();
+		// Bulk export passes the freshness it already learned from the conversation list. Without
+		// one there is nothing cheaper than a full fetch — a freshness check costs the same TTFB
+		// as the data itself — so skip the cache rather than pay for it twice.
+		const conversationData = freshnessHint
+			? await conversation.getData(false, freshnessHint)
+			: await conversation.getData(true);
 		const wasCached = conversation.lastGetDataFromCache;
 		const messages = await conversation.getMessages(exportTree);
 		const safeName = (conversationData.name || 'untitled').replace(/[<>:"/\\|?*]/g, '_');
@@ -1441,6 +1834,14 @@
 				return;
 			}
 
+			// The list already tells us, per conversation, everything the cache needs to be
+			// judged against — so cached conversations cost an IndexedDB read instead of a
+			// full API round trip each.
+			const freshness = new Map(conversations.map(c => [c.uuid, {
+				updated_at: c.updated_at,
+				current_leaf_message_uuid: c.current_leaf_message_uuid
+			}]));
+
 			const masterZip = new JSZip();
 			let completed = 0;
 			const total = conversations.length;
@@ -1458,7 +1859,8 @@
 					const conv = chunk[i];
 					try {
 						const { filename, blob, wasCached } = await exportSingleConversation(
-							orgId, conv.uuid, format, extension, exportTree, exportOptions, loadingModal
+							orgId, conv.uuid, format, extension, exportTree, exportOptions, loadingModal,
+							freshness.get(conv.uuid)
 						);
 						results.push({ filename, blob });
 
@@ -1584,7 +1986,7 @@
 		const content = document.createElement('div');
 
 		// Variables to hold references (may not be created)
-		let formatSelect, toggleInput, thinkingToggleInput, attachmentsToggleInput, dateInput;
+		let formatSelect, toggleInput, thinkingToggleInput, attachmentsToggleInput, imagesToggleInput, dateInput;
 
 		//#region Export section (always shown, context-aware)
 		{
@@ -1603,13 +2005,14 @@
 				{ value: 'html_html', label: 'HTML (.html)', copyable: true },
 				{ value: 'zip_zip', label: 'Zip (.zip)', copyable: false },
 				{ value: 'md_md', label: 'Markdown (.md)', copyable: true },
-				{ value: 'jsonl_jsonl', label: 'JSONL (.jsonl)', copyable: true },
+				{ value: 'txt_txt', label: 'Text (.txt)', copyable: true },
+				{ value: 'jsonl_jsonl', label: 'SillyTavern (.jsonl)', copyable: true },
 				{ value: 'librechat_json', label: 'Librechat (.json)', copyable: true },
-				{ value: 'raw_json', label: 'Raw JSON (.json)', copyable: true }
+				{ value: 'raw_json', label: 'Anthropic JSON (.json)', copyable: true }
 			];
 			const isCopyable = (v) => EXPORT_FORMATS.find(f => f.value === v)?.copyable ?? false;
 
-			// Fall back if the saved format is no longer offered (e.g. the removed txt option)
+			// Fall back if the saved format is no longer offered
 			const selectedFormat = EXPORT_FORMATS.some(f => f.value === lastFormat) ? lastFormat : 'html_html';
 
 			// Format select
@@ -1674,6 +2077,20 @@
 			attachmentsOption.appendChild(attachmentsToggleContainer);
 			content.appendChild(attachmentsOption);
 
+			// Images option (librechat + html). Every image is downloaded and inlined as a base64
+			// data URI, so it dominates both file size and export time. Off by default for
+			// librechat, where the export is otherwise a small JSON file; on by default for html,
+			// which already embeds everything else and is meant to be the high-fidelity archive.
+			const imagesOption = document.createElement('div');
+			imagesOption.id = 'imagesOption';
+			imagesOption.className = 'mb-4 hidden';
+
+			const initialImagesDefault = selectedFormat.split('_')[0] === 'html';
+			const { container: imagesToggleContainer, input: imagesInput } = createClaudeToggle('Include images', initialImagesDefault);
+			imagesToggleInput = imagesInput;
+			imagesOption.appendChild(imagesToggleContainer);
+			content.appendChild(imagesOption);
+
 			// Date filter option (bulk export only)
 			const dateOption = document.createElement('div');
 			dateOption.className = 'mb-4' + (isInConversation ? ' hidden' : '');
@@ -1692,6 +2109,7 @@
 			treeOption.classList.toggle('hidden', !['librechat', 'raw', 'html', 'zip'].includes(initialFormat));
 			thinkingOption.classList.toggle('hidden', initialFormat !== 'md');
 			attachmentsOption.classList.toggle('hidden', initialFormat !== 'md');
+			imagesOption.classList.toggle('hidden', !['librechat', 'html'].includes(initialFormat));
 			syncCopyEnabled();
 
 			// Update option visibility on select change
@@ -1700,7 +2118,9 @@
 				treeOption.classList.toggle('hidden', !['librechat', 'raw', 'html', 'zip'].includes(format));
 				thinkingOption.classList.toggle('hidden', format !== 'md');
 				attachmentsOption.classList.toggle('hidden', format !== 'md');
+				imagesOption.classList.toggle('hidden', !['librechat', 'html'].includes(format));
 				toggleInput.checked = ['html', 'zip'].includes(format);
+				imagesToggleInput.checked = format === 'html';
 				syncCopyEnabled();
 			};
 
@@ -1708,7 +2128,8 @@
 			exportButton.onclick = async () => {
 				const exportOptions = {
 					includeThinking: thinkingToggleInput?.checked ?? true,
-					includeAttachments: attachmentsToggleInput?.checked ?? false
+					includeAttachments: attachmentsToggleInput?.checked ?? false,
+					includeImages: imagesToggleInput?.checked ?? false
 				};
 
 				if (isInConversation) {
@@ -1756,7 +2177,8 @@
 
 				const exportOptions = {
 					includeThinking: thinkingToggleInput?.checked ?? true,
-					includeAttachments: attachmentsToggleInput?.checked ?? false
+					includeAttachments: attachmentsToggleInput?.checked ?? false,
+					includeImages: imagesToggleInput?.checked ?? false
 				};
 
 				const loadingModal = createLoadingModal('Copying...');
