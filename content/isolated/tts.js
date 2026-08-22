@@ -97,6 +97,7 @@
 			}
 		} catch (error) {
 			console.error('[QOL-TTS] Synthesis failed:', error);
+			if (window.showErrorToast) window.showErrorToast('TTS Synthesis failed: ' + (error.message || error));
 		} finally {
 			if (!entry.cancelled) postSynthDone(requestId);
 			activeSynth.delete(requestId);
@@ -613,6 +614,7 @@
 					loadingModal.destroy();
 				} catch (error) {
 					console.error('Failed to load provider data:', error);
+					if (window.showErrorToast) window.showErrorToast('Failed to load provider data: ' + (error.message || error));
 					loadingModal.destroy();
 					showClaudeAlert('Loading Error', 'Failed to load provider data');
 				}
