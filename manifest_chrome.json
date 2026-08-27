@@ -45,6 +45,7 @@
 				"https://claude.ai/*"
 			],
 			"js": [
+				"lib/dexie.min.js",
 				"lib/jszip.min.js",
 				"lib/mime.min.js",
 				"content/helpers/claude-styles.js",
@@ -72,8 +73,8 @@
 		"service_worker": "background.js"
 	},
 	"icons": {
-		"512": "icon512.png",
-		"128": "icon128.png"
+		"128": "icon128.png",
+		"512": "icon512.png"
 	},
 	"action": {
 		"default_icon": {

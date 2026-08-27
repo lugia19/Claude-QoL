@@ -2,7 +2,7 @@
 // Version update notification for Claude QoL extension
 'use strict';
 
-const QOL_BLUE_HIGHLIGHT = '#2c84db';
+const QOL_BLUE_HIGHLIGHT = 'var(--qol-primary, #2c84db)';
 
 // Notification card styles
 const notificationStyles = document.createElement('style');
@@ -386,3 +386,39 @@ class QoLNotifications {
 
 // Self-initialize
 const qolNotifications = new QoLNotifications();
+
+// Global Error Toast Notification
+class ErrorToastNotification extends FloatingCard {
+	constructor(message) {
+		super();
+		this.defaultPosition = { bottom: '20px', right: '20px' };
+		this.element.classList.add('qol-text-left');
+		this.element.style.maxWidth = '300px';
+		this.element.style.borderLeft = '4px solid #ef4444'; // Tailwind red-500
+		
+		const msgDiv = document.createElement('div');
+		msgDiv.className = 'qol-mb-1';
+		msgDiv.style.fontWeight = 'bold';
+		msgDiv.textContent = 'Claude QoL Error';
+		
+		const detailsDiv = document.createElement('div');
+		detailsDiv.style.fontSize = '12px';
+		detailsDiv.textContent = message;
+		
+		this.element.appendChild(msgDiv);
+		this.element.appendChild(detailsDiv);
+		this.addCloseButton();
+		
+		// Auto dismiss after 5 seconds
+		setTimeout(() => {
+			if (this.element && this.element.parentNode) {
+				this.remove();
+			}
+		}, 5000);
+	}
+}
+
+window.showErrorToast = (msg) => {
+	const toast = new ErrorToastNotification(msg);
+	toast.show();
+};

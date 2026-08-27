@@ -1,0 +1,43 @@
+project: Claude-QoL
+description: An extension that adds QOL/Utility features to claude.ai (Search, Navigation, TTS, forking, exporting, etc.)
+ascii_tree: |
+  Claude-QoL/
+  ├── content/
+  │   ├── helpers/
+  │   ├── isolated/
+  │   └── main/
+  ├── html_template/
+  ├── lib/
+  ├── background.js
+  ├── manifest_chrome.json
+  ├── manifest_firefox.json
+  ├── manifest_electron.json
+  ├── build.bat
+  └── run-android.ps1
+directories:
+  content:
+    description: Content scripts that run in the context of the webpage
+    subdirectories:
+      helpers:
+        description: Shared utility scripts and API wrappers (e.g., claude-api.js, settings.js)
+      isolated:
+        description: Content scripts running in the isolated world (e.g., UI elements for search, TTS, exporting)
+      main:
+        description: Content scripts running in the main world, usually interceptors (e.g., forking.js, search-interceptor.js)
+  html_template:
+    description: HTML templates for features like exporting
+  lib:
+    description: External libraries or shared internal modules
+files:
+  background.js:
+    description: Background service worker for the extension
+  manifest_chrome.json:
+    description: Extension manifest for Chrome
+  manifest_firefox.json:
+    description: Extension manifest for Firefox
+  manifest_electron.json:
+    description: Manifest for Electron/desktop client
+  build.bat:
+    description: Build script for Windows
+  run-android.ps1:
+    description: Script for running on Android

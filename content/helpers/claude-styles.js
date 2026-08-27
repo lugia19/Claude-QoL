@@ -266,7 +266,7 @@ function createLoadingContent(text) {
 	});
 
 	div.innerHTML = `
-		<div class="claude-modal-spinner rounded-full h-5 w-5 border-2 border-border-300 flex-shrink-0" style="border-top-color: #2c84db"></div>
+		<div class="claude-modal-spinner rounded-full h-5 w-5 border-2 border-border-300 flex-shrink-0" style="border-top-color: var(--qol-primary, #2c84db)"></div>
 	`;
 	div.appendChild(textContent);
 
@@ -835,7 +835,7 @@ function createClaudeToggle(labelText = '', checked = false, onChange = null) {
 	thumb.style.transform = checked ? 'translateX(16px)' : 'translateX(0)';
 
 	const updateTrackColor = (on) => {
-		track.style.backgroundColor = on ? '#2c84db' : '';
+		track.style.backgroundColor = on ? 'var(--qol-primary, #2c84db)' : '';
 	};
 	updateTrackColor(checked);
 
@@ -872,6 +872,7 @@ function createClaudeSlider(label, defaultValue = 100, options = {}) {
 		max = 100,
 		step = 25,
 		showLabels = true,
+		showTickLabels = true,
 		suffix = '%',
 		leftLabel = null,
 		rightLabel = null
@@ -912,12 +913,12 @@ function createClaudeSlider(label, defaultValue = 100, options = {}) {
 	// Filled track (progress)
 	const fillTrack = document.createElement('div');
 	fillTrack.className = 'absolute left-0 top-0 h-full rounded-lg pointer-events-none';
-	fillTrack.style.backgroundColor = '#2c84db';
+	fillTrack.style.backgroundColor = 'var(--qol-primary, #2c84db)';
 
 	// Thumb
 	const thumb = document.createElement('div');
 	thumb.className = 'absolute top-1/2 w-5 h-5 rounded-full border-2 border-white shadow-md cursor-grab active:cursor-grabbing';
-	thumb.style.backgroundColor = '#2c84db';
+	thumb.style.backgroundColor = 'var(--qol-primary, #2c84db)';
 	thumb.style.transform = 'translate(-50%, -50%)';
 	thumb.style.transition = 'none';
 
@@ -950,10 +951,12 @@ function createClaudeSlider(label, defaultValue = 100, options = {}) {
 			tickWrapper.appendChild(tick);
 
 			// Label
-			const tickLabel = document.createElement('span');
-			tickLabel.className = 'text-xs text-text-400 select-none whitespace-nowrap';
-			tickLabel.textContent = `${value}${suffix}`;
-			tickWrapper.appendChild(tickLabel);
+			if (showTickLabels) {
+				const tickLabel = document.createElement('span');
+				tickLabel.className = 'text-xs text-text-400 select-none whitespace-nowrap';
+				tickLabel.textContent = `${value}${suffix}`;
+				tickWrapper.appendChild(tickLabel);
+			}
 
 			// Click on tick to set value
 			tickWrapper.addEventListener('click', () => {

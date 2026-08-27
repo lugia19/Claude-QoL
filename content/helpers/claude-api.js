@@ -802,6 +802,11 @@ class ClaudeConversation {
 		return cleaned;
 	}
 
+	static sanitizeInjectionVectors(text) {
+		if (typeof text !== 'string') return text;
+		return text.replace(/<(\/?instructions)>/gi, '[$1]');
+	}
+
 	static buildChatlog(messages, { includeRoleLabels = false, includeHeader = false, cleanup = true, conversation = null } = {}) {
 		if (includeRoleLabels && includeHeader) {
 			throw new Error('buildChatlog: includeRoleLabels and includeHeader are mutually exclusive');
@@ -814,7 +819,8 @@ class ClaudeConversation {
 		const separator = '\n\n';
 		const messageParts = finalMessages.map(msg => {
 			const role = msg.sender === 'human' ? '[User]' : '[Assistant]';
-			const text = msg.toChatlogString();
+			let text = msg.toChatlogString();
+			text = ClaudeConversation.sanitizeInjectionVectors(text);
 			return includeRoleLabels ? `${role}\n${text}` : text;
 		});
 
