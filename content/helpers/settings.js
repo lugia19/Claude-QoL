@@ -46,6 +46,9 @@ const SETTINGS_KEYS = {
 	},
 	IMAGE_EXTRACTOR: {
 		AUTO_EXPAND: { key: 'image_auto_expand', default: false, type: 'boolean' },
+		ENABLED: { key: 'image_gallery_enabled', default: true, type: 'boolean' },
+		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },
+		LIMIT: { key: 'image_gallery_limit', default: 3, type: 'number' },
 	},
 	// Extension lifecycle state, not user data — must not survive a reinstall, or the
 	// first-install branch of checkForVersionUpdate() is skipped and a spurious update card shows.

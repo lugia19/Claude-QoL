@@ -92,10 +92,11 @@
 				this._chunks.push(msg.text ?? '');
 			} else if (msg.type === 'close_stream') {
 				let text = this._chunks.join('');
-				// Strip our own injected markers (phantom-messages.js) before synthesis.
+				// Strip our own injected markers (phantom-messages.js, image-extractor.js) before synthesis.
 				text = text
 					.replace(/====PHANTOM_MESSAGE====/g, '')
-					.replace(/====UUID:[a-f0-9-]+====/gi, '');
+					.replace(/====UUID:[a-f0-9-]+====/gi, '')
+					.replace(/====GALLERY_BREAK====/g, '');
 				const conversationId = (typeof getConversationId === 'function') ? getConversationId() : null;
 				window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, '*');
 			}

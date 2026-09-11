@@ -6,6 +6,7 @@ const OLD_FORK_PREFIX = 'fork_history_';
 const PHANTOM_MARKER = '====PHANTOM_MESSAGE====';
 const UUID_MARKER_PREFIX = '====UUID:';
 const UUID_MARKER_SUFFIX = '====';
+const GALLERY_BREAK_MARKER = '====GALLERY_BREAK===='; // injected by image-extractor.js between galleries
 
 // ==== STORAGE FUNCTIONS ====
 // storePhantomMessages, getPhantomMessages, clearPhantomMessages are defined in claude-api.js
@@ -341,6 +342,21 @@ function removeUUIDMarkerFromElement(element) {
 	});
 }
 
+// Gallery-break markers sit between injected image galleries (image-extractor.js). Unlike the
+// UUID marker they also appear mid-stream, so they're hidden on every pass, not just once a
+// message has been tagged.
+function hideGalleryBreakMarkers() {
+	const { allMessages } = getUIMessages();
+	allMessages.forEach(container => {
+		if (!container.textContent.includes(GALLERY_BREAK_MARKER)) return;
+		container.querySelectorAll('p').forEach(p => {
+			if (p.textContent.includes(GALLERY_BREAK_MARKER)) {
+				p.style.display = 'none';
+			}
+		});
+	});
+}
+
 
 // ==== CLIPBOARD CLEANUP - Strip markers before copying ====
 const originalClipboardWrite = navigator.clipboard.write;
@@ -362,6 +378,9 @@ navigator.clipboard.write = async (data) => {
 
 				// Strip UUID markers
 				text = text.replace(/====UUID:[a-f0-9-]+====/gi, '');
+
+				// Strip gallery-break markers
+				text = text.replace(/====GALLERY_BREAK====/g, '');
 
 				// Clean up extra newlines/whitespace from removal
 				if (type === 'text/plain') {
@@ -400,6 +419,7 @@ let _passScheduled = false;
 function runTaggingPass() {
 	stylePhantomMessages();
 	extractAndStoreUUIDs();
+	hideGalleryBreakMarkers();
 }
 
 function schedulePass() {

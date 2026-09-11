@@ -18,6 +18,7 @@
 	function convertAndWrite(plainText) {
 		plainText = plainText.replace(/====PHANTOM_MESSAGE====/g, '');
 		plainText = plainText.replace(/====UUID:[a-f0-9-]+====/gi, '');
+		plainText = plainText.replace(/====GALLERY_BREAK====/g, '');
 		plainText = plainText.replace(/\n{3,}/g, '\n\n').trim();
 
 		const html = marked.parse(plainText, { breaks: true });

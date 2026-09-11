@@ -56,6 +56,28 @@ function _markConversationHasImages(convId) {
 	} catch (e) { /* quota or serialization issue — non-fatal */ }
 }
 
+// ==== User settings ====
+// Mirrored into localStorage by content/isolated/image-gallery.js (the settings bridge to
+// the ISOLATED world isn't up yet when the conversation GET we rewrite fires). Absent mirror
+// = defaults: inject, no per-gallery limit.
+const _IMG_GALLERY_CONFIG_KEY = 'claude_qol_image_gallery';
+
+function _galleryConfig() {
+	const defaults = { enabled: true, limitEnabled: false, limit: 3 };
+	try {
+		const raw = localStorage.getItem(_IMG_GALLERY_CONFIG_KEY);
+		return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
+	} catch (e) { return defaults; }
+}
+
+// Images per gallery; Infinity when the user hasn't enabled a limit. The renderer only shows
+// up to 3 images of a strip inline (see "Gallery building" below), so a higher limit just
+// hides the rest — that's the user's call.
+function _galleryLimit() {
+	const { limitEnabled, limit } = _galleryConfig();
+	return limitEnabled && limit >= 1 ? Math.floor(limit) : Infinity;
+}
+
 // Conversation ID from an API URL (covers /completion, /retry_completion, and the
 // rendering_mode=messages conversation fetch).
 function _convIdFromUrl(url) {
@@ -153,17 +175,21 @@ function extractDimsFromStream(imageItem, toolInput) {
 //    discarded by the renderer and split nothing.
 //  - The strip for a run of tool blocks is only drawn once the run is closed by a non-tool block
 //    (or the message ends).
-const MAX_GALLERY_IMAGES = 3;
+// How many images share a gallery is the user's setting, see _galleryLimit().
 
 // Text block placed between galleries so each renders as its own strip. Must be real text (see
-// above); it shows up as visible message text. Never sent to the server — injection is local.
-const GALLERY_SEPARATOR_TEXT = 'More generated images:';
+// above), so it's a marker in the same family as ====UUID:...====: phantom-messages.js hides
+// its <p> in the DOM and it is stripped from copied / read-aloud text alongside the other
+// markers. Never sent to the server — injection is local.
+const GALLERY_SEPARATOR_TEXT = '====GALLERY_BREAK====';
 
 // Gallery entries are { image, prompt }: the image_gallery item plus the generating prompt.
+// Split into runs of at most _galleryLimit() (a single run when there is no limit).
 function chunkGalleryEntries(entries) {
+	const limit = _galleryLimit();
 	const chunks = [];
-	for (let i = 0; i < entries.length; i += MAX_GALLERY_IMAGES) {
-		chunks.push(entries.slice(i, i + MAX_GALLERY_IMAGES));
+	for (let i = 0; i < entries.length; i += limit) {
+		chunks.push(entries.slice(i, i + limit));
 	}
 	return chunks;
 }
@@ -379,14 +405,15 @@ function createImageInjectingStream(sourceBody, orgId) {
 		}));
 
 		const events = [];
+		const limit = _galleryLimit();
 		let nextIndex = firstIndex;
 		while (entries.length) {
 			// Fill whatever room the current strip has left before starting a new one.
-			const chunk = entries.splice(0, MAX_GALLERY_IMAGES - stripImageCount);
+			const chunk = entries.splice(0, limit - stripImageCount);
 			events.push(...buildGalleryEvents(nextIndex, chunk));
 			nextIndex += 2;
 			stripImageCount += chunk.length;
-			if (stripImageCount >= MAX_GALLERY_IMAGES) {
+			if (stripImageCount >= limit) {
 				events.push(...buildSeparatorEvents(nextIndex));
 				nextIndex += 1;
 				stripImageCount = 0;
@@ -562,6 +589,11 @@ window.fetch = async (...args) => {
 		(url.includes('/completion') || url.includes('/retry_completion')) &&
 		config?.method === 'POST') {
 
+		if (!_galleryConfig().enabled) {
+			_diag('wrapper skipped — gallery injection disabled in settings');
+			return _imageExtractorOriginalFetch(...args);
+		}
+
 		// Only wrap conversations known to contain generated images (flagged by the
 		// load-time path). Everything else gets the native stream, untouched — JS
 		// re-piping janks streaming on some machines.
@@ -604,7 +636,8 @@ window.fetch = async (...args) => {
 	if (url &&
 		url.includes('/chat_conversations/') &&
 		url.includes('rendering_mode=messages') &&
-		(!config || config.method === 'GET' || !config.method)) {
+		(!config || config.method === 'GET' || !config.method) &&
+		_galleryConfig().enabled) {
 
 		const response = await _imageExtractorOriginalFetch(...args);
 		const data = await response.json();
@@ -627,7 +660,7 @@ window.fetch = async (...args) => {
 				}
 
 				// Rebuild the content in one forward pass. Images from a run of tool_results are
-				// queued and flushed — in generation order, MAX_GALLERY_IMAGES per gallery, a
+				// queued and flushed — in generation order, _galleryLimit() per gallery, a
 				// separator between galleries — right before the next text block (so the renderer
 				// draws them after the collapsed tool run), or at the end of the message.
 				// (An earlier version spliced galleries in backwards from a shared insertion point,
