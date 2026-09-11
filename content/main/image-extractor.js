@@ -143,6 +143,85 @@ function extractDimsFromStream(imageItem, toolInput) {
 	);
 }
 
+// ==== Gallery building ====
+// Shared by the live (SSE) and load-time (conversation JSON) injectors below. Facts about
+// claude.ai's renderer these are built around (verified against the live site):
+//  - Consecutive image_search tool_results get merged into ONE strip that shows at most 3
+//    images and silently drops the rest — no "+N" tile. Native tool blocks in between do not
+//    break the run.
+//  - A text block with real content does break the run; empty / whitespace-only text blocks are
+//    discarded by the renderer and split nothing.
+//  - The strip for a run of tool blocks is only drawn once the run is closed by a non-tool block
+//    (or the message ends).
+const MAX_GALLERY_IMAGES = 3;
+
+// Text block placed between galleries so each renders as its own strip. Must be real text (see
+// above); it shows up as visible message text. Never sent to the server — injection is local.
+const GALLERY_SEPARATOR_TEXT = 'More generated images:';
+
+// Gallery entries are { image, prompt }: the image_gallery item plus the generating prompt.
+function chunkGalleryEntries(entries) {
+	const chunks = [];
+	for (let i = 0; i < entries.length; i += MAX_GALLERY_IMAGES) {
+		chunks.push(entries.slice(i, i + MAX_GALLERY_IMAGES));
+	}
+	return chunks;
+}
+
+// Result text for a gallery: names the prompt when every image in it came from the same one.
+function galleryText(entries) {
+	const prompts = new Set(entries.map((e) => e.prompt));
+	const prompt = prompts.size === 1 ? [...prompts][0] : '';
+	return prompt ? 'Generated image for: ' + prompt : 'Generated image' + (entries.length > 1 ? 's' : '');
+}
+
+// image_gallery item for a generated image. Width is scaled to 3840 so it renders full-width.
+function buildGalleryImage(fileUuid, imageUrl, dims, prompt) {
+	const scale = 3840 / dims.width;
+	const scaledW = Math.round(dims.width * scale);
+	const scaledH = Math.round(dims.height * scale);
+	return {
+		id: fileUuid,
+		url: imageUrl,
+		thumbnail_url: imageUrl,
+		title: prompt ? 'Generated: ' + prompt.substring(0, 100) : '',
+		source: '',
+		page_url: imageUrl,
+		width: scaledW,
+		height: scaledH,
+		thumbnail_width: scaledW,
+		thumbnail_height: scaledH
+	};
+}
+
+// Synthetic image_search tool_use + tool_result pair in conversation-JSON shape. The renderer
+// only draws a full gallery for tool_results named image_search.
+function buildGalleryPair(entries) {
+	const toolUseId = 'toolu_gallery_' + crypto.randomUUID().replace(/-/g, '').substring(0, 20);
+	const timestamp = new Date().toISOString();
+	return [
+		{
+			start_timestamp: timestamp,
+			stop_timestamp: timestamp,
+			type: 'tool_use',
+			id: toolUseId,
+			name: 'image_search',
+			input: {},
+			message: 'Generated image' + (entries.length > 1 ? 's' : '')
+		},
+		{
+			type: 'tool_result',
+			tool_use_id: toolUseId,
+			name: 'image_search',
+			content: [
+				{ type: 'text', text: galleryText(entries), uuid: crypto.randomUUID() },
+				{ type: 'image_gallery', images: entries.map((e) => e.image), uuid: crypto.randomUUID(), is_expired: false }
+			],
+			is_error: false
+		}
+	];
+}
+
 // ==== DIAGNOSTICS ====
 // Timing logs to pinpoint streaming stalls (our blocking measure, our injection build, or
 // upstream). ON by default while diagnosing; disable with localStorage['claude_qol_img_diag']='0'.
@@ -158,9 +237,10 @@ function _diag(...a) { if (_imgDiagOn()) { try { console.log('[QOL-DIAG]', ...a)
 // gallery when a tool_result's name === "image_search", so — mirroring the load-time
 // injector below — we splice a synthetic image_search tool_use + tool_result (carrying
 // an image_gallery) into the stream right after each such block. Content blocks are
-// keyed by a sequential integer index, so every later event's index is bumped by +2
-// per injection. This is purely a live/visual upgrade; on reload the load-time path
-// re-injects from the conversation JSON (with real measured dimensions).
+// keyed by a sequential integer index, so every later event's index is bumped by the
+// number of blocks injected so far (+2 per gallery pair, +1 per separator). This is purely
+// a live/visual upgrade; on reload the load-time path re-injects from the conversation
+// JSON (with real measured dimensions).
 function createImageInjectingStream(sourceBody, orgId) {
 	const decoder = new TextDecoder();
 	const encoder = new TextEncoder();
@@ -170,6 +250,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 	const toolUseInputBuf = new Map();   // nativeIndex -> accumulated input_json_delta string
 	const toolUseParsed = new Map();     // nativeIndex -> parsed tool_use input object
 	const pendingInjections = new Map(); // tool_result nativeIndex -> [image items]
+	let stripImageCount = 0;             // images in the strip the renderer is currently merging galleries into
 
 	// Diagnostics: stream clock + inter-event gap tracking to catch stalls.
 	const _streamStart = performance.now();
@@ -185,51 +266,12 @@ function createImageInjectingStream(sourceBody, orgId) {
 		return rawEvent.replace(/"index":(\d+)/, (m, n) => `"index":${parseInt(n, 10) + indexOffset}`);
 	};
 
-	const buildInjectedEvents = async (toolResultNativeIndex, images, prompt, toolInput = {}) => {
-		const outIndex = toolResultNativeIndex + indexOffset; // output index of the native tool_result we just emitted
-		const toolUseIndex = outIndex + 1;
-		const toolResultIndex = outIndex + 2;
+	// SSE events for one synthetic image_search tool_use + tool_result pair, occupying the
+	// block indices toolUseIndex and toolUseIndex + 1.
+	const buildGalleryEvents = (toolUseIndex, entries) => {
+		const toolResultIndex = toolUseIndex + 1;
 		const toolUseId = 'toolu_gallery_' + crypto.randomUUID().replace(/-/g, '').substring(0, 20);
 		const ts = new Date().toISOString();
-
-		// Measure each preview (same helper + shared localStorage cache the load-time path
-		// uses) so the gallery renders at the correct aspect immediately — no flash — and
-		// so the later reload is instant. Width is scaled to 3840 so it renders full-width,
-		// matching the load-time injector. Awaiting here pauses the stream while measuring;
-		// because we now pipe through a TransformStream, that await backpressures the source
-		// correctly and only stalls around an image result, not general text streaming.
-		const galleryImages = await Promise.all(images.map(async (c) => {
-			const imageUrl = `https://claude.ai/api/${orgId}/files/${c.file_uuid}/preview`;
-			// Prefer dimensions carried in the stream (image item or generating tool_use input);
-			// only fall back to the network measure when the stream doesn't provide them.
-			let dims = extractDimsFromStream(c, toolInput);
-			if (dims) {
-				_diag(`dims from STREAM for ${c.file_uuid}`, dims);
-				// Stream dims are aspect-only (e.g. 16:9); still measure the real preview in the
-				// background (fire-and-forget) to warm the shared cache so the load-time path
-				// re-injects at true pixel dimensions on the next reload.
-				getImageDimensions(c.file_uuid, imageUrl).catch(() => {});
-			} else {
-				const _t0 = performance.now();
-				dims = await getImageDimensions(c.file_uuid, imageUrl);
-				_diag(`dims MEASURED (network, BLOCKING) for ${c.file_uuid} took ${Math.round(performance.now() - _t0)}ms`, dims);
-			}
-			const scale = 3840 / dims.width;
-			const scaledW = Math.round(dims.width * scale);
-			const scaledH = Math.round(dims.height * scale);
-			return {
-				id: c.file_uuid,
-				url: imageUrl,
-				thumbnail_url: imageUrl,
-				title: prompt ? 'Generated: ' + prompt.substring(0, 100) : '',
-				source: '',
-				page_url: imageUrl,
-				width: scaledW,
-				height: scaledH,
-				thumbnail_width: scaledW,
-				thumbnail_height: scaledH
-			};
-		}));
 
 		const toolUseBlock = {
 			type: 'content_block_start',
@@ -239,7 +281,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 				id: toolUseId,
 				name: 'image_search',
 				input: {},
-				message: 'Generated image' + (galleryImages.length > 1 ? 's' : ''),
+				message: 'Generated image' + (entries.length > 1 ? 's' : ''),
 				integration_name: null,
 				integration_icon_url: null,
 				icon_name: null,
@@ -264,8 +306,8 @@ function createImageInjectingStream(sourceBody, orgId) {
 				tool_use_id: toolUseId,
 				name: 'image_search',
 				content: [
-					{ text: prompt ? 'Generated image for: ' + prompt : 'Generated image', type: 'text' },
-					{ type: 'image_gallery', images: galleryImages }
+					{ text: galleryText(entries), type: 'text' },
+					{ type: 'image_gallery', images: entries.map((e) => e.image) }
 				],
 				is_error: false,
 				structured_content: null,
@@ -288,6 +330,69 @@ function createImageInjectingStream(sourceBody, orgId) {
 			`event: content_block_start\ndata: ${JSON.stringify(toolResultBlock)}`,
 			`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: toolResultIndex, stop_timestamp: ts })}`
 		];
+	};
+
+	// SSE events for a GALLERY_SEPARATOR_TEXT text block at the given index. Mirrors how native
+	// text streams — empty block start, the text as a delta, then stop — because the renderer
+	// ignores text carried directly in content_block_start.
+	const buildSeparatorEvents = (index) => {
+		const ts = new Date().toISOString();
+		return [
+			`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index, content_block: { type: 'text', text: '', start_timestamp: ts, stop_timestamp: null, citations: [] } })}`,
+			`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: GALLERY_SEPARATOR_TEXT } })}`,
+			`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index, stop_timestamp: ts })}`
+		];
+	};
+
+	// Build the events to inject after one native image tool_result. Each result gets its own
+	// gallery as it arrives (grouping across results would mean holding images back); the
+	// renderer merges adjacent galleries into one strip anyway, so this only tracks how full
+	// that strip is. The strip is drawn only once a non-tool block closes the run, so the
+	// separator goes out right after the gallery that fills it — that way the first three show
+	// as soon as the third lands instead of waiting for the fourth result. Side effect: a
+	// message with exactly 3 (6, …) images shows a trailing separator until the
+	// post-completion refetch replaces the live layout with the load-time one.
+	const buildInjectedEvents = async (toolResultNativeIndex, images, prompt, toolInput = {}) => {
+		const firstIndex = toolResultNativeIndex + indexOffset + 1; // right after the native tool_result
+
+		// Measure each preview (same helper + shared localStorage cache the load-time path
+		// uses) so the gallery renders at the correct aspect immediately — no flash — and
+		// so the later reload is instant. Awaiting here delays only the events around an
+		// image result; the eager pump below keeps draining the socket meanwhile.
+		const entries = await Promise.all(images.map(async (c) => {
+			const imageUrl = `https://claude.ai/api/${orgId}/files/${c.file_uuid}/preview`;
+			// Prefer dimensions carried in the stream (image item or generating tool_use input);
+			// only fall back to the network measure when the stream doesn't provide them.
+			let dims = extractDimsFromStream(c, toolInput);
+			if (dims) {
+				_diag(`dims from STREAM for ${c.file_uuid}`, dims);
+				// Stream dims are aspect-only (e.g. 16:9); still measure the real preview in the
+				// background (fire-and-forget) to warm the shared cache so the load-time path
+				// re-injects at true pixel dimensions on the next reload.
+				getImageDimensions(c.file_uuid, imageUrl).catch(() => {});
+			} else {
+				const _t0 = performance.now();
+				dims = await getImageDimensions(c.file_uuid, imageUrl);
+				_diag(`dims MEASURED (network, BLOCKING) for ${c.file_uuid} took ${Math.round(performance.now() - _t0)}ms`, dims);
+			}
+			return { image: buildGalleryImage(c.file_uuid, imageUrl, dims, prompt), prompt };
+		}));
+
+		const events = [];
+		let nextIndex = firstIndex;
+		while (entries.length) {
+			// Fill whatever room the current strip has left before starting a new one.
+			const chunk = entries.splice(0, MAX_GALLERY_IMAGES - stripImageCount);
+			events.push(...buildGalleryEvents(nextIndex, chunk));
+			nextIndex += 2;
+			stripImageCount += chunk.length;
+			if (stripImageCount >= MAX_GALLERY_IMAGES) {
+				events.push(...buildSeparatorEvents(nextIndex));
+				nextIndex += 1;
+				stripImageCount = 0;
+			}
+		}
+		return { events, addedBlocks: nextIndex - firstIndex };
 	};
 
 	// NOTE: this runs inside a TransformStream.transform(); a thrown error here would error
@@ -316,6 +421,11 @@ function createImageInjectingStream(sourceBody, orgId) {
 		if (!parsed || typeof parsed.index !== 'number') return;
 
 		try {
+			// Native text closes the current strip; the next gallery starts a fresh one.
+			if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'text') {
+				stripImageCount = 0;
+			}
+
 			// Accumulate the preceding tool_use's streamed input so we can recover its prompt.
 			if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
 				toolUseInputBuf.set(parsed.index, '');
@@ -330,7 +440,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 			// an image_gallery instead of bare image items, so they never match.
 			if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_result') {
 				const images = (parsed.content_block.content || []).filter((c) => c.type === 'image' && c.file_uuid);
-				if (images.length > 0 && orgId) pendingInjections.set(parsed.index, images);
+				if (images.length > 0) pendingInjections.set(parsed.index, images);
 			}
 
 			// The tool_result start is immediately followed by its stop; inject right after it.
@@ -344,10 +454,10 @@ function createImageInjectingStream(sourceBody, orgId) {
 					images.forEach((c, i) => _diag(`    image[${i}] keys=`, Object.keys(c), c));
 				}
 				const _tb = performance.now();
-				const _evs = await buildInjectedEvents(parsed.index, images, prompt, toolInput);
+				const { events, addedBlocks } = await buildInjectedEvents(parsed.index, images, prompt, toolInput);
 				_diag(`<<< buildInjectedEvents took ${Math.round(performance.now() - _tb)}ms (blocks the stream this long)`);
-				for (const ev of _evs) emit(controller, ev);
-				indexOffset += 2;
+				for (const ev of events) emit(controller, ev);
+				indexOffset += addedBlocks;
 			}
 		} catch (e) {
 			// Injection is best-effort; never let it break the native stream.
@@ -516,11 +626,27 @@ window.fetch = async (...args) => {
 					fileMap.set(f.file_uuid || f.uuid, f);
 				}
 
-				// Collect galleries to insert (process backwards to avoid index shift)
-				const insertions = []; // { afterIndex, toolUse, toolResult }
+				// Rebuild the content in one forward pass. Images from a run of tool_results are
+				// queued and flushed — in generation order, MAX_GALLERY_IMAGES per gallery, a
+				// separator between galleries — right before the next text block (so the renderer
+				// draws them after the collapsed tool run), or at the end of the message.
+				// (An earlier version spliced galleries in backwards from a shared insertion point,
+				// which reversed every such run. Don't go back to that.)
+				const rebuilt = [];
+				let pending = []; // gallery entries awaiting the next text block
+				const flush = () => {
+					chunkGalleryEntries(pending).forEach((chunk, n) => {
+						if (n > 0) rebuilt.push({ type: 'text', text: GALLERY_SEPARATOR_TEXT, uuid: crypto.randomUUID() });
+						rebuilt.push(...buildGalleryPair(chunk));
+					});
+					pending = [];
+				};
 
 				for (let i = 0; i < content.length; i++) {
 					const item = content[i];
+					if (item.type === 'text' && pending.length) flush();
+					rebuilt.push(item);
+
 					if (item.type !== 'tool_result') continue;
 					if (!item.content?.some(c => c.type === 'image')) continue;
 
@@ -528,10 +654,14 @@ window.fetch = async (...args) => {
 					// in this conversation get the live wrapper even if this build fails.
 					_markConversationHasImages(convId);
 
+					// Prompt from the preceding tool_use, if any
+					const precedingToolUse = i > 0 && content[i - 1].type === 'tool_use' ? content[i - 1] : null;
+					const prompt = precedingToolUse?.input?.prompt || '';
+
 					// Collect all image items from this tool_result. Resolve URL from the
 					// file entry if present, otherwise build it ourselves, then measure
 					// dimensions in parallel.
-					const galleryImages = (await Promise.all(item.content.map(async (c) => {
+					const entries = await Promise.all(item.content.map(async (c) => {
 						if (c.type !== 'image') return null;
 						const file = fileMap.get(c.file_uuid);
 
@@ -550,99 +680,17 @@ window.fetch = async (...args) => {
 
 						// Prefer dimensions from the file asset; otherwise measure the preview.
 						const asset = file?.preview_asset || file?.thumbnail_asset || {};
-						let realW = asset.image_width;
-						let realH = asset.image_height;
-						if (!realW || !realH) {
-							const dims = await getImageDimensions(c.file_uuid, imageUrl);
-							realW = dims.width;
-							realH = dims.height;
+						let dims = { width: asset.image_width, height: asset.image_height };
+						if (!dims.width || !dims.height) {
+							dims = await getImageDimensions(c.file_uuid, imageUrl);
 						}
 
-						// Scale dimensions up so the gallery renders at full width
-						const scale = 3840 / realW;
-						const scaledW = Math.round(realW * scale);
-						const scaledH = Math.round(realH * scale);
-
-						return {
-							id: c.file_uuid,
-							url: imageUrl,
-							thumbnail_url: imageUrl,
-							title: "",
-							source: "",
-							page_url: imageUrl,
-							width: scaledW,
-							height: scaledH,
-							thumbnail_width: scaledW,
-							thumbnail_height: scaledH
-						};
-					}))).filter(Boolean);
-
-					if (galleryImages.length === 0) continue;
-
-					// Get prompt from preceding tool_use if available
-					let prompt = "";
-					const precedingToolUse = i > 0 && content[i - 1].type === 'tool_use' ? content[i - 1] : null;
-					if (precedingToolUse?.input?.prompt) {
-						prompt = precedingToolUse.input.prompt;
-						galleryImages.forEach(img => img.title = "Generated: " + prompt.substring(0, 100));
-					}
-
-					const toolUseId = "toolu_gallery_" + crypto.randomUUID().replace(/-/g, '').substring(0, 20);
-					const timestamp = new Date().toISOString();
-
-					const galleryToolUse = {
-						start_timestamp: timestamp,
-						stop_timestamp: timestamp,
-						type: "tool_use",
-						id: toolUseId,
-						name: "image_search",
-						input: {},
-						message: "Generated image" + (galleryImages.length > 1 ? "s" : "")
-					};
-
-					const galleryToolResult = {
-						type: "tool_result",
-						tool_use_id: toolUseId,
-						name: "image_search",
-						content: [
-							{
-								type: "text",
-								text: prompt ? "Generated image for: " + prompt : "Generated image",
-								uuid: crypto.randomUUID()
-							},
-							{
-								type: "image_gallery",
-								images: galleryImages,
-								uuid: crypto.randomUUID(),
-								is_expired: false
-							}
-						],
-						is_error: false
-					};
-
-					insertions.push({ afterIndex: i, toolUse: galleryToolUse, toolResult: galleryToolResult });
+						return { image: buildGalleryImage(c.file_uuid, imageUrl, dims, prompt), prompt };
+					}));
+					pending.push(...entries.filter(Boolean));
 				}
-
-				// Apply insertions from end to start to preserve indices
-				for (let j = insertions.length - 1; j >= 0; j--) {
-					const { afterIndex, toolUse, toolResult } = insertions[j];
-
-					// Find first text item after the tool_result
-					let insertAt = -1;
-					for (let k = afterIndex + 1; k < content.length; k++) {
-						if (content[k].type === 'text') {
-							insertAt = k;
-							break;
-						}
-					}
-
-					if (insertAt !== -1) {
-						content.splice(insertAt, 0, toolUse, toolResult);
-					} else {
-						content.push(toolUse, toolResult);
-					}
-				}
-
+				if (pending.length) flush();
+				msg.content = rebuilt;
 			}
 		}
 
