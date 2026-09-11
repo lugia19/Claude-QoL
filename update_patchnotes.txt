@@ -1,1 +1,1 @@
-Change MAIN scripts load order to fix extra models (Opus 4.5) staying disabled
+Removed global text search - claude.ai's own search now searches message text. Chat search (all branches within a chat) is unchanged.

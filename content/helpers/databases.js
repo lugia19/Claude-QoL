@@ -38,9 +38,8 @@
 
 	// ======== QUERY MATCHING ========
 	// A query wrapped in slashes (`/pattern/`) is treated as a case-insensitive regex, everything
-	// else is scanned literally. Slashes are the only in-band syntax available to us - global search
-	// runs inside claude.ai's own search box, so there's nowhere to put a "regex" toggle.
-	// Anything trailing the closing slash means "not regex", so `/foo/i` searches for that literally.
+	// else is scanned literally. Anything trailing the closing slash means "not regex", so `/foo/i`
+	// searches for that literally.
 	window.ClaudeSearchShared.compileQuery = function (query) {
 		const literal = { regex: null, lower: (query || '').toLowerCase() };
 		if (!query || query.length <= 2) return literal;
@@ -247,15 +246,11 @@
 
 	async function _wipeAllEncryptedData() {
 		try {
-			const msgCount = await db.messages.count();
-			const metaCount = await db.metadata.count();
 			const cacheCount = await cacheDB.conversations.count();
 			const phantomCount = await phantomDB.phantomMessages.count();
-			console.log(`[QOL-Encryption] Wiping: ${msgCount} messages, ${metaCount} metadata, ${cacheCount} cached conversations, ${phantomCount} phantom messages`);
+			console.log(`[QOL-Encryption] Wiping: ${cacheCount} cached conversations, ${phantomCount} phantom messages`);
 
 			await Promise.all([
-				db.messages.clear(),
-				db.metadata.clear(),
 				cacheDB.conversations.clear(),
 				phantomDB.phantomMessages.clear()
 			]);
@@ -290,115 +285,22 @@
 	getEncryptionKey();
 
 	// ======== INDEXEDDB MANAGEMENT ========
-	const db = new Dexie('ClaudeSearchDB');
-
-	db.version(1).stores({
-		metadata: 'uuid',
-		messages: 'uuid'
-	});
-
-	// One-time migration: delete old databases
+	// One-time migration: delete databases left behind by removed features (the old search index
+	// and the global text search that replaced it).
 	async function deleteOldDatabases() {
-		try {
-			await Dexie.delete('claudeSearchIndex');
-			console.log('[QOL-DB] Deleted old database: claudeSearchIndex');
-		} catch (e) {
-			// Doesn't exist, that's fine
+		for (const name of ['claudeSearchIndex', 'ClaudeSearchDB']) {
+			try {
+				if (!(await Dexie.exists(name))) continue;
+				await Dexie.delete(name);
+				console.log('[QOL-DB] Deleted old database:', name);
+			} catch (e) {
+				console.warn('[QOL-DB] Failed to delete old database', name, e.message);
+			}
 		}
+		localStorage.removeItem('global_search_queries');
 	}
 
 	deleteOldDatabases();
-
-	class SearchDatabase {
-		constructor() {
-			// No initialization needed! Dexie handles it.
-		}
-
-		async setMetadata(conversationObj) {
-			await db.metadata.put(conversationObj);
-		}
-
-		async getMetadata(conversationId) {
-			return await db.metadata.get(conversationId);
-		}
-
-		async getAllMetadata() {
-			return await db.metadata.toArray();
-		}
-
-		async setMessages(conversationId, messages) {
-			// Extract searchable text only
-			const searchableText = messages
-				.map(m => ClaudeConversation.extractMessageText(m))
-				.join('\n');
-
-			const encrypted = await encryptData(searchableText);
-			await db.messages.put({
-				uuid: conversationId,
-				searchableText: encrypted
-			});
-		}
-
-		async getMessages(conversationId) {
-			const result = await db.messages.get(conversationId);
-			if (!result || !result.searchableText) return null;
-
-			try {
-				const raw = result.searchableText;
-				const decrypted = await decryptData(raw);
-				// Encrypt-on-read: if stored as plaintext and we have a key, re-encrypt
-				if (!raw?.v && _keyHash) {
-					const encrypted = await encryptData(decrypted);
-					await db.messages.put({ uuid: conversationId, searchableText: encrypted });
-				}
-				return decrypted;
-			} catch (e) {
-				console.warn(`[QOL-Encryption] Decryption failed for messages ${conversationId}, deleting entry`);
-				await db.messages.delete(conversationId);
-				return null;
-			}
-		}
-
-		// Which conversations have message text stored. The keys of `messages` are conversation
-		// uuids, one row per conversation, so this answers the existence question without reading
-		// (and decrypting) a single value.
-		async getAllConversationIdsWithMessages() {
-			return await db.messages.toCollection().primaryKeys();
-		}
-
-		async getAllMessages() {
-			const all = await db.messages.toArray();
-			const results = [];
-			for (const entry of all) {
-				try {
-					const raw = entry.searchableText;
-					const decrypted = await decryptData(raw);
-					// Encrypt-on-read
-					if (!raw?.v && _keyHash) {
-						const encrypted = await encryptData(decrypted);
-						await db.messages.put({ uuid: entry.uuid, searchableText: encrypted });
-					}
-					results.push({ uuid: entry.uuid, searchableText: decrypted });
-				} catch (e) {
-					console.warn(`[QOL-Encryption] Decryption failed for messages ${entry.uuid}, deleting entry`);
-					await db.messages.delete(entry.uuid);
-				}
-			}
-			return results;
-		}
-
-		async deleteConversation(conversationId) {
-			await Promise.all([
-				db.metadata.delete(conversationId),
-				db.messages.delete(conversationId)
-			]);
-		}
-	}
-
-
-
-	// Global database instance
-	window.ClaudeSearchShared.searchDB = new SearchDatabase();
 
 	// ======== CONVERSATION CACHE DB ========
 	const cacheDB = new Dexie('ClaudeExportDB'); // keep DB name for migration
@@ -477,14 +379,6 @@
 
 	async function _bulkEncryptAll() {
 		try {
-			// Encrypt all plaintext messages
-			const allMessages = await db.messages.toArray();
-			for (const row of allMessages) {
-				if (!row.searchableText?.v && _keyHash) {
-					const encrypted = await encryptData(row.searchableText);
-					await db.messages.put({ uuid: row.uuid, searchableText: encrypted });
-				}
-			}
 			// Encrypt all plaintext conversation cache entries
 			const allConvos = await cacheDB.conversations.toArray();
 			for (const row of allConvos) {

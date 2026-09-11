@@ -226,62 +226,8 @@
 		}
 	}
 
-	// ======== AUTO-OPEN SEARCH ========
-	let isNewConversation = true;
-
-	function checkForAutoOpenSearch() {
-		const conversationId = getConversationId();
-
-		if (!conversationId) {
-			// Not in a chat, reset flag
-			isNewConversation = true;
-			return;
-		}
-
-		// In a chat - only auto-open if we just navigated here
-		if (!isNewConversation) {
-			return;
-		}
-
-		console.log('[QOL-ChatSearch] Current conversation ID:', conversationId);
-
-		const queriesJson = localStorage.getItem('global_search_queries');
-		console.log('[QOL-ChatSearch] Queries from storage:', queriesJson);
-
-		const queries = JSON.parse(queriesJson || '{}');
-		const query = queries[conversationId];
-
-		console.log('[QOL-ChatSearch] Query for this conversation:', query);
-
-		if (!query) {
-			// No query for this conversation, mark as processed
-			isNewConversation = false;
-			return;
-		}
-
-		console.log('Auto-open search detected for query:', query);
-
-		const searchButton = document.querySelector('.search-button');
-		console.log('[QOL-ChatSearch] Search button found:', !!searchButton);
-
-		if (searchButton) {
-			console.log('Search button found, opening modal directly');
-
-			// Remove just this conversation's entry
-			delete queries[conversationId];
-			localStorage.setItem('global_search_queries', JSON.stringify(queries));
-
-			showSearchModal(query);
-
-			// NOW mark as not new, after successful open
-			isNewConversation = false;
-		}
-
-		// If button not found yet, keep isNewConversation=true so we keep checking
-	}
-
 	// ======== MAIN SEARCH MODAL ========
-	async function showSearchModal(autoQuery = null) {
+	async function showSearchModal() {
 		// Show loading modal
 		const loadingModal = createLoadingModal('Loading conversation...');
 		loadingModal.show();
@@ -446,12 +392,6 @@
 
 		// Focus the search input
 		setTimeout(() => searchInput.focus(), 100);
-
-		// If auto-open, pre-populate and run search
-		if (autoQuery) {
-			searchInput.value = autoQuery;
-			performSearch();
-		}
 	}
 
 	// ======== BUTTON CREATION ========
@@ -491,15 +431,6 @@
 			tooltip: 'Search Conversation',
 			pages: ['chat'],
 		});
-
-		// Check for auto-open search on chat pages (delayed start)
-		setTimeout(() => {
-			setInterval(() => {
-				if (window.location.pathname.includes('/chat/')) {
-					checkForAutoOpenSearch();
-				}
-			}, 1000);
-		}, 5000);
 	}
 
 	// Wait for DOM to be ready

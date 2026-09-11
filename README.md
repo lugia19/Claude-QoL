@@ -13,12 +13,6 @@ Available on:
 
 Allows you to start a new chat by forking an existing one. The new chat will include all the content of the old one up to that point (or a summary of the content up to that point) and optionally any attachments.
 
-## Global Text Search
-<img width="1165" height="209" alt="image" src="https://github.com/user-attachments/assets/82e11513-156e-4864-b472-9e70cc5348e4" />
-<img width="1156" height="553" alt="image" src="https://github.com/user-attachments/assets/edd0fd6d-6174-417c-bb1f-fafb0abad61b" />
-
-Allows you to search for text in all chats on your account. Will automatically open the chat-specific search with your query once you select a conversation.
-
 ## Chat Search
 <img width="710" height="298" alt="image" src="https://github.com/user-attachments/assets/fb240eca-68ac-4236-81b1-b6fbbdcd28a4" />
 
@@ -72,6 +66,6 @@ Adds a "Copy as rich text" button next to the existing copy button on content bl
 
 You may notice a disabled skill on your account named `qol-encryptionkey-do-not-delete` (the extension hides it from the in-app skills list, but it exists on your account). This is created and managed automatically — please don't delete it.
 
-Its only purpose is to store an encryption key at the account level. Features like global search keep a local cache of your message text in the browser (IndexedDB), and that cache is encrypted at rest using this key. Storing the key as an account-level skill means it travels with your account rather than being tied to a single browser, which lays the groundwork for future cross-device sync of that cached data.
+Its only purpose is to store an encryption key at the account level. Some features keep a local cache of conversation content in the browser (IndexedDB) - the export cache and forking's carried-over messages - and that cache is encrypted at rest using this key. Storing the key as an account-level skill means it travels with your account rather than being tied to a single browser, which lays the groundwork for future cross-device sync of that cached data.
 
 If you do delete it, nothing breaks — the extension simply generates a new key and rebuilds the local cache from scratch (the old encrypted cache becomes unrecoverable and is wiped).
