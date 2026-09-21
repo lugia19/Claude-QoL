@@ -140,7 +140,7 @@ window.fetch = async (...args) => {
 
 				let body;
 				try {
-					body = JSON.parse(config.body);
+					body = await readJsonRequestBody(config);
 				} catch (e) {
 					return originalFetch(...args);
 				}
@@ -149,12 +149,7 @@ window.fetch = async (...args) => {
 					console.log('Fixing parent_message_uuid from phantom to root for completion request');
 					body.parent_message_uuid = "00000000-0000-4000-8000-000000000000";
 
-					const newConfig = {
-						...config,
-						body: JSON.stringify(body)
-					};
-
-					return originalFetch(input, newConfig);
+					return originalFetch(input, await withJsonRequestBody(config, body));
 				}
 			}
 		}

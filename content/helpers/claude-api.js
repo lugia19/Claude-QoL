@@ -1924,6 +1924,28 @@ function generateUuid() {
 	});
 }
 
+// claude.ai gzips some request bodies (Content-Encoding: gzip, body is bytes instead of a JSON string)
+function isGzipRequest(config) {
+	return new Headers(config?.headers || {}).get('content-encoding')?.toLowerCase() === 'gzip';
+}
+
+// Parse a fetch init's JSON body, whether it's a string or (gzipped) bytes
+async function readJsonRequestBody(config) {
+	const body = config?.body;
+	if (typeof body === 'string') return JSON.parse(body);
+	let stream = new Response(body).body;
+	if (isGzipRequest(config)) stream = stream.pipeThrough(new DecompressionStream('gzip'));
+	return JSON.parse(await new Response(stream).text());
+}
+
+// Return a copy of config with bodyObj serialized in the same encoding the original body used
+async function withJsonRequestBody(config, bodyObj) {
+	const json = JSON.stringify(bodyObj);
+	if (!isGzipRequest(config)) return { ...config, body: json };
+	const compressed = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+	return { ...config, body: await new Response(compressed).arrayBuffer() };
+}
+
 function getOrgId() {
 	const cookies = document.cookie.split(';');
 	for (const cookie of cookies) {

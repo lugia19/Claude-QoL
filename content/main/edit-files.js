@@ -699,8 +699,8 @@
 		});
 	}
 
-	function formatNewRequest(url, config) {
-		const originalBody = JSON.parse(config.body);
+	async function formatNewRequest(url, config) {
+		const originalBody = await readJsonRequestBody(config);
 		const completionJson = editMessage.toCompletionJSON();
 
 		const modifiedBody = {
@@ -712,10 +712,7 @@
 
 		return {
 			url,
-			config: {
-				...config,
-				body: JSON.stringify(modifiedBody)
-			}
+			config: await withJsonRequestBody(config, modifiedBody)
 		};
 	}
 	//#endregion
@@ -740,7 +737,7 @@
 			pendingEditData = null;
 
 			try {
-				const modifiedRequest = formatNewRequest(url, config);
+				const modifiedRequest = await formatNewRequest(url, config);
 				cleanupEditState();
 				return originalFetch(modifiedRequest.url, modifiedRequest.config);
 			} catch (error) {
