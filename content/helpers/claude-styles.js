@@ -1372,6 +1372,8 @@ const ButtonBar = {
 	// _fitToHeader). Insertion order is collapse order, so the last entry is the first to come back.
 	// Each maps to the button's width when it was collapsed, which is what restoring it will cost.
 	_overflowed: new Map(),
+	_fitScope: null,
+	_fitScopeGroup: null,
 	_fitObservedHeader: null,
 	_fitResizeObserver: null,
 	_fitMutationObserver: null,
@@ -1424,6 +1426,17 @@ const ButtonBar = {
 		this._cleanStaleContainers(anchor);
 		this._ensureContainer(anchor);
 		if (!this._container) return;
+
+		// What overflowed belongs to one header on one page type. Going straight from one fitted
+		// header to another (a narrow chat to a narrow cowork chat) keeps us in fit mode throughout,
+		// so nothing else would clear it, and the next page would start with the last page's buttons
+		// hidden - some of which it doesn't even have.
+		const fitScope = this._container.parentElement;
+		if (fitScope !== this._fitScope || layout.group !== this._fitScopeGroup) {
+			this._fitScope = fitScope;
+			this._fitScopeGroup = layout.group;
+			this._overflowed.clear();
+		}
 
 		this._syncButtons(layout.group);
 
@@ -1646,13 +1659,16 @@ const ButtonBar = {
 		const isMobile = window.innerHeight > window.innerWidth;
 		const isChatGroup = group === 'chat';
 
-		// Remove buttons that don't belong to the current group
+		// Remove buttons that don't belong to the current group - from the bar and from the menu, or
+		// the menu keeps offering the previous page's actions.
 		for (const [buttonClass, reg] of this._registrations) {
 			if (!reg.pages.includes(group)) {
 				const existing = container.querySelector('.' + buttonClass);
 				if (existing) existing.remove();
 			}
 		}
+		this._mobileModalButtons = this._mobileModalButtons.filter(b =>
+			this._registrations.get(b.class)?.pages.includes(group));
 
 		for (const [buttonClass, reg] of this._registrations) {
 			// Check if this button should appear on this page type
@@ -1689,10 +1705,6 @@ const ButtonBar = {
 				const button = reg.createFn();
 				button.classList.add(buttonClass);
 
-				if (isMobile) {
-					button.classList.add('-mx-1.5');
-				}
-
 				if (reg.tooltip) {
 					createClaudeTooltip(button, reg.tooltip);
 				}
@@ -1716,7 +1728,6 @@ const ButtonBar = {
 					</svg>
 				`, 'icon');
 				moreButton.classList.add('more-actions-button');
-				if (isMobile) moreButton.classList.add('-mx-1.5');
 				moreButton.onclick = () => this._showMoreActionsModal();
 				createClaudeTooltip(moreButton, 'More actions');
 				container.appendChild(moreButton);
@@ -1725,6 +1736,10 @@ const ButtonBar = {
 			const moreBtn = container.querySelector('.more-actions-button');
 			if (moreBtn) moreBtn.remove();
 		}
+
+		// The mobile spacing tracks the current mode rather than the one a button was created in: a
+		// button made in landscape stays in the bar across a rotation to portrait, and vice versa.
+		container.querySelectorAll('button').forEach(btn => btn.classList.toggle('-mx-1.5', isMobile));
 
 		this._reorderButtons();
 	},
