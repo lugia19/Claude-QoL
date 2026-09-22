@@ -121,6 +121,77 @@
                     is_dismissible: false
                 }
             }
+        },
+        {
+            // Claude still ships 4.7 in `chat`/`design`/`voice` as deprecated + disabled.
+            bootstrap: {
+                model: 'claude-opus-4-7',
+                name: 'Claude Opus 4.7',
+                inactive: false,
+                notice_text: 'Opus consumes usage limits faster than other models',
+                paprika_modes: ['extended'],
+                thinking_modes: [
+                    {
+                        description: 'Can think for more complex tasks',
+                        id: 'auto',
+                        mode: 'extended',
+                        paprika_mode_value: 'extended',
+                        selection_title: 'Thinking',
+                        title: 'Thinking'
+                    }
+                ],
+                hard_limit: 449000
+            },
+            selector: {
+                id: 'claude-opus-4-7',
+                name: 'Opus 4.7',
+                short_name: 'Opus',
+                notice_text: 'Opus consumes usage limits faster than Sonnet and Haiku',
+                section: TARGET_SECTION,
+                capabilities: {
+                    compass: true,
+                    gsuite_tools: true,
+                    mm_images: true,
+                    mm_pdf: true,
+                    web_search: true
+                },
+                thinking: {
+                    type: 'effort_and_mode',
+                    description: 'Higher effort means more thorough responses, but takes longer and uses your limits faster.',
+                    effort_options: [
+                        { id: 'low', name: 'Low' },
+                        { id: 'medium', name: 'Medium' },
+                        { id: 'high', name: 'High' },
+                        {
+                            id: 'xhigh',
+                            name: 'Extra',
+                            recommended: true,
+                            badge: { message: 'Default', variant: 'neutral' }
+                        },
+                        {
+                            id: 'max',
+                            name: 'Max',
+                            tooltip: {
+                                content: 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.'
+                            }
+                        }
+                    ],
+                    mode_options: [
+                        { id: 'auto', name: 'Thinking', description: 'Can think for more complex tasks' },
+                        { id: 'off', name: 'Off' }
+                    ]
+                },
+                hard_limit: 449000,
+                voice_model: 'claude-opus-5',
+                notice: {
+                    title: null,
+                    text: 'Opus consumes usage limits faster than Sonnet and Haiku',
+                    cta: null,
+                    is_dismissible: false
+                }
+            },
+            // 4.7 has no `extended` mode — its thinking toggle is `auto`/`off`.
+            defaultThinking: { type: 'effort_and_mode', effort: 'xhigh', mode: 'auto' }
         }
     ];
 
@@ -175,7 +246,7 @@
                 if (surface.thinking_by_model.some(t => t.id === id)) continue;
                 surface.thinking_by_model.push({
                     id,
-                    thinking: { type: 'effort_and_mode', effort: 'high', mode: 'extended' }
+                    thinking: extra.defaultThinking ?? { type: 'effort_and_mode', effort: 'high', mode: 'extended' }
                 });
             }
         }
