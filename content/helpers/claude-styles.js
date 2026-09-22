@@ -1368,6 +1368,14 @@ const ButtonBar = {
 	_pollInterval: null,
 	_container: null,
 	_currentGroup: null,
+	// Buttons moved into the "More actions" menu because the header ran out of width (see
+	// _fitToHeader). Insertion order is collapse order, so the last entry is the first to come back.
+	// Each maps to the button's width when it was collapsed, which is what restoring it will cost.
+	_overflowed: new Map(),
+	_fitObservedHeader: null,
+	_fitResizeObserver: null,
+	_fitMutationObserver: null,
+	_fitScheduled: false,
 
 	getCurrentGroup() {
 		return this._currentGroup;
@@ -1424,6 +1432,137 @@ const ButtonBar = {
 		} else if (anchor.mode === 'inline') {
 			this._updateInlineOffset();
 		}
+
+		this._observeHeaderForFit(anchor);
+		this._fitToHeader();
+	},
+
+	// ======== HEADER OVERFLOW ========
+	// Inline, the buttons share a fixed-height header row with the page title, the page's own
+	// actions, and anything other extensions put there. In a narrow window that row runs out of
+	// width, and the title group is the only thing in it allowed to shrink. The portrait "mobile"
+	// check never fires for a narrow landscape window (a side panel open, a half-screen window), so
+	// all the buttons stayed and squeezed the title to nothing. So collapse buttons into the "More
+	// actions" menu, rightmost first, while anything in the row doesn't fit.
+	//
+	// "Doesn't fit" is deliberately generic: a row child whose content is wider than its box, or
+	// taller than the row. It sees an ellipsised title only if the ellipsis is on that child itself,
+	// so claude.ai's normal truncation of a long title doesn't trigger it - but content spilling out
+	// of a row child does, whoever put it there. Claude Usage Tracker relies on this: it keeps its
+	// stats line's full width claimed in the title group and lets it spill, and expects us to make
+	// room.
+
+	_isHeaderFitMode(anchor) {
+		return anchor?.mode === 'inline' && window.innerHeight <= window.innerWidth;
+	},
+
+	_headerRowChildren(header) {
+		return [...header.children].filter(child => {
+			if (child === this._container) return false;
+			const cs = getComputedStyle(child);
+			return cs.display !== 'none' && cs.display !== 'contents'
+				&& cs.position !== 'absolute' && cs.position !== 'fixed';
+		});
+	},
+
+	_headerOverflows(header) {
+		const rowHeight = header.clientHeight;
+		return this._headerRowChildren(header).some(child =>
+			child.scrollWidth > child.clientWidth + 1
+			|| child.getBoundingClientRect().height > rowHeight + 1);
+	},
+
+	// Width the row could still give up: its inner width minus everything that doesn't grow. A
+	// growing child (claude.ai's draggable spacer) is only soaking up leftover space, so it counts
+	// as free.
+	_headerSlack(header) {
+		const cs = getComputedStyle(header);
+		const inner = header.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+		const gap = parseFloat(cs.columnGap) || 0;
+		const children = [...this._headerRowChildren(header), this._container];
+		const used = children
+			.filter(child => child === this._container || (parseFloat(getComputedStyle(child).flexGrow) || 0) === 0)
+			.reduce((sum, child) => sum + child.getBoundingClientRect().width, 0);
+		return inner - used - gap * Math.max(0, children.length - 1);
+	},
+
+	_fitToHeader() {
+		const container = this._container;
+		const header = container?.parentElement;
+		const layout = this._detectLayout();
+		const anchor = layout?.getAnchor();
+		if (!header || !this._isHeaderFitMode(anchor)) {
+			if (this._overflowed.size > 0) {
+				this._overflowed.clear();
+				if (layout) this._syncButtons(layout.group);
+			}
+			return;
+		}
+
+		const gap = parseFloat(getComputedStyle(container).columnGap) || 0;
+		const collapsible = () => [...container.querySelectorAll('button')]
+			.filter(btn => !btn.classList.contains('more-actions-button'))
+			.map(btn => [...this._registrations.keys()].find(cls => btn.classList.contains(cls)))
+			.filter(Boolean);
+
+		// Collapse, rightmost first, until the row fits or there is nothing left to collapse.
+		let changed = false;
+		while (this._headerOverflows(header)) {
+			const visible = collapsible();
+			if (visible.length === 0) break;
+			const buttonClass = visible[visible.length - 1];
+			const width = container.querySelector('.' + buttonClass).getBoundingClientRect().width;
+			this._overflowed.set(buttonClass, width);
+			this._syncButtons(layout.group);
+			changed = true;
+		}
+
+		// Restore, last collapsed first, only when the row has room for the button - and, when it is
+		// the last one out, counting the "More actions" button it lets us drop. The width test is what
+		// keeps this from flapping: without it we would restore into an overflow, collapse again on the
+		// next check, and repeat. Checked again afterwards in case the estimate was wrong.
+		while (!changed && this._overflowed.size > 0) {
+			const [buttonClass, width] = [...this._overflowed].pop();
+			const moreButton = container.querySelector('.more-actions-button');
+			const freed = this._overflowed.size === 1 && moreButton ? moreButton.getBoundingClientRect().width + gap : 0;
+			if (this._headerSlack(header) + freed < width + gap) break;
+			this._overflowed.delete(buttonClass);
+			this._syncButtons(layout.group);
+			if (this._headerOverflows(header)) {
+				this._overflowed.set(buttonClass, width);
+				this._syncButtons(layout.group);
+				break;
+			}
+		}
+	},
+
+	// Re-fit as soon as the row changes rather than on the next 1s tick: on a resize, and when
+	// anything outside our own container is added, removed or retexted.
+	_observeHeaderForFit(anchor) {
+		const header = this._isHeaderFitMode(anchor) ? this._container?.parentElement : null;
+		if (header === this._fitObservedHeader) return;
+
+		this._fitResizeObserver?.disconnect();
+		this._fitMutationObserver?.disconnect();
+		this._fitObservedHeader = header;
+		if (!header) return;
+
+		this._fitResizeObserver ??= new ResizeObserver(() => this._scheduleFit());
+		this._fitMutationObserver ??= new MutationObserver(records => {
+			// Our own collapses and restores mutate the container; reacting to them would loop.
+			if (records.some(r => !this._container?.contains(r.target))) this._scheduleFit();
+		});
+		this._fitResizeObserver.observe(header);
+		this._fitMutationObserver.observe(header, { childList: true, subtree: true, characterData: true });
+	},
+
+	_scheduleFit() {
+		if (this._fitScheduled) return;
+		this._fitScheduled = true;
+		requestAnimationFrame(() => {
+			this._fitScheduled = false;
+			this._fitToHeader();
+		});
 	},
 
 	_cleanStaleContainers(anchor) {
@@ -1507,8 +1646,9 @@ const ButtonBar = {
 			// Check if this button should appear on this page type
 			if (!reg.pages.includes(group)) continue;
 
-			// Mobile handling: on chat pages, non-forced buttons go to "More actions" modal
-			if (isMobile && isChatGroup && !reg.forceDisplayOnMobile) {
+			// Mobile handling: on chat pages, non-forced buttons go to "More actions" modal. So does
+			// anything the header had no room for (see _fitToHeader).
+			if ((isMobile && isChatGroup && !reg.forceDisplayOnMobile) || this._overflowed.has(buttonClass)) {
 				// Remove from container if it exists
 				const existing = container.querySelector('.' + buttonClass);
 				if (existing) existing.remove();
@@ -1553,8 +1693,8 @@ const ButtonBar = {
 			}
 		}
 
-		// Handle "More actions" button for mobile on chat pages
-		if (isMobile && isChatGroup && this._mobileModalButtons.length > 0) {
+		// Handle "More actions" button for mobile on chat pages, or for whatever the header overflowed
+		if ((isMobile && isChatGroup || this._overflowed.size > 0) && this._mobileModalButtons.length > 0) {
 			if (!container.querySelector('.more-actions-button')) {
 				const moreButton = createClaudeButton(`
 					<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -1563,7 +1703,8 @@ const ButtonBar = {
 						<circle cx="8" cy="14" r="1.5"/>
 					</svg>
 				`, 'icon');
-				moreButton.classList.add('more-actions-button', '-mx-1.5');
+				moreButton.classList.add('more-actions-button');
+				if (isMobile) moreButton.classList.add('-mx-1.5');
 				moreButton.onclick = () => this._showMoreActionsModal();
 				createClaudeTooltip(moreButton, 'More actions');
 				container.appendChild(moreButton);
@@ -1639,7 +1780,12 @@ const ButtonBar = {
 		const list = document.createElement('div');
 		list.className = 'space-y-2';
 
-		this._mobileModalButtons.forEach(btnInfo => {
+		// In bar order: header overflow adds entries rightmost first.
+		const barIndex = cls => {
+			const i = this.BUTTON_PRIORITY.indexOf(cls);
+			return i === -1 ? this.BUTTON_PRIORITY.length : i;
+		};
+		[...this._mobileModalButtons].sort((a, b) => barIndex(a.class) - barIndex(b.class)).forEach(btnInfo => {
 			const button = btnInfo.createFn();
 			const item = document.createElement('div');
 			item.className = 'p-3 rounded bg-bg-200 border border-border-300 hover:bg-bg-300 cursor-pointer transition-colors flex items-center gap-3';
