@@ -146,6 +146,8 @@
 			createFn: createBannerWatcherButton,
 			tooltip: 'Usage flags',
 			pages: ['chat', 'home', 'coworkHome', 'coworkChat'],
+			// Hidden with no active flags (see updateButton) - in the More menu too.
+			menuVisible: () => _activeFlags.length > 0,
 			onInjected: (btn) => {
 				_buttonRef = btn;
 				updateButton();

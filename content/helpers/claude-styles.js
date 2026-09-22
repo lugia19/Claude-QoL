@@ -1404,9 +1404,9 @@ const ButtonBar = {
 		if (modalEntry) modalEntry.tooltip = text;
 	},
 
-	register({ buttonClass, createFn, tooltip = '', forceDisplayOnMobile = false, pages, onInjected = null }) {
+	register({ buttonClass, createFn, tooltip = '', forceDisplayOnMobile = false, pages, onInjected = null, menuVisible = null }) {
 		if (this._registrations.has(buttonClass)) return;
-		this._registrations.set(buttonClass, { buttonClass, createFn, tooltip, forceDisplayOnMobile, pages, onInjected });
+		this._registrations.set(buttonClass, { buttonClass, createFn, tooltip, forceDisplayOnMobile, pages, onInjected, menuVisible });
 		if (!this._pollInterval) {
 			this._pollInterval = setInterval(() => this._tick(), 1000);
 			this._tick();
@@ -1538,7 +1538,8 @@ const ButtonBar = {
 
 		const gap = parseFloat(getComputedStyle(container).columnGap) || 0;
 		const collapsible = () => [...container.querySelectorAll('button')]
-			.filter(btn => !btn.classList.contains('more-actions-button'))
+			// A button that isn't rendered (hidden by its own feature) frees nothing by collapsing.
+			.filter(btn => !btn.classList.contains('more-actions-button') && btn.getBoundingClientRect().width > 0)
 			.map(btn => [...this._registrations.keys()].find(cls => btn.classList.contains(cls)))
 			.filter(Boolean);
 
@@ -1825,7 +1826,13 @@ const ButtonBar = {
 			const i = this.BUTTON_PRIORITY.indexOf(cls);
 			return i === -1 ? this.BUTTON_PRIORITY.length : i;
 		};
-		[...this._mobileModalButtons].sort((a, b) => barIndex(a.class) - barIndex(b.class)).forEach(btnInfo => {
+		// A menu entry is rebuilt from createFn and never passed to onInjected, so a button that hides
+		// itself (the banner watcher, with no active flags) can't do so here. Its menuVisible() says
+		// whether it would currently be shown.
+		const entries = this._mobileModalButtons
+			.filter(btnInfo => this._registrations.get(btnInfo.class)?.menuVisible?.() ?? true)
+			.sort((a, b) => barIndex(a.class) - barIndex(b.class));
+		entries.forEach(btnInfo => {
 			const button = btnInfo.createFn();
 			const item = document.createElement('div');
 			item.className = 'p-3 rounded bg-bg-200 border border-border-300 hover:bg-bg-300 cursor-pointer transition-colors flex items-center gap-3';
