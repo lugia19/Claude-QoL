@@ -1252,7 +1252,7 @@ const pageLayouts = {
 		getAnchor() {
 			const actionsSlot = document.querySelector('#dframe-header-actions-slot');
 			if (!actionsSlot) return null;
-			return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline' };
+			return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline', fitToHeader: true };
 		},
 	},
 	chatActions: {
@@ -1271,7 +1271,7 @@ const pageLayouts = {
 					return { parent: header, referenceNode: null, mode: 'inline' };
 				}
 			}
-			return { parent: chatActions.parentElement, referenceNode: chatActions, mode: 'inline' };
+			return { parent: chatActions.parentElement, referenceNode: chatActions, mode: 'inline', fitToHeader: true };
 		},
 	},
 	chatWiggle: {
@@ -1287,7 +1287,7 @@ const pageLayouts = {
 			if (!wiggle) return null;
 			const actionsSlot = wiggle.closest('#dframe-header-actions-slot');
 			if (actionsSlot) {
-				return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline' };
+				return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline', fitToHeader: true };
 			}
 			const isMobile = window.innerHeight > window.innerWidth;
 			if (isMobile) {
@@ -1445,15 +1445,24 @@ const ButtonBar = {
 	// all the buttons stayed and squeezed the title to nothing. So collapse buttons into the "More
 	// actions" menu, rightmost first, while anything in the row doesn't fit.
 	//
-	// "Doesn't fit" is deliberately generic: a row child whose content is wider than its box, or
-	// taller than the row. It sees an ellipsised title only if the ellipsis is on that child itself,
-	// so claude.ai's normal truncation of a long title doesn't trigger it - but content spilling out
-	// of a row child does, whoever put it there. Claude Usage Tracker relies on this: it keeps its
-	// stats line's full width claimed in the title group and lets it spill, and expects us to make
-	// room.
+	// "Doesn't fit" means squeezed: the row has no free width left, and a row child that is allowed
+	// to shrink has content wider than its box, or has grown taller than the row. Both conditions
+	// matter. Some of claude.ai's own controls overflow their boxes by a few pixels as a matter of
+	// course (the new-chat page's actions slot does), and collapsing can't fix that - it would take
+	// every button away for nothing. A shrink-0 child was never squeezed by us, and a row with slack
+	// isn't short of width.
+	//
+	// It sees an ellipsised title only if the ellipsis is on that child itself, so claude.ai's normal
+	// truncation of a long title doesn't trigger it - but content spilling out of a row child does,
+	// whoever put it there. Claude Usage Tracker relies on this: it keeps its stats line's full width
+	// claimed in the title group and lets it spill, and expects us to make room.
+	//
+	// Opt-in per layout (`fitToHeader` on the anchor): only a header row shared with a title has
+	// something worth making room for, and other anchors sit inside small native button clusters
+	// where the row measurements mean nothing.
 
 	_isHeaderFitMode(anchor) {
-		return anchor?.mode === 'inline' && window.innerHeight <= window.innerWidth;
+		return anchor?.mode === 'inline' && anchor.fitToHeader === true && window.innerHeight <= window.innerWidth;
 	},
 
 	_headerRowChildren(header) {
@@ -1466,10 +1475,13 @@ const ButtonBar = {
 	},
 
 	_headerOverflows(header) {
+		if (this._headerSlack(header) > 1) return false;
 		const rowHeight = header.clientHeight;
-		return this._headerRowChildren(header).some(child =>
-			child.scrollWidth > child.clientWidth + 1
-			|| child.getBoundingClientRect().height > rowHeight + 1);
+		return this._headerRowChildren(header).some(child => {
+			if ((parseFloat(getComputedStyle(child).flexShrink) || 0) === 0) return false;
+			return child.scrollWidth > child.clientWidth + 1
+				|| child.getBoundingClientRect().height > rowHeight + 1;
+		});
 	},
 
 	// Width the row could still give up: its inner width minus everything that doesn't grow. A
