@@ -1197,6 +1197,18 @@ function createClaudeTooltip(element, tooltipText, deleteOnClick) {
 }
 
 
+// Whether to use the mobile variants of our UI: a touch device with a narrow window. The same test
+// Claude Usage Tracker uses, so the two extensions agree on it.
+//
+// Not orientation (innerHeight > innerWidth), which is what this used to be. On Android the on-screen
+// keyboard shrinks the layout viewport, so opening it turned a phone "landscape" and flipped
+// everything back to the desktop layout for as long as the user was typing. Neither input here moves
+// when the keyboard opens. A narrow desktop window, which orientation used to catch, stays desktop
+// and is handled by the button bar collapsing into its menu when the header runs out of width.
+function isMobileLayout() {
+	return matchMedia('(pointer: coarse)').matches && window.innerWidth < 768;
+}
+
 // ======== PAGE LAYOUTS ========
 // Modular layout registry for button injection targets.
 // Each layout has match() to detect the page, getAnchor() to find the DOM insertion point.
@@ -1264,7 +1276,7 @@ const pageLayouts = {
 		getAnchor() {
 			const chatActions = document.querySelector('[data-testid="chat-actions"]');
 			if (!chatActions) return null;
-			const isMobile = window.innerHeight > window.innerWidth;
+			const isMobile = isMobileLayout();
 			if (isMobile) {
 				const header = chatActions.closest('header');
 				if (header) {
@@ -1289,7 +1301,7 @@ const pageLayouts = {
 			if (actionsSlot) {
 				return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline', fitToHeader: true };
 			}
-			const isMobile = window.innerHeight > window.innerWidth;
+			const isMobile = isMobileLayout();
 			if (isMobile) {
 				return { parent: wiggle.parentElement, referenceNode: wiggle.nextElementSibling, mode: 'wiggle' };
 			}
@@ -1453,10 +1465,10 @@ const ButtonBar = {
 	// ======== HEADER OVERFLOW ========
 	// Inline, the buttons share a fixed-height header row with the page title, the page's own
 	// actions, and anything other extensions put there. In a narrow window that row runs out of
-	// width, and the title group is the only thing in it allowed to shrink. The portrait "mobile"
-	// check never fires for a narrow landscape window (a side panel open, a half-screen window), so
-	// all the buttons stayed and squeezed the title to nothing. So collapse buttons into the "More
-	// actions" menu, rightmost first, while anything in the row doesn't fit.
+	// width, and the title group is the only thing in it allowed to shrink. A narrow desktop window (a
+	// side panel open, a half-screen window) isn't a mobile layout (see isMobileLayout), so all the
+	// buttons stayed and squeezed the title to nothing. So collapse buttons into the "More actions"
+	// menu, rightmost first, while anything in the row doesn't fit.
 	//
 	// "Doesn't fit" means squeezed: the row has no free width left, and a row child that is allowed
 	// to shrink has content wider than its box, or has grown taller than the row. Both conditions
@@ -1475,7 +1487,7 @@ const ButtonBar = {
 	// where the row measurements mean nothing.
 
 	_isHeaderFitMode(anchor) {
-		return anchor?.mode === 'inline' && anchor.fitToHeader === true && window.innerHeight <= window.innerWidth;
+		return anchor?.mode === 'inline' && anchor.fitToHeader === true && !isMobileLayout();
 	},
 
 	_headerRowChildren(header) {
@@ -1626,7 +1638,7 @@ const ButtonBar = {
 			let container = anchor.parent.querySelector(':scope > .toolbox-buttons');
 			if (!container) {
 				container = document.createElement('div');
-				const isMobileChat = this._currentGroup === 'chat' && window.innerHeight > window.innerWidth;
+				const isMobileChat = this._currentGroup === 'chat' && isMobileLayout();
 				if (anchor.mode === 'wiggle') {
 					if (isMobileChat) {
 						container.className = 'toolbox-buttons flex items-center gap-1 pointer-events-auto self-end px-3 z-20 bg-bg-100 rounded-bl-lg';
@@ -1656,7 +1668,7 @@ const ButtonBar = {
 
 	_syncButtons(group) {
 		const container = this._container;
-		const isMobile = window.innerHeight > window.innerWidth;
+		const isMobile = isMobileLayout();
 		const isChatGroup = group === 'chat';
 
 		// Remove buttons that don't belong to the current group - from the bar and from the menu, or
@@ -1738,7 +1750,8 @@ const ButtonBar = {
 		}
 
 		// The mobile spacing tracks the current mode rather than the one a button was created in: a
-		// button made in landscape stays in the bar across a rotation to portrait, and vice versa.
+		// button made in the desktop layout stays in the bar when the window crosses into the mobile
+		// one (a rotation, a resize), and vice versa.
 		container.querySelectorAll('button').forEach(btn => btn.classList.toggle('-mx-1.5', isMobile));
 
 		this._reorderButtons();
@@ -1794,7 +1807,7 @@ const ButtonBar = {
 	},
 
 	_updateWigglePosition(anchor) {
-		if (window.innerHeight > window.innerWidth) return;
+		if (isMobileLayout()) return;
 		const wiggle = anchor.parent.querySelector('[data-testid="wiggle-controls-actions"]');
 		if (wiggle && this._container) {
 			this._container.style.right = (wiggle.offsetWidth + 4) + 'px';

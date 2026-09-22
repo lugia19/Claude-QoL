@@ -324,7 +324,7 @@
 
 	//#region File Item Builders and Handlers
 	function truncateFilename(filename, customMaxLength = null) {
-		const maxLength = customMaxLength || (window.innerWidth < window.innerHeight ? 20 : 60);
+		const maxLength = customMaxLength || (isMobileLayout() ? 20 : 60);
 
 		if (filename.length <= maxLength) return filename;
 
