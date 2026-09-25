@@ -135,10 +135,20 @@ class ClaudeModal {
 		}
 	}
 
+	// Escape / backdrop click. Behaves exactly like clicking Cancel, so a modal
+	// whose caller waits on its Cancel handler can't be left hanging.
+	dismiss() {
+		if (this.dismissButton) {
+			this.dismissButton.click();
+		} else {
+			this.destroy();
+		}
+	}
+
 	_attachEventListeners() {
 		this._handleEscape = (e) => {
 			if (e.key === 'Escape' && this.isVisible && this.config.dismissible) {
-				this.hide();
+				this.dismiss();
 			}
 		};
 
@@ -153,7 +163,7 @@ class ClaudeModal {
 		this.backdrop.addEventListener('mouseup', (e) => {
 			// Only close if both mousedown AND mouseup were on backdrop
 			if (mouseDownOnBackdrop && e.target === this.backdrop && this.config.dismissible) {
-				this.hide();
+				this.dismiss();
 			}
 			// Reset flag
 			mouseDownOnBackdrop = false;
@@ -192,7 +202,8 @@ class ClaudeModal {
 	}
 
 	addCancel(text = 'Cancel', onClick = null) {
-		return this.addButton(text, 'secondary', onClick, true);
+		this.dismissButton = this.addButton(text, 'secondary', onClick, true);
+		return this.dismissButton;
 	}
 
 	addConfirm(text = 'Confirm', onClick = null, closeOnClick = true) {
@@ -293,14 +304,6 @@ function showClaudeConfirm(title, message) {
 		modal.addConfirm('Confirm', () => {
 			resolve(true);
 		});
-
-		// Override backdrop click to resolve with false
-		modal.backdrop.onclick = (e) => {
-			if (e.target === modal.backdrop) {
-				modal.hide();
-				resolve(false);
-			}
-		};
 
 		modal.show();
 	});
@@ -437,7 +440,8 @@ function showClaudeAlert(title, message, buttonText = 'OK') {
 		}
 
 		const modal = new ClaudeModal(title, contentDiv);
-		modal.addButton(buttonText, 'primary', () => {
+		// Its only button is the acknowledgement, so dismissing counts as clicking it.
+		modal.dismissButton = modal.addButton(buttonText, 'primary', () => {
 			resolve();
 		});
 		modal.show();
