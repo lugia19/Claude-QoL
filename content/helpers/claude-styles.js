@@ -63,6 +63,10 @@ if (document.head) document.head.appendChild(toolboxStyles);
 
 // Component creators
 class ClaudeModal {
+	// Visible modals, in show order. Escape only ever dismisses the topmost one,
+	// so an alert stacked on a prompt doesn't also cancel the prompt.
+	static _openStack = [];
+
 	constructor(title = '', content = '', dismissible = true) {
 		this.config = { title, content, dismissible };
 		this.isVisible = false;
@@ -146,12 +150,6 @@ class ClaudeModal {
 	}
 
 	_attachEventListeners() {
-		this._handleEscape = (e) => {
-			if (e.key === 'Escape' && this.isVisible && this.config.dismissible) {
-				this.dismiss();
-			}
-		};
-
 		// Track where the mousedown occurred
 		let mouseDownOnBackdrop = false;
 
@@ -221,7 +219,7 @@ class ClaudeModal {
 
 		this.backdrop.style.display = 'flex';
 		document.body.appendChild(this.backdrop);
-		document.addEventListener('keydown', this._handleEscape);
+		ClaudeModal._openStack.push(this);
 		this.isVisible = true;
 
 		// Steal focus
@@ -235,7 +233,7 @@ class ClaudeModal {
 		if (!this.isVisible) return this;
 
 		this.backdrop.style.display = 'none';
-		document.removeEventListener('keydown', this._handleEscape);
+		ClaudeModal._openStack.splice(ClaudeModal._openStack.indexOf(this), 1);
 		this.isVisible = false;
 
 		return this;
@@ -257,6 +255,12 @@ class ClaudeModal {
 		return this;
 	}
 }
+
+document.addEventListener('keydown', (e) => {
+	if (e.key !== 'Escape') return;
+	const top = ClaudeModal._openStack.at(-1);
+	if (top?.config.dismissible) top.dismiss();
+});
 
 function createLoadingContent(text) {
 	const div = document.createElement('div');
