@@ -9,8 +9,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"common.skip_file": "Lewati File",
 
 	// lang
-	"lang.tooltip": "Bahasa",
-	"lang.title": "Bahasa Toolbox",
 	"lang.label": "Bahasa",
 
 	// nav

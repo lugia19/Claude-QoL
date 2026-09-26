@@ -17,6 +17,7 @@
 // configured) we pass through to the real WebSocket so native TTS plays normally.
 (function () {
 	'use strict';
+	const log = createLogger('TTSWebSocket');
 
 	const OrigWS = window.WebSocket;
 	let hijack = false; // pushed from the ISOLATED world; false until told otherwise
@@ -81,7 +82,7 @@
 			if (type === 'message') ev = new MessageEvent('message', init);
 			else if (type === 'close') ev = new CloseEvent('close', init || { wasClean: true, code: 1000, reason: '' });
 			else ev = new Event(type);
-			try { this._handlers[type]?.call(this, ev); } catch (err) { console.error('[QOL-TTS] handler error', err); }
+			try { this._handlers[type]?.call(this, ev); } catch (err) { log.error('handler error', err); }
 			this.dispatchEvent(ev);
 		}
 
@@ -132,7 +133,7 @@
 				return new FakeWebSocket(url);
 			}
 		} catch (e) {
-			console.error('[QOL-TTS] WS hijack decision failed, passing through', e);
+			log.error('WS hijack decision failed, passing through', e);
 		}
 		return protocols === undefined ? new OrigWS(url) : new OrigWS(url, protocols);
 	}

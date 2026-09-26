@@ -9,8 +9,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"common.skip_file": "Salta file",
 
 	// lang
-	"lang.tooltip": "Lingua",
-	"lang.title": "Lingua di Toolbox",
 	"lang.label": "Lingua",
 
 	// nav

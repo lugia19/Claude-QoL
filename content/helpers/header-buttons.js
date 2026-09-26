@@ -165,7 +165,7 @@ const ButtonBar = {
 		'preset-switcher-button',
 		'export-button',
 		'tts-settings-button',
-		'language-settings-button',
+		'extension-settings-button',
 	],
 
 	_registrations: new Map(),

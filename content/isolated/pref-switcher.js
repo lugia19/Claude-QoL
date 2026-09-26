@@ -1,6 +1,7 @@
 // pref-switcher.js
 (function () {
 	'use strict';
+	const log = createLogger('PrefSwitcher');
 	const channel = new BroadcastChannel('pref-switcher-updates');
 
 	const PRESET_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>`;
@@ -18,7 +19,7 @@
 			const data = await response.json();
 			return data.conversation_preferences || '';
 		} catch (error) {
-			console.error('Failed to fetch preferences:', error);
+			log.error('Failed to fetch preferences:', error);
 			return '';
 		}
 	}
@@ -36,7 +37,7 @@
 			}
 			return response.ok;
 		} catch (error) {
-			console.error('Failed to set preferences:', error);
+			log.error('Failed to set preferences:', error);
 			return false;
 		}
 	}
@@ -191,7 +192,7 @@
 			modal.addCancel(localize('common.close'));
 			modal.show();
 		} catch (error) {
-			console.error('Error loading presets:', error);
+			log.error('Error loading presets:', error);
 			loadingModal.destroy();
 			showClaudeAlert(localize('common.error'), localize('prefs.load_presets_failed'));
 		}

@@ -22,6 +22,8 @@
 				"lib/mime.min.js",
 				"lib/marked.min.js",
 				"lib/highlight.min.js",
+				"common/log/logger.js",
+				"content/helpers/logging.js",
 				"common/i18n/en.js",
 				"common/i18n/fr.js",
 				"common/i18n/de.js",
@@ -64,7 +66,7 @@
 				"content/isolated/notifications.js",
 				"content/isolated/banner-watcher.js",
 				"content/isolated/rich-copy.js",
-				"content/isolated/language.js"
+				"content/isolated/extension-settings.js"
 			],
 			"run_at": "document_idle"
 		},
@@ -76,6 +78,8 @@
 				"content/main/extra-models.js",
 				"lib/jszip.min.js",
 				"lib/mime.min.js",
+				"common/log/logger.js",
+				"content/helpers/logging.js",
 				"common/i18n/en.js",
 				"common/i18n/fr.js",
 				"common/i18n/de.js",
@@ -132,6 +136,8 @@
 				"common/assets/kofi-button.png",
 				"common/assets/rate-badge.png",
 				"update_patchnotes.txt",
+				"common/log/viewer.html",
+				"common/log/viewer.js",
 				"html_template/export-template.css",
 				"html_template/export-template.js"
 			],

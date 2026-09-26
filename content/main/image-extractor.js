@@ -8,6 +8,8 @@
 // msg.files no longer carries preview_asset dimensions, so we load the built preview
 // URL and read its natural size. Persist the results in localStorage keyed by
 // file_uuid so reloading a long conversation doesn't re-measure every image.
+const imageLog = createLogger('ImageExtractor');
+
 const _IMG_DIMS_CACHE_KEY = 'claude_qol_image_dims_cache';
 
 const _imageDimsCache = (() => {
@@ -254,7 +256,7 @@ function buildGalleryPair(entries) {
 function _imgDiagOn() {
 	try { return localStorage.getItem('claude_qol_img_diag') !== '0'; } catch (e) { return true; }
 }
-function _diag(...a) { if (_imgDiagOn()) { try { console.log('[QOL-DIAG]', ...a); } catch (e) {} } }
+function _diag(...a) { if (_imgDiagOn()) imageLog.debug('DIAG', ...a); }
 
 // ==== LIVE SSE INJECTION ====
 // During a streaming completion, MCP/ComfyUI image tools stream back as a bare
@@ -488,7 +490,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 			}
 		} catch (e) {
 			// Injection is best-effort; never let it break the native stream.
-			console.error('[QOL-ImageExtractor] injection error (native stream unaffected):', e);
+			imageLog.error('injection error (native stream unaffected):', e);
 		}
 	};
 
@@ -608,7 +610,7 @@ window.fetch = async (...args) => {
 				headers: ClaudeExtNet.sanitizedHeaders(response)
 			});
 		} catch (e) {
-			console.error('[QOL-ImageExtractor] Failed to wrap completion stream, passing through:', e);
+			imageLog.error('Failed to wrap completion stream, passing through:', e);
 			return response;
 		}
 	}

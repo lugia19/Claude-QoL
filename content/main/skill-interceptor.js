@@ -2,6 +2,7 @@
 // Hides the encryption key skill from the skills list.
 (function() {
 	'use strict';
+	const log = createLogger('SkillInterceptor');
 
 	const HIDDEN_SKILL_NAME = 'qol-encryptionkey-do-not-delete';
 	// Legacy encryption-key styles that have since been converted into skills.
@@ -27,12 +28,12 @@
 						!(typeof s.description === 'string' && s.description.includes(HIDDEN_DESCRIPTION_MARKER))
 					);
 					if (data.skills.length !== before) {
-						console.log('[QOL-SkillInterceptor] Filtered encryption key skill(s) from skills list');
+						log('Filtered encryption key skill(s) from skills list');
 					}
 					return ClaudeExtNet.jsonResponse(response, data);
 				}
 			} catch (e) {
-				console.warn('[QOL-SkillInterceptor] Failed to parse skills response:', e.message);
+				log.warn('Failed to parse skills response:', e.message);
 			}
 			return response;
 		}

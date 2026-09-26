@@ -1,6 +1,7 @@
 // forking.js
 (function () {
 	'use strict';
+	const log = createLogger('Forking');
 	const defaultSummaryPrompt =
 		`I've attached a chatlog from a previous conversation. Please create a complete, detailed summary of the conversation that covers all important points, questions, and responses. This summary will be used to continue the conversation in a new chat, so make sure it provides enough context to understand the full discussion. Be thorough, and think things through. Make it lengthy.
 If this is a technical discussion, include any relevant technical details, code snippets, or explanations that were part of the conversation, maintaining information concerning only the latest version of any code discussed.
@@ -71,7 +72,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				updateDisplay();
 			})
 			.catch(err => {
-				console.error('Failed to pre-fetch messages for token estimate:', err);
+				log.error('Failed to pre-fetch messages for token estimate:', err);
 				tokenLabel.textContent = localize('fork.tokens_unavailable');
 			});
 
@@ -306,7 +307,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			const conversationId = getConversationId();
 			const orgId = getOrgId();
 
-			console.log('Forking conversation', conversationId, 'from message', messageUuid, 'with model', pendingFork.model);
+			log('Forking conversation', conversationId, 'from message', messageUuid, 'with model', pendingFork.model);
 
 			loadingModal.setContent(createLoadingContent(localize('fork.getting_messages')));
 
@@ -330,7 +331,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 				// Normalize FIRST - break up oversized messages
 				messages = normalizeOversizedMessages(messages);
-				console.log('Messages after normalization:', messages);
+				log('Messages after normalization:', messages);
 
 				// NOW token-based splitting works at the right granularity
 				const splitIndex = calculateSplitIndex(messages, pendingFork.rawTextPercentage);
@@ -350,9 +351,9 @@ If this is a writing or creative discussion, include sections for characters, pl
 						const phantomTokensToKeep = phantomTokens - tokensToSummarize;
 						const phantomKeepCount = takeMessagesFromEnd(existingPhantoms, phantomTokensToKeep, true);
 						phantomsToCarryOver = existingPhantoms.slice(-phantomKeepCount);
-						console.log(`Carrying over ${phantomsToCarryOver.length} phantom messages (${phantomTokensToKeep} tokens)`);
+						log(`Carrying over ${phantomsToCarryOver.length} phantom messages (${phantomTokensToKeep} tokens)`);
 					} else {
-						console.log('All phantom messages fall within summarized range, none carried over');
+						log('All phantom messages fall within summarized range, none carried over');
 					}
 				}
 
@@ -397,7 +398,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 				// 100% verbatim: carry over ALL existing phantoms
 				if (existingPhantoms.length > 0) {
-					console.log(`Carrying over all ${existingPhantoms.length} phantom messages (100% verbatim)`);
+					log(`Carrying over all ${existingPhantoms.length} phantom messages (100% verbatim)`);
 
 					// First real message points to last existing phantom
 					if (messages.length > 0) {
@@ -440,7 +441,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				forkAttachments
 			);
 
-			console.log('Forked conversation created:', newUuid);
+			log('Forked conversation created:', newUuid);
 			loadingModal.setContent(createLoadingContent(localize('fork.complete_redirecting')));
 
 			if (failedFiles && failedFiles.length > 0) {
@@ -456,7 +457,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				loadingModal.destroy();
 				return;
 			}
-			console.error('Failed to fork conversation:', error);
+			log.error('Failed to fork conversation:', error);
 			loadingModal.setTitle(localize('common.error'));
 			loadingModal.setContent(localize('fork.fork_failed', { error: error.message }));
 			loadingModal.clearButtons();
@@ -598,7 +599,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 						await new Promise(r => setTimeout(r, 200));
 					}
 				} catch (error) {
-					console.log(`Failed to transfer file ${f.file_name}:`, error);
+					log(`Failed to transfer file ${f.file_name}:`, error);
 					const choice = await showClaudeThreeOption(
 						localize('fork.upload_failed_title'),
 						localize('fork.upload_failed', { name: f.file_name, error: error.message }),
@@ -718,18 +719,18 @@ If this is a writing or creative discussion, include sections for characters, pl
 	}
 
 	async function generateSummaryForChunk(tempConversation, messages, priorSummaryTexts) {
-		console.log("Generating summary for chunk with", messages.length, "messages");
+		log("Generating summary for chunk with", messages.length, "messages");
 		const includeAttachments = pendingFork.includeAttachments && pendingFork.keepFilesFromSummarized;
 		for (const msg of messages) {
 			// Need to filter through each element in the content array
 			const newContentArray = []
 			for (const item of msg.content) {
 				if (item.type == 'text') {
-					console.log("Original text content:", item.text);
+					log("Original text content:", item.text);
 					const text = item.text;
 					if (text.includes("Simply say 'Acknowledged' and wait for user input.")) {
 						item.text = text.replace("Simply say 'Acknowledged' and wait for user input.", '').trim();
-						console.log("Removed boilerplate text from message content");
+						log("Removed boilerplate text from message content");
 					}
 				}
 				newContentArray.push(item);
@@ -773,7 +774,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 					await summaryMessage.addFile(f);
 					uploaded = true;
 				} catch (error) {
-					console.warn(`Failed file ${f.file_name} during summarization:`, error);
+					log.warn(`Failed file ${f.file_name} during summarization:`, error);
 					const choice = await showClaudeThreeOption(
 						localize('fork.upload_failed_title'),
 						localize('fork.upload_failed_summarization', { name: f.file_name, error: error.message }),
@@ -804,14 +805,14 @@ If this is a writing or creative discussion, include sections for characters, pl
 		const content = attachment.extracted_content || '';
 		const maxChars = LAST_CHUNK_SIZE * 4; // Reverse token estimation
 
-		console.log(`splitOversizedAttachment: "${attachment.file_name}", content length: ${content.length}, maxChars: ${maxChars}`);
+		log(`splitOversizedAttachment: "${attachment.file_name}", content length: ${content.length}, maxChars: ${maxChars}`);
 
 		if (content.length <= maxChars) {
-			console.log(`  -> No split needed, under limit`);
+			log(`  -> No split needed, under limit`);
 			return [attachment];
 		}
 
-		console.log(`  -> Splitting attachment into parts...`);
+		log(`  -> Splitting attachment into parts...`);
 
 		const parts = [];
 		let remaining = content;
@@ -849,7 +850,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			partNum++;
 		}
 
-		console.log(`  -> Split into ${parts.length} parts`);
+		log(`  -> Split into ${parts.length} parts`);
 		return parts;
 	}
 
@@ -888,7 +889,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				// This should never happen after splitOversizedAttachment,
 				// but keep as a safety fallback
 				if (attTokens > LAST_CHUNK_SIZE) {
-					console.warn('Single attachment still exceeds max chunk size after splitting - this should not happen:', attachment.file_name);
+					log.warn('Single attachment still exceeds max chunk size after splitting - this should not happen:', attachment.file_name);
 					if (currentChunk.length > 0) {
 						attachmentChunks.push(currentChunk);
 						currentChunk = [];
@@ -897,12 +898,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 					attachmentChunks.push([attachment]);
 				} else if (currentTokens + attTokens > LAST_CHUNK_SIZE) {
 					// Would exceed, start new chunk
-					console.log('Current chunk full, starting new chunk for attachment:', attachment.file_name);
+					log('Current chunk full, starting new chunk for attachment:', attachment.file_name);
 					attachmentChunks.push(currentChunk);
 					currentChunk = [attachment];
 					currentTokens = attTokens;
 				} else {
-					console.log('Adding attachment to current chunk:', attachment.file_name);
+					log('Adding attachment to current chunk:', attachment.file_name);
 					currentChunk.push(attachment);
 					currentTokens += attTokens;
 				}
@@ -913,7 +914,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			}
 
 			// Create synthetic messages - split into multiple pairs
-			console.log(`Splitting message ${msg.uuid} into ${attachmentChunks.length} chunks.`);
+			log(`Splitting message ${msg.uuid} into ${attachmentChunks.length} chunks.`);
 
 			const originalSender = msg.sender;
 			const alternateSender = originalSender === 'human' ? 'assistant' : 'human';
@@ -962,7 +963,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				}
 			}
 
-			console.log(`Message ${msg.uuid} split into ${attachmentChunks.length} chunks with acknowledgments.`);
+			log(`Message ${msg.uuid} split into ${attachmentChunks.length} chunks with acknowledgments.`);
 		}
 
 		return normalized;
@@ -1071,7 +1072,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				syntheticMessages.push(userMessage, assistantMessage);
 			}
 
-			console.log('Generated synthetic summary messages:', syntheticMessages.map(m => m.toHistoryJSON()));
+			log('Generated synthetic summary messages:', syntheticMessages.map(m => m.toHistoryJSON()));
 			return syntheticMessages;
 		} finally {
 			await summaryConv.delete();
@@ -1135,8 +1136,6 @@ If this is a writing or creative discussion, include sections for characters, pl
 			frontChunks.unshift(chunk);  // Add to beginning since we're working backwards
 		}
 
-		//console.log(`Calculated ${frontChunks.length} front chunks and 1 last chunk for summarization.`);
-		//console.log("Chunks:", [...frontChunks, lastChunk]);
 		return [...frontChunks, lastChunk];
 	}
 
@@ -1308,7 +1307,7 @@ Provide the complete rewritten summary.`;
 						try {
 							await rewriteMessage.addFile(f);
 						} catch (error) {
-							console.warn(`Skipping file ${f.file_name} during rewrite: ${error.message}`);
+							log.warn(`Skipping file ${f.file_name} during rewrite: ${error.message}`);
 						}
 					}
 

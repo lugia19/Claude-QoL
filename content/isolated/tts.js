@@ -1,6 +1,7 @@
 // tts.js
 (function () {
 	'use strict';
+	const log = createLogger('TTS');
 
 	const T = SETTINGS_KEYS.TTS;
 	const TP = SETTINGS_KEYS.TTS_PERCHAT;
@@ -96,7 +97,7 @@
 				await provider.synthesize(finalText, defaultVoice, settings.model, settings.apiKey, { baseUrl }, signal, onChunk);
 			}
 		} catch (error) {
-			console.error('[QOL-TTS] Synthesis failed:', error);
+			log.error('Synthesis failed:', error);
 		} finally {
 			if (!entry.cancelled) postSynthDone(requestId);
 			activeSynth.delete(requestId);
@@ -172,7 +173,7 @@
 					await new Promise(r => setTimeout(r, retryDelay));
 				}
 			}
-			console.log('[QOL-TTS] Could not find native read-aloud button for message:', messageUuid);
+			log('Could not find native read-aloud button for message:', messageUuid);
 		}
 	});
 	//#endregion
@@ -612,7 +613,7 @@
 
 					loadingModal.destroy();
 				} catch (error) {
-					console.error('Failed to load provider data:', error);
+					log.error('Failed to load provider data:', error);
 					loadingModal.destroy();
 					showClaudeAlert(localize('tts.loading_error_title'), localize('tts.load_provider_failed'));
 				}
@@ -677,7 +678,7 @@
 		} catch (error) {
 			loadingModal.destroy();
 			showClaudeAlert(localize('common.error'), localize('tts.load_settings_failed', { error: error.message }));
-			console.error('Settings modal error:', error);
+			log.error('Settings modal error:', error);
 		}
 	}
 
@@ -888,7 +889,7 @@
 		} catch (error) {
 			loadingModal.destroy();
 			showClaudeAlert(localize('common.error'), localize('tts.actor_config_failed', { error: error.message }));
-			console.error('Actor config modal error:', error);
+			log.error('Actor config modal error:', error);
 		}
 	}
 

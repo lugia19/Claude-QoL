@@ -1,6 +1,7 @@
 // claude-search-chat.js
 (function () {
 	'use strict';
+	const log = createLogger('ChatSearch');
 
 	const { getRelativeTime, simplifyText, fuzzyMatch, compileQuery, findMatches } = window.ClaudeSearchShared;
 
@@ -251,7 +252,7 @@
 			conversation = new ClaudeConversation(orgId, conversationId);
 			await conversation.getData();
 		} catch (error) {
-			console.error('Failed to fetch conversation:', error);
+			log.error('Failed to fetch conversation:', error);
 			loadingModal.destroy();
 
 			// Show error modal
@@ -421,7 +422,7 @@
 		sessionStorage.removeItem('highlight_previous_message'); // legacy key, no longer written
 
 		const revealed = await revealMessageByUuid(messageUuid);
-		if (!revealed) console.log('[QOL-ChatSearch] Could not reveal message', messageUuid);
+		if (!revealed) log('Could not reveal message', messageUuid);
 	}
 
 	// ======== INITIALIZATION ========

@@ -1,6 +1,8 @@
 // phantom-messages.js
 'use strict';
 
+const phantomLog = createLogger('PhantomMessages');
+
 const PHANTOM_PREFIX = 'phantom_messages_';
 const OLD_FORK_PREFIX = 'fork_history_';
 const PHANTOM_MARKER = '====PHANTOM_MESSAGE====';
@@ -25,7 +27,7 @@ getPhantomMessages = async function (conversationId) {
 
 	const localData = localStorage.getItem(newKey) || localStorage.getItem(oldKey);
 	if (localData) {
-		console.log(`[QOL-PhantomMessages] Migrating ${conversationId} to IndexedDB`);
+		phantomLog(`Migrating ${conversationId} to IndexedDB`);
 		const messagesJson = JSON.parse(localData);
 		const messages = messagesJson.map(json => new ClaudeMessage(conversation, json));
 		await storePhantomMessages(conversationId, messages);
@@ -76,7 +78,7 @@ getPhantomMessages = async function (conversationId) {
 						);
 
 						if (chatlogAtt) {
-							console.warn('No phantom messages found for conversation, attempting reconstruction from attachments');
+							phantomLog.warn('No phantom messages found for conversation, attempting reconstruction from attachments');
 							const summaryTexts = attachments
 								.filter(a => a.file_name?.match(/^summary_chunk_\d+\.txt$/))
 								.sort((a, b) => {
@@ -129,7 +131,7 @@ getPhantomMessages = async function (conversationId) {
 					}
 
 					if (body.parent_message_uuid === lastPhantomUuid) {
-						console.log('Fixing parent_message_uuid from phantom to root for completion request');
+						phantomLog('Fixing parent_message_uuid from phantom to root for completion request');
 						body.parent_message_uuid = "00000000-0000-4000-8000-000000000000";
 
 						return originalFetch(input, await net.withJsonRequestBody(config, body));
@@ -213,7 +215,7 @@ function injectPhantomMessages(data, phantomMessages) {
 		lastPhantom = ackMessage;
 	}
 
-	console.log(`Injecting ${phantomMessages.length} phantom messages into conversation`);
+	phantomLog(`Injecting ${phantomMessages.length} phantom messages into conversation`);
 
 	// Convert to JSON for injection
 	let phantomJson = phantomMessages.map(msg => msg.toHistoryJSON());
@@ -227,7 +229,7 @@ function injectPhantomMessages(data, phantomMessages) {
 	// ClaudeConversation.getRenderedMessages so both views of the list agree.
 	stitchPhantomMessages(data, phantomJson);
 
-	console.log('Updated chat messages with phantom messages:', data.chat_messages);
+	phantomLog('Updated chat messages with phantom messages:', data.chat_messages);
 }
 
 function injectUUIDMarkers(data) {
@@ -378,7 +380,7 @@ navigator.clipboard.write = async (data) => {
 
 		return originalClipboardWrite.call(navigator.clipboard, [new ClipboardItem(types)]);
 	} catch (error) {
-		console.error('[QOL-PhantomMessages] Error cleaning clipboard text:', error);
+		phantomLog.error('Error cleaning clipboard text:', error);
 		return originalClipboardWrite.call(navigator.clipboard, data);
 	}
 };

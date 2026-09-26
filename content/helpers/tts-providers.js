@@ -1,6 +1,7 @@
 // tts-providers.js
 (function () {
 	'use strict';
+	const log = createLogger('TTSProviders');
 
 
 	//#region PCM Helpers
@@ -117,7 +118,7 @@
 					if (limit) this.modelCharLimits[model.model_id] = limit;
 				}
 			} catch (e) {
-				console.warn('Failed to fetch ElevenLabs model char limits:', e);
+				log.warn('Failed to fetch ElevenLabs model char limits:', e);
 			}
 		}
 
@@ -144,7 +145,7 @@
 					});
 
 					if (!response.ok) {
-						console.error('Failed to fetch voices:', response.status);
+						log.error('Failed to fetch voices:', response.status);
 						return allVoices;
 					}
 
@@ -163,7 +164,7 @@
 				return allVoices;
 
 			} catch (error) {
-				console.error('Error fetching voices:', error);
+				log.error('Error fetching voices:', error);
 				return allVoices;
 			}
 		}
@@ -179,7 +180,7 @@
 				});
 
 				if (!response.ok) {
-					console.error('Failed to fetch models:', response.status);
+					log.error('Failed to fetch models:', response.status);
 					return [];
 				}
 
@@ -193,7 +194,7 @@
 				}));
 
 			} catch (error) {
-				console.error('Failed to load models:', error);
+				log.error('Failed to load models:', error);
 				return [{
 					model_id: 'eleven_multilingual_v2',
 					name: 'Multilingual v2',
@@ -277,7 +278,7 @@ JSON array:`;
 
 								resolve(segments);
 							} catch (error) {
-								console.error('Failed to parse attribution response:', error);
+								log.error('Failed to parse attribution response:', error);
 								reject(error);
 							}
 						} else {
@@ -471,7 +472,7 @@ JSON array:`;
 
 								resolve(segments);
 							} catch (error) {
-								console.error('Failed to parse attribution response:', error);
+								log.error('Failed to parse attribution response:', error);
 								reject(error);
 							}
 						} else {

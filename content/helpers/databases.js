@@ -1,6 +1,7 @@
 // databases.js
 (function () {
 	'use strict';
+	const log = createLogger('Database');
 
 	// ======== HELPERS ========
 	window.ClaudeSearchShared = window.ClaudeSearchShared || {};
@@ -132,11 +133,11 @@
 	async function encryptData(data) {
 		const key = await getEncryptionKey();
 		if (!key) {
-			console.log('[QOL-Encryption] encrypt: no key, plaintext passthrough');
+			log('encrypt: no key, plaintext passthrough');
 			return data;
 		}
 
-		console.log('[QOL-Encryption] Encrypting with keyHash:', _keyHash);
+		log('Encrypting with keyHash:', _keyHash);
 		const iv = crypto.getRandomValues(new Uint8Array(12));
 		const encoded = new TextEncoder().encode(JSON.stringify(data));
 		const ciphertext = await crypto.subtle.encrypt(
@@ -154,13 +155,13 @@
 	async function decryptData(item) {
 		// Plaintext passthrough — not an encrypted wrapper
 		if (!item || typeof item !== 'object' || !item.v || !item.keyHash) {
-			console.log('[QOL-Encryption] decrypt: plaintext passthrough');
+			log('decrypt: plaintext passthrough');
 			return item;
 		}
 
 		const key = await getEncryptionKey();
 
-		console.log('[QOL-Encryption] Decrypting, item keyHash:', item.keyHash, 'current keyHash:', _keyHash);
+		log('Decrypting, item keyHash:', item.keyHash, 'current keyHash:', _keyHash);
 
 		if (!key || item.keyHash !== _keyHash) {
 			throw new Error(`Key mismatch: item encrypted with ${item.keyHash}, current key is ${_keyHash || 'none'}`);
@@ -183,11 +184,11 @@
 				break;
 			} catch (e) {
 				if (attempt < 9) {
-					console.warn(`[QOL-Encryption] Failed to fetch skills (attempt ${attempt + 1}/10), retrying...`);
+					log.warn(`Failed to fetch skills (attempt ${attempt + 1}/10), retrying...`);
 					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
 					continue;
 				}
-				console.warn('[QOL-Encryption] Failed to fetch skills after 10 attempts, operating in plaintext mode:', e.message);
+				log.warn('Failed to fetch skills after 10 attempts, operating in plaintext mode:', e.message);
 				return null;
 			}
 		}
@@ -195,12 +196,12 @@
 		const keySkill = (skillsData.skills || []).find(s => s.name === ENCRYPTION_SKILL_NAME);
 
 		if (keySkill) {
-			console.log('[QOL-Encryption] Found encryption key skill:', keySkill.id);
+			log('Found encryption key skill:', keySkill.id);
 			const base64Key = keySkill.description;
 			const standardBase64 = base64Key.replace(/-/g, '+').replace(/_/g, '/');
 			const rawKey = Uint8Array.from(atob(standardBase64), c => c.charCodeAt(0));
 			_keyHash = await _computeKeyHash(rawKey);
-			console.log('[QOL-Encryption] Key hash:', _keyHash);
+			log('Key hash:', _keyHash);
 			const key = await crypto.subtle.importKey(
 				'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
 			);
@@ -210,7 +211,7 @@
 		}
 
 		// No skill found — wipe any existing encrypted data (old key is unrecoverable)
-		console.log('[QOL-Encryption] No encryption key skill found, wiping existing data...');
+		log('No encryption key skill found, wiping existing data...');
 		await _wipeAllEncryptedData();
 
 		// Generate new key
@@ -224,22 +225,22 @@
 			try {
 				const orgId = getOrgId();
 				const skill = await createSkill(orgId, ENCRYPTION_SKILL_NAME, base64Key);
-				console.log('[QOL-Encryption] Created encryption key skill:', skill.id);
+				log('Created encryption key skill:', skill.id);
 				await disableSkill(orgId, skill.id);
-				console.log('[QOL-Encryption] Disabled encryption key skill');
+				log('Disabled encryption key skill');
 				_keyHash = await _computeKeyHash(rawKey);
-				console.log('[QOL-Encryption] New key hash:', _keyHash);
+				log('New key hash:', _keyHash);
 				const key = await crypto.subtle.importKey(
 					'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
 				);
 				return key;
 			} catch (e) {
 				if (attempt < 9) {
-					console.warn(`[QOL-Encryption] Failed to create key skill (attempt ${attempt + 1}/10), retrying...`);
+					log.warn(`Failed to create key skill (attempt ${attempt + 1}/10), retrying...`);
 					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
 					continue;
 				}
-				console.warn('[QOL-Encryption] Failed to create key skill after 10 attempts, operating in plaintext mode:', e.message);
+				log.warn('Failed to create key skill after 10 attempts, operating in plaintext mode:', e.message);
 				return null;
 			}
 		}
@@ -249,16 +250,16 @@
 		try {
 			const cacheCount = await cacheDB.conversations.count();
 			const phantomCount = await phantomDB.phantomMessages.count();
-			console.log(`[QOL-Encryption] Wiping: ${cacheCount} cached conversations, ${phantomCount} phantom messages`);
+			log(`Wiping: ${cacheCount} cached conversations, ${phantomCount} phantom messages`);
 
 			await Promise.all([
 				cacheDB.conversations.clear(),
 				phantomDB.phantomMessages.clear()
 			]);
 
-			console.log('[QOL-Encryption] Data wipe complete');
+			log('Data wipe complete');
 		} catch (e) {
-			console.warn('[QOL-Encryption] Error during data wipe:', e.message);
+			log.warn('Error during data wipe:', e.message);
 		}
 	}
 
@@ -270,11 +271,11 @@
 			if (!Array.isArray(connectors)) return;
 			const old = connectors.find(c => c.name === OLD_CONNECTOR_NAME);
 			if (!old) return;
-			console.log('[QOL-Encryption] Deleting old encryption connector:', old.uuid);
+			log('Deleting old encryption connector:', old.uuid);
 			await fetch(`/api/organizations/${orgId}/mcp/remote_servers/${old.uuid}`, { method: 'DELETE' });
-			console.log('[QOL-Encryption] Old connector deleted');
+			log('Old connector deleted');
 		} catch (e) {
-			console.warn('[QOL-Encryption] Failed to delete old connector:', e.message);
+			log.warn('Failed to delete old connector:', e.message);
 		}
 	}
 
@@ -293,9 +294,9 @@
 			try {
 				if (!(await Dexie.exists(name))) continue;
 				await Dexie.delete(name);
-				console.log('[QOL-DB] Deleted old database:', name);
+				log('Deleted old database:', name);
 			} catch (e) {
-				console.warn('[QOL-DB] Failed to delete old database', name, e.message);
+				log.warn('Failed to delete old database', name, e.message);
 			}
 		}
 		localStorage.removeItem('global_search_queries');
@@ -324,7 +325,7 @@
 				}
 				return { uuid: entry.uuid, updated_at: entry.updated_at, data: decryptedData };
 			} catch (e) {
-				console.warn(`[QOL-Encryption] Decryption failed for cache ${conversationId}, deleting entry`);
+				log.warn(`Decryption failed for cache ${conversationId}, deleting entry`);
 				await cacheDB.conversations.delete(conversationId);
 				return null;
 			}
@@ -368,7 +369,7 @@
 			}
 			return decrypted.messages;
 		} catch (e) {
-			console.warn(`[QOL-Encryption] Decryption failed for phantom ${conversationId}, deleting entry`);
+			log.warn(`Decryption failed for phantom ${conversationId}, deleting entry`);
 			await phantomDB.phantomMessages.delete(conversationId);
 			return null;
 		}
@@ -396,9 +397,8 @@
 					await phantomDB.phantomMessages.put({ conversationId: row.conversationId, encryptedData: encrypted });
 				}
 			}
-			//console.log('[QOL-Encryption] Bulk migration complete.');
 		} catch (e) {
-			console.warn('[QOL-Encryption] Bulk migration error:', e.message);
+			log.warn('Bulk migration error:', e.message);
 		}
 	}
 

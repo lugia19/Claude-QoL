@@ -4,6 +4,7 @@
 
 (function () {
 	'use strict';
+	const log = createLogger('Exporter');
 
 	// Global role configuration
 	const ROLES = {
@@ -122,7 +123,7 @@
 							const text = await blob.text();
 							output += `<details>\n<summary>Attachment: ${file.file_name}</summary>\n\n${text}\n\n</details>\n\n`;
 						} catch (e) {
-							console.warn(`Failed to download file ${file.file_name} for markdown export:`, e);
+							log.warn(`Failed to download file ${file.file_name} for markdown export:`, e);
 						}
 					}
 				}
@@ -423,7 +424,7 @@
 							if (attachment) imageAttachments.push(attachment);
 						} catch (e) {
 							// An image that won't download shouldn't sink the whole export.
-							console.error('[Exporter] Failed to embed generated image:', e);
+							log.error('Failed to embed generated image:', e);
 						}
 					}
 				}
@@ -562,7 +563,7 @@
 					result.set(placeholder, dataUri);
 				}
 			} catch (e) {
-				console.warn('Failed to process stylesheet:', sheetUrl, e);
+				log.warn('Failed to process stylesheet:', sheetUrl, e);
 			}
 		}
 
@@ -593,7 +594,7 @@
 		// declared alongside each family instead of emitting broken CSS.
 		const unresolved = processedCss.match(/\{\{FONT_[A-Z_]+\}\}/g);
 		if (unresolved) {
-			console.warn('Export: could not embed fonts', [...new Set(unresolved)].join(', '));
+			log.warn('Export: could not embed fonts', [...new Set(unresolved)].join(', '));
 			processedCss = processedCss.replace(/@font-face\s*\{[^{}]*\{\{FONT_[A-Z_]+\}\}[^{}]*\}\s*/g, '');
 		}
 
@@ -717,7 +718,7 @@
 		// Needed to build preview URLs for tool-generated images; fail soft so a missing org id
 		// costs us the images rather than the whole export.
 		let orgId = null;
-		try { orgId = getOrgId(); } catch (e) { console.warn('[Exporter] No org id; skipping generated images'); }
+		try { orgId = getOrgId(); } catch (e) { log.warn('No org id; skipping generated images'); }
 
 		// One pacer shared by generated-image and attachment downloads. Both run per message, so
 		// per-loop delays would let a message carrying an image AND files fire two bursts back to
@@ -775,7 +776,7 @@
 							}
 						} catch (e) {
 							// One unavailable image shouldn't sink the whole export.
-							console.error('[Exporter] Failed to embed generated image:', e);
+							log.error('Failed to embed generated image:', e);
 						}
 					}
 				}
@@ -848,7 +849,6 @@
 			/\{\{(TITLE|DEFAULT_LEAF|MESSAGES|TREE_JSON|RAW_TXT)\}\}/g,
 			(_, key) => templateValues[key]
 		);
-		// console.log(templateResult);
 		return templateResult;
 	}
 	// #endregion
@@ -906,7 +906,7 @@
 			try {
 				const blob = await file.download();
 				if (!blob) {
-					console.log(`No download URL for ${file.file_name}, skipping`);
+					log(`No download URL for ${file.file_name}, skipping`);
 					continue;
 				}
 				const base64 = await new Promise((resolve) => {
@@ -922,7 +922,7 @@
 					await new Promise(r => setTimeout(r, 200));
 				}
 			} catch (error) {
-				console.log(`Failed to download ${file.file_name}:`, error);
+				log(`Failed to download ${file.file_name}:`, error);
 			}
 		}
 
@@ -1694,14 +1694,14 @@
 			}
 		}
 
-		console.log('Parsed import data:', { name, messages, zipFiles });
+		log('Parsed import data:', { name, messages, zipFiles });
 		try {
 			await finalizeImport(name, messages, model, zipFiles, loadingModal, settings);
 			// Navigation happens in finalizeImport, loading modal cleaned up automatically
 		} catch (error) {
 			loadingModal.destroy();
 			if (error.message === 'USER_CANCELLED') return;
-			console.error('Import failed:', error);
+			log.error('Import failed:', error);
 			showClaudeAlert(localize('export.import_error_title'), error.message || localize('export.import_failed'));
 		}
 	}
@@ -1765,7 +1765,7 @@
 			// Reload to show changes
 			window.location.reload();
 		} catch (error) {
-			console.error('Replace failed:', error);
+			log.error('Replace failed:', error);
 			loadingModal.destroy();
 			showClaudeAlert(localize('export.replace_error_title'), error.message || localize('export.replace_failed'));
 		}
@@ -1869,7 +1869,7 @@
 							await new Promise(resolve => setTimeout(resolve, delayMs));
 						}
 					} catch (error) {
-						console.error(`Failed to export conversation ${conv.uuid}:`, error);
+						log.error(`Failed to export conversation ${conv.uuid}:`, error);
 					}
 
 					completed++;
@@ -1929,7 +1929,7 @@
 					try {
 						const response = await fetch(downloadUrl);
 						if (!response.ok) {
-							console.error(`Failed to fetch project file ${file.file_name}`);
+							log.error(`Failed to fetch project file ${file.file_name}`);
 							continue;
 						}
 						const blob = await response.blob();
@@ -1937,7 +1937,7 @@
 
 						await addToZip(masterZip, `project_files/${filename}`, blob);
 					} catch (error) {
-						console.error(`Error downloading project file ${file.file_name}:`, error);
+						log.error(`Error downloading project file ${file.file_name}:`, error);
 					}
 				}
 			}
@@ -1965,7 +1965,7 @@
 			loadingModal.destroy();
 			modal.hide();
 		} catch (error) {
-			console.error('Bulk export failed:', error);
+			log.error('Bulk export failed:', error);
 			loadingModal.destroy();
 			if (!bulkExportCancelled) {
 				showClaudeAlert(localize('export.export_error_title'), error.message || localize('export.bulk_export_failed'));
@@ -2160,7 +2160,7 @@
 						loadingModal.destroy();
 						modal.hide();
 					} catch (error) {
-						console.error('Export failed:', error);
+						log.error('Export failed:', error);
 						loadingModal.destroy();
 						showClaudeAlert(localize('export.export_error_title'), error.message || localize('export.export_failed'));
 					}
@@ -2206,7 +2206,7 @@
 					loadingModal.destroy();
 					modal.hide();
 				} catch (error) {
-					console.error('Copy failed:', error);
+					log.error('Copy failed:', error);
 					loadingModal.destroy();
 					showClaudeAlert(localize('export.copy_error_title'), error.message || localize('export.copy_failed'));
 				}

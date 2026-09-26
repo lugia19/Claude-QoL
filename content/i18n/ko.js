@@ -9,8 +9,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"common.skip_file": "파일 건너뛰기",
 
 	// lang
-	"lang.tooltip": "언어",
-	"lang.title": "Toolbox 언어",
 	"lang.label": "언어",
 
 	// nav

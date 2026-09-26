@@ -1,6 +1,7 @@
 // edit-files.js
 (function () {
 	'use strict';
+	const log = createLogger('EditFiles');
 
 	//#region Constants and State
 
@@ -111,9 +112,9 @@
 				setTimeout(() => autoSubmitEditWithText(editMessage.text), 100);
 			} catch (error) {
 				if (error.message === 'Edit cancelled by user') {
-					console.log('Edit cancelled — no side effects');
+					log('Edit cancelled — no side effects');
 				} else {
-					console.error('Advanced edit error:', error);
+					log.error('Advanced edit error:', error);
 				}
 			} finally {
 				loadingModal.destroy();
@@ -161,7 +162,7 @@
 		const controls = findNativeEditControls();
 		if (!controls) {
 			if (attempt >= AUTO_SUBMIT_MAX_ATTEMPTS) {
-				console.error('Advanced edit: never found the native edit textarea, aborting');
+				log.error('Advanced edit: never found the native edit textarea, aborting');
 				pendingEditData = null;
 				cleanupEditState();
 				showClaudeAlert(localize('common.error'), localize('edit.editor_not_found'));
@@ -530,7 +531,7 @@
 				if (await isLikelyTextFile(file)) {
 					validFiles.push(file);
 				} else {
-					console.warn(`Skipping ${file.name} - doesn't appear to be a text file`);
+					log.warn(`Skipping ${file.name} - doesn't appear to be a text file`);
 				}
 			}
 
@@ -599,7 +600,7 @@
 				return { success: true, file: file.name };
 
 			} catch (error) {
-				console.error(`Failed to upload ${file.name}:`, error);
+				log.error(`Failed to upload ${file.name}:`, error);
 
 				// Convert to error state
 				const icon = uploadingItem.querySelector('.w-8.h-8');
@@ -636,7 +637,7 @@
 		// Log summary
 		const succeeded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
 		const failed = results.length - succeeded;
-		console.log(`Upload complete: ${succeeded} succeeded, ${failed} failed`);
+		log(`Upload complete: ${succeeded} succeeded, ${failed} failed`);
 	}
 
 	function updateSubmitButtonState(uploading, count = 0) {
@@ -717,7 +718,7 @@
 
 		// Intercept /completion requests when edit data is pending
 		if (pendingEditData && ClaudeExtNet.isCompletionUrl(url) && ClaudeExtNet.getFetchMethod(input, config) === 'POST') {
-			console.log('Intercepting edit completion request');
+			log('Intercepting edit completion request');
 			pendingEditData = null;
 
 			try {
@@ -725,7 +726,7 @@
 				cleanupEditState();
 				return originalFetch(modifiedRequest.url, modifiedRequest.config);
 			} catch (error) {
-				console.error('Error applying edit modifications:', error);
+				log.error('Error applying edit modifications:', error);
 				cleanupEditState();
 				return originalFetch(...args);
 			}

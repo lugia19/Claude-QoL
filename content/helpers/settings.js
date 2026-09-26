@@ -24,6 +24,8 @@
 // Each entry: { key: 'storage_key', default: defaultValue, type: 'boolean'|'string'|'object' }
 // Optional `local: true` — keep in chrome.storage.local instead of IndexedDB (see above).
 
+const settingsLog = createLogger('Settings');
+
 const SETTINGS_KEYS = {
 	TTS: {
 		ENABLED: { key: 'tts_enabled', default: false, type: 'boolean', local: true }, // legacy; migrated to PROVIDER='claude'
@@ -207,10 +209,10 @@ if (_isIsolatedWorld) {
 			// Remove only after the writes land — a crash midway just leaves work for the next run.
 			if (toRemove.length) await chrome.storage.local.remove(toRemove);
 			await chrome.storage.local.set({ [MIGRATION_MARKER]: true });
-			if (migrated) console.log(`[QOL-Settings] Migrated ${migrated} setting(s) to IndexedDB`);
+			if (migrated) settingsLog(`Migrated ${migrated} setting(s) to IndexedDB`);
 		} catch (e) {
 			// Leave the marker unset so the next page load retries.
-			console.warn('[QOL-Settings] Migration to IndexedDB failed:', e.message);
+			settingsLog.warn('Migration to IndexedDB failed:', e.message);
 		}
 	}
 
@@ -378,7 +380,7 @@ if (_isIsolatedWorld) {
 	};
 
 	settingsRegistry.onChange = function () {
-		console.warn('[QOL-Settings] onChange is not available in MAIN world');
+		settingsLog.warn('onChange is not available in MAIN world');
 		return () => { };
 	};
 

@@ -1,6 +1,7 @@
 // navigation.js
 (function () {
 	'use strict';
+	const log = createLogger('Navigation');
 
 	const _NAV_KEY = SETTINGS_KEYS.NAVIGATION.BOOKMARKS;
 
@@ -21,7 +22,7 @@
 			}
 			localStorage.removeItem('navigation_bookmarks');
 		} catch (e) {
-			console.error('[QOL-Navigation] Failed to migrate bookmarks from localStorage:', e);
+			log.error('Failed to migrate bookmarks from localStorage:', e);
 		}
 	}
 
@@ -200,7 +201,7 @@
 					sessionStorage.setItem('message_uuid_to_find', bookmark.uuid);
 					window.location.reload();
 				} catch (error) {
-					console.error('Navigation failed:', error);
+					log.error('Navigation failed:', error);
 					showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
 					loadingModal.destroy();
 				}
@@ -247,7 +248,7 @@
 		try {
 			conversation = await getConversation();
 		} catch (error) {
-			console.error('Failed to fetch conversation:', error);
+			log.error('Failed to fetch conversation:', error);
 			loading.setTitle(localize('common.error'));
 			loading.setContent(localize('nav.load_conversation_failed'));
 			loading.addConfirm(localize('shared.ok'));

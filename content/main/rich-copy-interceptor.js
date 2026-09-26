@@ -4,6 +4,7 @@
 
 (function () {
 	'use strict';
+	const log = createLogger('RichCopy');
 
 	let richCopyActive = false;
 
@@ -54,7 +55,7 @@
 			await convertAndWrite(plainText);
 			window.postMessage({ type: 'rich-copy-done' }, '*');
 		} catch (err) {
-			console.error('[QOL-RichCopy] Interceptor error:', err);
+			log.error('Interceptor error:', err);
 			window.postMessage({ type: 'rich-copy-error', error: err.message }, '*');
 			return prevWrite.call(navigator.clipboard, data);
 		}
@@ -76,7 +77,7 @@
 			await convertAndWrite(text);
 			window.postMessage({ type: 'rich-copy-done' }, '*');
 		} catch (err) {
-			console.error('[QOL-RichCopy] Interceptor error:', err);
+			log.error('Interceptor error:', err);
 			window.postMessage({ type: 'rich-copy-error', error: err.message }, '*');
 			return prevWriteText.call(navigator.clipboard, text);
 		}

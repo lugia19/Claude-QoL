@@ -1,6 +1,8 @@
 // message-ui.js
 // Message DOM helpers, virtualized-list navigation and MessageButtonBar. No IIFE - shared global context.
 
+const messageUiLog = createLogger('MessageUI');
+
 function findMessageControls(messageElement) {
 	// Find the message container (the .group element's parent)
 	const messageContainer = messageElement.closest('.group')?.parentElement?.parentElement;
@@ -221,7 +223,7 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 		if (!anchorElement) return null;
 		return _settleOnMessage(anchorElement, step, highlight);
 	} catch (error) {
-		console.error('[QOL] revealMessageByUuid failed:', error);
+		messageUiLog.error('revealMessageByUuid failed:', error);
 		return null;
 	} finally {
 		_revealInFlight = false;

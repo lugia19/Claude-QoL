@@ -9,8 +9,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"common.skip_file": "Pular arquivo",
 
 	// lang
-	"lang.tooltip": "Idioma",
-	"lang.title": "Idioma do Toolbox",
 	"lang.label": "Idioma",
 
 	// nav

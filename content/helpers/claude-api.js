@@ -1,5 +1,7 @@
 // claude_api.js
 
+const apiLog = createLogger('API');
+
 const MAX_FILES_PER_MESSAGE = 18;
 
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
@@ -332,7 +334,7 @@ class ClaudeConversation {
 			});
 
 			if (!response.ok) {
-				console.error(await response.json());
+				apiLog.error(await response.json());
 				throw new Error('Failed to send message');
 			}
 
@@ -346,7 +348,7 @@ class ClaudeConversation {
 			await ClaudeExtNet.readSseEvents(response, (event) => {
 				if (!responseUuid && event.raw.includes('"message_start"')) {
 					responseUuid = event.data?.message?.uuid ?? null;
-					console.log('Got response UUID from message_start:', responseUuid);
+					apiLog('Got response UUID from message_start:', responseUuid);
 				}
 				if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) return false;
 			});
@@ -359,7 +361,7 @@ class ClaudeConversation {
 
 			while (!assistantMessage && attempts < maxAttempts) {
 				if (attempts > 0) {
-					console.log(`Assistant message not found, waiting 3 seconds and retrying (attempt ${attempts}/${maxAttempts})...`);
+					apiLog(`Assistant message not found, waiting 3 seconds and retrying (attempt ${attempts}/${maxAttempts})...`);
 					await new Promise(r => setTimeout(r, 3000));
 				}
 				messages = await this.getMessages(false, true);
@@ -375,8 +377,8 @@ class ClaudeConversation {
 			}
 
 			if (!assistantMessage) {
-				console.error('Messages after retry:', messages);
-				console.error('Response UUID:', responseUuid, 'requestSentTime:', requestSentTime);
+				apiLog.error('Messages after retry:', messages);
+				apiLog.error('Response UUID:', responseUuid, 'requestSentTime:', requestSentTime);
 				throw new Error('Completion finished but no assistant message found after retry');
 			}
 
@@ -490,7 +492,7 @@ class ClaudeConversation {
 		const response = await fetch(apiUrl);
 		if (!response.ok) {
 			if (response.status === 404 && this.conversationData) {
-				console.error('getData: 404 on conversation that should exist, falling back to local data');
+				apiLog.error('getData: 404 on conversation that should exist, falling back to local data');
 				return this.conversationData;
 			}
 			throw new Error('Failed to get conversation data');
@@ -555,7 +557,7 @@ class ClaudeConversation {
 		try {
 			phantoms = await getPhantomMessages(this.conversationId);
 		} catch (error) {
-			console.error('[QOL-API] Failed to load phantom messages:', error);
+			apiLog.error('Failed to load phantom messages:', error);
 		}
 		if (!phantoms?.length) return this._trunkFrom(data);
 
@@ -634,7 +636,7 @@ class ClaudeConversation {
 		});
 
 		if (!response.ok) {
-			console.error('Failed to delete conversation');
+			apiLog.error('Failed to delete conversation');
 		}
 	}
 
@@ -941,7 +943,7 @@ class ClaudeFile {
 			const blobIsImage = blobMime.startsWith('image/');
 			const filenameIsPdf = filenameMime === 'application/pdf';
 			if (blobIsImage && filenameIsPdf) {
-				console.warn(`[QOL-ClaudeFile] MIME mismatch for "${fileName}": blob is ${blobMime} but filename suggests ${filenameMime}. Using blob MIME.`);
+				apiLog.warn(`MIME mismatch for "${fileName}": blob is ${blobMime} but filename suggests ${filenameMime}. Using blob MIME.`);
 				mimeType = blobMime;
 				const ext = blobMime.split('/')[1]?.replace('jpeg', 'jpg') || 'png';
 				fileName = fileName.replace(/\.[^.]+$/, `.${ext}`);
@@ -951,7 +953,7 @@ class ClaudeFile {
 
 		// Direct upload for images and PDFs, conversion for other documents
 		const isDirectUpload = mimeType.startsWith('image/') || mimeType === 'application/pdf';
-		console.log(`[QOL-ClaudeFile] Uploading file "${fileName}" as ${isDirectUpload ? 'direct upload' : 'document conversion'} (MIME: ${mimeType})`);
+		apiLog(`Uploading file "${fileName}" as ${isDirectUpload ? 'direct upload' : 'document conversion'} (MIME: ${mimeType})`);
 		if (isDirectUpload) {
 			// Regular file upload
 			const formData = new FormData();
@@ -1702,7 +1704,7 @@ class ClaudeProject {
 			try {
 				const response = await fetch(downloadUrl);
 				if (!response.ok) {
-					console.error(`[QOL-ClaudeProject] Failed to fetch ${file.file_name}`);
+					apiLog.error(`Failed to fetch ${file.file_name}`);
 					continue;
 				}
 				const blob = await response.blob();
@@ -1711,7 +1713,7 @@ class ClaudeProject {
 				const filename = this._makeUniqueFilename(file.file_name, file.file_uuid);
 				await addToZip(zip, filename, blob);
 			} catch (error) {
-				console.error(`[QOL-ClaudeProject] Error downloading ${file.file_name}:`, error);
+				apiLog.error(`Error downloading ${file.file_name}:`, error);
 			}
 		}
 
@@ -1800,7 +1802,7 @@ async function downloadFiles(files) {
 				originalUuid: file.uuid
 			});
 		} catch (error) {
-			console.error(`Failed to download file ${file.name}:`, error);
+			apiLog.error(`Failed to download file ${file.name}:`, error);
 		}
 	}
 
@@ -1819,7 +1821,7 @@ async function processSyncSource(orgId, syncsource) {
 	});
 
 	if (!response.ok) {
-		console.error(`Failed to process sync source: ${response.statusText}`);
+		apiLog.error(`Failed to process sync source: ${response.statusText}`);
 		return null;
 	}
 
@@ -1835,7 +1837,7 @@ async function getUserType(orgId) {
 	});
 
 	if (!response.ok) {
-		console.error('Failed to fetch user type');
+		apiLog.error('Failed to fetch user type');
 		return 'unknown';
 	}
 
@@ -1960,7 +1962,7 @@ async function isLikelyTextFile(file) {
 		// If >90% of bytes are printable, likely text
 		return (printableCount / bytes.length) > 0.9;
 	} catch (error) {
-		console.error('Error checking file type:', error);
+		apiLog.error('Error checking file type:', error);
 		// Default to allowing it if we can't check
 		return true;
 	}

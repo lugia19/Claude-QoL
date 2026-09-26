@@ -1,13 +1,14 @@
 // tts-interceptor.js
 (function () {
 	'use strict';
+	const log = createLogger('TTSInterceptor');
 
 	// Fallback for when message_start didn't yield a UUID: fetch the conversation and
 	// pick the newest assistant message. Only reachable if the stream parse failed.
 	async function findNewAssistantMessage(orgId, conversationId, requestSentTime, maxRetries = 2) {
 		for (let attempt = 0; attempt <= maxRetries; attempt++) {
 			if (attempt > 0) {
-				console.log(`Assistant message not found, retrying (${attempt}/${maxRetries})...`);
+				log(`Assistant message not found, retrying (${attempt}/${maxRetries})...`);
 				await new Promise(r => setTimeout(r, 1000));
 			}
 
@@ -17,7 +18,7 @@
 				);
 
 				if (!response.ok) {
-					console.error('Failed to fetch conversation:', response.status);
+					log.error('Failed to fetch conversation:', response.status);
 					continue;
 				}
 
@@ -33,7 +34,7 @@
 					return assistantMessage;
 				}
 			} catch (error) {
-				console.error('Error fetching conversation:', error);
+				log.error('Error fetching conversation:', error);
 			}
 		}
 
@@ -52,7 +53,7 @@
 			// clone in a tight loop can make Claude's renderer receive data in bursts (streaming
 			// jank). This lets us confirm that live with no rebuild.
 			if (ClaudeExtNet.isKillSwitchOn('claude_qol_tts_noclone')) {
-				console.log('[QOL-DIAG] TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
+				log('TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
 				return originalFetch(...args);
 			}
 
@@ -64,7 +65,7 @@
 				return originalFetch(...args);
 			}
 
-			console.log('Intercepted completion request for TTS handling:', url);
+			log('Intercepted completion request for TTS handling:', url);
 			const requestSentTime = new Date().toISOString();
 
 			// Make the original request
@@ -83,15 +84,15 @@
 					await ClaudeExtNet.readSseEvents(clonedResponse, (event) => {
 						if (!responseUuid && event.raw.includes('"message_start"')) {
 							responseUuid = event.data?.message?.uuid ?? null;
-							console.log('TTS: Got response UUID from message_start:', responseUuid);
+							log('TTS: Got response UUID from message_start:', responseUuid);
 						}
 						if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) {
-							console.log('Stream completion detected');
+							log('Stream completion detected');
 							return false;
 						}
 					});
 
-					console.log('Completed reading completion response stream for TTS handling');
+					log('Completed reading completion response stream for TTS handling');
 					// The UUID from message_start is all the ISOLATED side needs - it only uses it
 					// to locate the message in the DOM. Refetching the whole conversation to look
 					// up a UUID we already have is pure waste, so only do it if parsing failed.
@@ -104,10 +105,10 @@
 							messageUuid
 						}, '*');
 					} else {
-						console.log('No new assistant message found after retries');
+						log('No new assistant message found after retries');
 					}
 				} catch (error) {
-					console.error('Error processing completion stream:', error);
+					log.error('Error processing completion stream:', error);
 				}
 			})();
 
@@ -144,7 +145,7 @@
 				}, '*');
 
 			} catch (error) {
-				console.error('Dialogue analysis failed:', error);
+				log.error('Dialogue analysis failed:', error);
 				window.postMessage({
 					type: 'tts-analyze-dialogue-response',
 					requestId: requestId,
