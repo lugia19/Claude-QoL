@@ -1,6 +1,8 @@
 // rich-copy.js (ISOLATED world)
-// Adds "Copy as Rich Text" buttons next to copy buttons on Claude's content blocks.
-// Clicks the native copy button, then the main-world interceptor converts markdown to HTML.
+// "Copy as rich text" next to Claude's native copy actions: a button beside the Copy button of
+// content blocks like email drafts, and an item after "Copy as Markdown" in an artifact's menu.
+// Both click the native copy, and the main-world interceptor converts the markdown to HTML.
+// Everything is matched by icon glyph, testid and structure, never by (localized) text.
 
 (function () {
 	'use strict';
@@ -11,62 +13,33 @@
 
 	const CHECK_SVG = `<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink: 0;"><path d="M15.3 5.3a1 1 0 0 1 1.4 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 1.4-1.4L8 12.58l7.3-7.3z"/></svg>`;
 
-	const MESSAGE_ACTIONS_SELECTOR = '[role="toolbar"][aria-label="Message actions"], [role="group"][aria-label="Message actions"], [data-cds="MessageActions"]';
+	// claude.ai's icon font glyph for "copy". Duplicate uses it too, so it's never enough alone.
+	const COPY_ICON_GLYPH = '';
 
-	function findContentBlockCopyButtons() {
-		const results = [];
-		const copyButtons = document.querySelectorAll('button[aria-label="Copy message"]');
+	function iconGlyph(el) {
+		return el.querySelector('[data-cds="Icon"]')?.textContent ?? '';
+	}
 
-		for (const btn of copyButtons) {
-			if (btn.dataset.testid === 'action-bar-copy') continue;
-			if (btn.closest(MESSAGE_ACTIONS_SELECTOR)) continue;
-			if (btn.nextElementSibling?.classList.contains(RICH_COPY_CLASS)) continue;
-
-			results.push(btn);
+	// Swap the icon for ours and the first text (the label) for `label`. Icon first, so its glyph
+	// isn't the text node that gets relabeled.
+	function restyleClone(clone, label) {
+		const iconEl = clone.querySelector('[data-cds="Icon"]');
+		if (iconEl) {
+			iconEl.innerHTML = RICH_COPY_SVG;
+		} else {
+			clone.insertAdjacentHTML('afterbegin', RICH_COPY_SVG);
 		}
-
-		return results;
+		const labelNode = [...clone.querySelectorAll('span')]
+			.flatMap((span) => [...span.childNodes])
+			.find((node) => node.nodeType === Node.TEXT_NODE && node.nodeValue.trim());
+		if (labelNode) labelNode.nodeValue = label;
+		clone.classList.add(RICH_COPY_CLASS);
+		clone.removeAttribute('id');
+		clone.removeAttribute('data-testid');
+		clone.removeAttribute('data-state');
 	}
 
-	// Copy buttons in artifact/file action rows carry no aria-label or testid, just an
-	// icon-font glyph and a "Copy" label. Never assume a split dropdown's primary button
-	// is the copy one — that slot also holds actions like "Send via Gmail".
-	const COPY_ICON_GLYPH = '\ue056';
-
-	function isNativeCopyButton(btn) {
-		if (btn.classList.contains(RICH_COPY_CLASS)) return false;
-		if (btn.dataset.testid === 'action-bar-copy') return false;
-		// The message action bar has its own copy button, handled above.
-		if (btn.closest(MESSAGE_ACTIONS_SELECTOR)) return false;
-
-		const label = (btn.getAttribute('aria-label') || '').trim().toLowerCase();
-		if (label && label !== 'copy') return false;
-
-		const icon = btn.querySelector('[data-cds="Icon"]');
-		if (icon && icon.textContent === COPY_ICON_GLYPH) return true;
-
-		return (btn.textContent || '').trim().toLowerCase() === 'copy';
-	}
-
-	function findArtifactCopyButtons() {
-		const results = [];
-
-		for (const copyBtn of document.querySelectorAll('button[data-cds="Button"]')) {
-			if (!isNativeCopyButton(copyBtn)) continue;
-
-			// Sit next to the whole split dropdown when the copy button lives inside one.
-			const anchor = copyBtn.closest('[data-cds="SplitDropdownButton"]') || copyBtn;
-			const parent = anchor.parentElement;
-			if (!parent) continue;
-			if (parent.querySelector('.' + RICH_COPY_CLASS)) continue;
-
-			results.push({ copyBtn, anchor });
-		}
-
-		return results;
-	}
-
-	async function copyAsRichText(nativeCopyBtn, richBtn) {
+	async function copyAsRichText(nativeCopy, richBtn = null) {
 		window.postMessage({ type: 'rich-copy-activate' }, '*');
 
 		await new Promise((resolve) => {
@@ -83,7 +56,7 @@
 			}, 100);
 		});
 
-		nativeCopyBtn.click();
+		nativeCopy.click();
 
 		const result = await new Promise((resolve) => {
 			const listener = (event) => {
@@ -100,6 +73,7 @@
 		});
 
 		if (result.type === 'rich-copy-done') {
+			if (!richBtn) return; // a menu item: the menu is already gone
 			const original = richBtn.innerHTML;
 			richBtn.innerHTML = CHECK_SVG;
 			setTimeout(() => { richBtn.innerHTML = original; }, 1500);
@@ -108,87 +82,85 @@
 		}
 	}
 
-	function createRichCopyButton(nativeCopyBtn) {
-		const btn = nativeCopyBtn.cloneNode(false);
-		btn.className = nativeCopyBtn.className + ' ' + RICH_COPY_CLASS;
-		btn.setAttribute('aria-label', localize('richcopy.copy_as_rich_text'));
-		btn.removeAttribute('data-testid');
+	// ======== Content blocks (email drafts and the like) ========
 
-		const iconSpans = nativeCopyBtn.querySelectorAll(':scope > span');
-		for (const span of iconSpans) {
-			const clone = span.cloneNode(true);
-			const iconEl = clone.querySelector('[data-cds="Icon"]');
-			if (iconEl) {
-				iconEl.innerHTML = RICH_COPY_SVG;
-			}
-			btn.appendChild(clone);
-		}
-
-		if (!btn.querySelector('svg')) {
-			btn.innerHTML = RICH_COPY_SVG;
-		}
-
-		btn.addEventListener('click', (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			copyAsRichText(nativeCopyBtn, btn);
-		});
-
-		createClaudeTooltip(btn, localize('richcopy.copy_as_rich_text'));
-
-		return btn;
+	// The labeled Copy button of a content block's action row. Not the message toolbar's (it
+	// already copies HTML) and not a code block's (code isn't markdown).
+	function isBlockCopyButton(btn) {
+		if (btn.classList.contains(RICH_COPY_CLASS)) return false;
+		if (iconGlyph(btn) !== COPY_ICON_GLYPH) return false;
+		if (btn.dataset.testid === 'action-bar-copy') return false;
+		if (btn.closest('[data-cds="MessageActions"]')) return false;
+		if (btn.closest('[role="group"]')?.querySelector('pre')) return false;
+		return true;
 	}
 
-	function createArtifactRichCopyButton(copyBtn) {
-		const btn = copyBtn.cloneNode(true);
-		btn.className = copyBtn.className + ' ' + RICH_COPY_CLASS;
+	function injectBlockButtons() {
+		for (const copyBtn of document.querySelectorAll('button[data-cds="Button"]')) {
+			if (!isBlockCopyButton(copyBtn)) continue;
 
-		const iconEl = btn.querySelector('[data-cds="Icon"]');
-		if (iconEl) {
-			iconEl.innerHTML = RICH_COPY_SVG;
-		} else {
-			btn.innerHTML = RICH_COPY_SVG;
+			// Sit next to the whole split dropdown when the copy button lives inside one.
+			const anchor = copyBtn.closest('[data-cds="SplitDropdownButton"]') || copyBtn;
+			if (anchor.parentElement?.querySelector('.' + RICH_COPY_CLASS)) continue;
+
+			const btn = copyBtn.cloneNode(true);
+			// Not "Copy" again right next to the native one.
+			restyleClone(btn, localize('richcopy.copy_rich_text_label'));
+			btn.setAttribute('aria-label', localize('richcopy.copy_as_rich_text'));
+			btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				copyAsRichText(copyBtn, btn);
+			});
+			createClaudeTooltip(btn, localize('richcopy.copy_as_rich_text'));
+			anchor.insertAdjacentElement('afterend', btn);
 		}
-
-		// Relabel so it doesn't read as a second "Copy" right next to the native one.
-		const labelNode = [...btn.querySelectorAll('span')]
-			.flatMap((span) => [...span.childNodes])
-			.find((node) => node.nodeType === Node.TEXT_NODE && node.nodeValue.trim());
-		if (labelNode) {
-			labelNode.nodeValue = localize('richcopy.copy_rich_text_label');
-		}
-
-		btn.setAttribute('aria-label', localize('richcopy.copy_as_rich_text'));
-		btn.removeAttribute('data-testid');
-		btn.removeAttribute('data-state');
-
-		btn.addEventListener('click', (e) => {
-			e.preventDefault();
-			e.stopPropagation();
-			copyAsRichText(copyBtn, btn);
-		});
-
-		createClaudeTooltip(btn, localize('richcopy.copy_as_rich_text'));
-
-		return btn;
 	}
 
-	function injectButtons() {
-		const copyButtons = findContentBlockCopyButtons();
-		for (const copyBtn of copyButtons) {
-			const richBtn = createRichCopyButton(copyBtn);
-			copyBtn.insertAdjacentElement('afterend', richBtn);
-		}
+	// ======== Artifact menu ========
 
-		const artifactTargets = findArtifactCopyButtons();
-		for (const { copyBtn, anchor } of artifactTargets) {
-			const richBtn = createArtifactRichCopyButton(copyBtn);
-			anchor.insertAdjacentElement('afterend', richBtn);
-		}
+	// The artifact's title menu (the only one with frame-title-menu-* items): its "Copy as
+	// Markdown" is the copy-glyph item without a testid (Duplicate shares the glyph, but has one).
+	function injectMenuItem(menu) {
+		if (!menu.querySelector('[data-testid^="frame-title-menu-"]')) return;
+		if (menu.querySelector('.' + RICH_COPY_CLASS)) return;
+		const copyItem = [...menu.querySelectorAll('[role="menuitem"]:not([data-testid])')]
+			.find((item) => iconGlyph(item) === COPY_ICON_GLYPH);
+		if (!copyItem) return;
+
+		const item = copyItem.cloneNode(true);
+		restyleClone(item, localize('richcopy.copy_as_rich_text'));
+		// The menu only highlights the items it knows about.
+		item.addEventListener('pointerenter', () => item.setAttribute('data-highlighted', ''));
+		item.addEventListener('pointerleave', () => item.removeAttribute('data-highlighted'));
+		item.addEventListener('click', (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			copyAsRichText(copyItem); // closes the menu, like the native item
+		});
+		copyItem.insertAdjacentElement('afterend', item);
+	}
+
+	// claude.ai mounts menus in #portal-root; watching only that stays cheap while a reply streams.
+	// Re-attached if the page ever replaces the element.
+	const portalObserver = new MutationObserver(() => {
+		for (const menu of document.querySelectorAll('#portal-root [role="menu"]')) injectMenuItem(menu);
+	});
+	let observedPortalRoot = null;
+
+	function watchMenus() {
+		const portalRoot = document.getElementById('portal-root');
+		if (!portalRoot || portalRoot === observedPortalRoot) return;
+		portalObserver.disconnect();
+		portalObserver.observe(portalRoot, { childList: true, subtree: true });
+		observedPortalRoot = portalRoot;
 	}
 
 	function initialize() {
-		setInterval(injectButtons, 1000);
+		setInterval(() => {
+			injectBlockButtons();
+			watchMenus();
+		}, 1000);
 	}
 
 	if (document.readyState === 'loading') {
