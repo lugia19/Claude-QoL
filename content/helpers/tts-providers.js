@@ -587,7 +587,7 @@ JSON array:`;
 	window.TTSProviders = {
 		TTS_PROVIDERS: {
 			claude: {
-				name: 'Claude (built-in)',
+				name: localize('tts.provider_claude_builtin'),
 				requiresApiKey: false,
 				native: true, // passthrough: let claude.ai's own TTS play, no hijack
 				class: null

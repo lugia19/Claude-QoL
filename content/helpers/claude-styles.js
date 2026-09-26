@@ -199,12 +199,12 @@ class ClaudeModal {
 		return button;
 	}
 
-	addCancel(text = 'Cancel', onClick = null) {
+	addCancel(text = localize('common.cancel'), onClick = null) {
 		this.dismissButton = this.addButton(text, 'secondary', onClick, true);
 		return this.dismissButton;
 	}
 
-	addConfirm(text = 'Confirm', onClick = null, closeOnClick = true) {
+	addConfirm(text = localize('common.confirm'), onClick = null, closeOnClick = true) {
 		return this.addButton(text, 'primary', onClick, closeOnClick);
 	}
 
@@ -288,7 +288,7 @@ function createLoadingContent(text) {
 	return div;
 }
 
-function createLoadingModal(text = 'Loading...') {
+function createLoadingModal(text = localize('common.loading')) {
 	return new ClaudeModal('', createLoadingContent(text), false);
 }
 
@@ -301,11 +301,11 @@ function showClaudeConfirm(title, message) {
 
 		const modal = new ClaudeModal(title, messageEl);
 
-		modal.addCancel('Cancel', () => {
+		modal.addCancel(localize('common.cancel'), () => {
 			resolve(false);
 		});
 
-		modal.addConfirm('Confirm', () => {
+		modal.addConfirm(localize('common.confirm'), () => {
 			resolve(true);
 		});
 
@@ -352,20 +352,17 @@ async function warnAboutSettingsMismatch(sourceSettings) {
 
 	const mismatches = [];
 	if (sourceArtifacts !== currentArtifacts) {
-		mismatches.push(`Artifacts: Originally ${sourceArtifacts ? 'ON' : 'OFF'} | Currently ${currentArtifacts ? 'ON' : 'OFF'}`);
+		mismatches.push(localize('ui.settings_mismatch_artifacts', { was: localize(sourceArtifacts ? 'ui.on' : 'ui.off'), now: localize(currentArtifacts ? 'ui.on' : 'ui.off') }));
 	}
 	if (sourceCE !== currentCE) {
-		mismatches.push(`Code Execution: Originally ${sourceCE ? 'ON' : 'OFF'} | Currently ${currentCE ? 'ON' : 'OFF'}`);
+		mismatches.push(localize('ui.settings_mismatch_code_execution', { was: localize(sourceCE ? 'ui.on' : 'ui.off'), now: localize(currentCE ? 'ui.on' : 'ui.off') }));
 	}
 
 	if (mismatches.length === 0) return currentSettings;
 
 	const proceed = await showClaudeConfirm(
-		'Settings Mismatch',
-		`The source conversation has different settings:\n${mismatches.join('\n')}\n\n` +
-		`The new conversation will use your current settings. ` +
-		`Note: features that are OFF when a conversation is created can never be enabled in it later. ` +
-		`Cancel and adjust your settings first if needed.`
+		localize('ui.settings_mismatch_title'),
+		localize('ui.settings_mismatch_body', { mismatches: mismatches.join('\n') })
 	);
 	if (!proceed) throw new Error('USER_CANCELLED');
 
@@ -393,11 +390,11 @@ function showClaudePrompt(title, message, placeholder = '', defaultValue = '', o
 
 		const modal = new ClaudeModal(title, contentDiv);
 
-		modal.addCancel('Cancel', () => {
+		modal.addCancel(localize('common.cancel'), () => {
 			reject(new Error('User cancelled'));
 		});
 
-		modal.addConfirm('OK', async (btn, modal) => {
+		modal.addConfirm(localize('common.ok'), async (btn, modal) => {
 			const value = input.value.trim();
 
 			// Run validation if provided
@@ -406,7 +403,7 @@ function showClaudePrompt(title, message, placeholder = '', defaultValue = '', o
 				if (validationResult !== true) {
 					// Show error message if validation failed
 					if (typeof validationResult === 'string') {
-						showClaudeAlert('Validation Error', validationResult);
+						showClaudeAlert(localize('ui.validation_error'), validationResult);
 					}
 					return false; // Keep modal open
 				}
@@ -432,7 +429,7 @@ function showClaudePrompt(title, message, placeholder = '', defaultValue = '', o
 }
 
 // Full-featured alert with customization
-function showClaudeAlert(title, message, buttonText = 'OK') {
+function showClaudeAlert(title, message, buttonText = localize('common.ok')) {
 	return new Promise((resolve) => {
 		const contentDiv = document.createElement('div');
 		contentDiv.className = 'text-text-200';
@@ -537,7 +534,7 @@ function createClaudeSelect(options, selectedValue = '', onChange = null) {
 		if (newOptions.length === 0) {
 			const optionEl = document.createElement('option');
 			optionEl.value = '';
-			optionEl.textContent = 'None available';
+			optionEl.textContent = localize('ui.none_available');
 			select.appendChild(optionEl);
 			select.disabled = true;
 			return;
@@ -593,7 +590,7 @@ function createClaudeSearchableSelect(options, selectedValue = '', onChange = nu
 
 	const searchInput = document.createElement('input');
 	searchInput.type = 'text';
-	searchInput.placeholder = 'Search...';
+	searchInput.placeholder = localize('ui.search_placeholder');
 	searchInput.className = CLAUDE_CLASSES.INPUT;
 	searchInput.style.borderRadius = '0';
 	searchInput.style.borderLeft = 'none';
@@ -757,7 +754,7 @@ function createClaudeSearchableSelect(options, selectedValue = '', onChange = nu
 	wrapper.populateOptions = function (newOptions, currentValue = '') {
 		currentOptions = [...newOptions];
 		if (newOptions.length === 0) {
-			currentOptions = [{ value: '', label: 'None available' }];
+			currentOptions = [{ value: '', label: localize('ui.none_available') }];
 			isDisabled = true;
 			selectedVal = '';
 		} else {
@@ -1381,6 +1378,7 @@ const ButtonBar = {
 		'preset-switcher-button',
 		'export-button',
 		'tts-settings-button',
+		'language-settings-button',
 	],
 
 	_registrations: new Map(),
@@ -1750,7 +1748,7 @@ const ButtonBar = {
 				`, 'icon');
 				moreButton.classList.add('more-actions-button');
 				moreButton.onclick = () => this._showMoreActionsModal();
-				createClaudeTooltip(moreButton, 'More actions');
+				createClaudeTooltip(moreButton, localize('ui.more_actions'));
 				container.appendChild(moreButton);
 			}
 		} else {
@@ -1824,7 +1822,7 @@ const ButtonBar = {
 	},
 
 	_showMoreActionsModal() {
-		const modal = new ClaudeModal('More Actions', '', true);
+		const modal = new ClaudeModal(localize('ui.more_actions_title'), '', true);
 
 		const list = document.createElement('div');
 		list.className = 'space-y-2';
@@ -1876,8 +1874,9 @@ function findMessageControls(messageElement) {
 	if (!messageContainer) return null;
 
 	// New UI: the role="toolbar" element is itself the justify-between flex row
-	// that directly contains the action buttons.
-	const toolbar = messageContainer.querySelector('[role="toolbar"][aria-label="Message actions"]');
+	// that directly contains the action buttons. Matched by data-cds, not aria-label: claude.ai
+	// localizes the label. Placeholder [data-cds="MessageActions"] rows without role="toolbar" exist too.
+	const toolbar = messageContainer.querySelector('[role="toolbar"][data-cds="MessageActions"]');
 	if (toolbar) return toolbar;
 
 	// Legacy UI: role="group" wrapper with a .justify-between child.

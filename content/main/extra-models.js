@@ -5,7 +5,12 @@
     // The section a re-enabled model lands in within the dropdown.
     const TARGET_SECTION = 'overflow';
 
-    const EXTRA_MODELS = [
+    // User-visible text in the injected metadata is localized. This file loads BEFORE i18n.js,
+    // so localize() may only be called lazily (the list is built at fetch time) and must be
+    // guarded. Ids, model names and *_key fields stay untouched - Claude's frontend keys on them.
+    const t = (key, fallback) => (typeof localize === 'function' ? localize(key) : fallback);
+
+    const buildExtraModels = () => [
         {
             // --- Legacy shape: account.memberships[].organization.claude_ai_bootstrap_models_config ---
             bootstrap: {
@@ -13,19 +18,19 @@
                 name: 'Opus 4.5',
                 inactive: false,
                 overflow: true,
-                notice_text: 'Opus consumes usage limits faster than other models',
+                notice_text: t('models.opus_notice', 'Opus consumes usage limits faster than other models'),
                 paprika_modes: ['extended'],
                 thinking_modes: [
                     {
-                        description: 'Think longer for complex tasks',
+                        description: t('models.think_longer', 'Think longer for complex tasks'),
                         description_key: 'amber_river_echo',
                         id: 'extended',
                         is_default: false,
                         mode: 'extended',
                         paprika_mode_value: 'extended',
-                        selection_title: 'Extended',
+                        selection_title: t('models.extended', 'Extended'),
                         selection_title_key: 'crimson_peak_summit',
-                        title: 'Extended thinking',
+                        title: t('models.extended_thinking', 'Extended thinking'),
                         title_key: 'golden_forest_whisper'
                     }
                 ]
@@ -37,8 +42,8 @@
             selector: {
                 id: 'claude-opus-4-5-20251101',
                 name: 'Opus 4.5',
-                description: 'Most capable for ambitious work',
-                notice_text: 'Opus consumes usage limits faster than other models',
+                description: t('models.opus_description', 'Most capable for ambitious work'),
+                notice_text: t('models.opus_notice', 'Opus consumes usage limits faster than other models'),
                 section: TARGET_SECTION,
                 capabilities: {
                     compass: true,
@@ -49,21 +54,21 @@
                 },
                 thinking: {
                     type: 'effort_and_mode',
-                    description: 'Higher effort means more thorough responses, but takes longer and uses your limits faster.',
+                    description: t('models.effort_description', 'Higher effort means more thorough responses, but takes longer and uses your limits faster.'),
                     effort_options: [
-                        { id: 'low', name: 'Low', description: 'Quick replies to simple questions' },
-                        { id: 'medium', name: 'Medium', description: 'Balanced for everyday work' },
+                        { id: 'low', name: t('models.effort_low', 'Low'), description: t('models.effort_low_description', 'Quick replies to simple questions') },
+                        { id: 'medium', name: t('models.effort_medium', 'Medium'), description: t('models.effort_medium_description', 'Balanced for everyday work') },
                         {
                             id: 'high',
-                            name: 'High',
-                            description: 'Complex, detailed work',
+                            name: t('models.effort_high', 'High'),
+                            description: t('models.effort_high_description', 'Complex, detailed work'),
                             recommended: true,
-                            badge: { message: 'Default', variant: 'neutral' }
+                            badge: { message: t('models.default_badge', 'Default'), variant: 'neutral' }
                         }
                     ],
                     mode_options: [
-                        { id: 'extended', name: 'Extended', description: 'Always uses deep reasoning' },
-                        { id: 'off', name: 'Off' }
+                        { id: 'extended', name: t('models.extended', 'Extended'), description: t('models.extended_description', 'Always uses deep reasoning') },
+                        { id: 'off', name: t('models.off', 'Off') }
                     ]
                 },
                 hard_limit: 190000
@@ -75,7 +80,7 @@
                 id: 'claude-opus-4-6',
                 name: 'Opus 4.6',
                 short_name: 'Opus',
-                notice_text: 'Opus consumes usage limits faster than other models',
+                notice_text: t('models.opus_notice', 'Opus consumes usage limits faster than other models'),
                 section: TARGET_SECTION,
                 capabilities: {
                     compass: true,
@@ -86,29 +91,29 @@
                 },
                 thinking: {
                     type: 'effort_and_mode',
-                    description: 'Higher effort means more thorough responses, but takes longer and uses your limits faster.',
+                    description: t('models.effort_description', 'Higher effort means more thorough responses, but takes longer and uses your limits faster.'),
                     effort_options: [
-                        { id: 'low', name: 'Low', description: 'Quick replies to simple questions' },
+                        { id: 'low', name: t('models.effort_low', 'Low'), description: t('models.effort_low_description', 'Quick replies to simple questions') },
                         {
                             id: 'medium',
-                            name: 'Medium',
-                            description: 'Balanced for everyday work',
+                            name: t('models.effort_medium', 'Medium'),
+                            description: t('models.effort_medium_description', 'Balanced for everyday work'),
                             recommended: true,
-                            badge: { message: 'Default', variant: 'neutral' }
+                            badge: { message: t('models.default_badge', 'Default'), variant: 'neutral' }
                         },
-                        { id: 'high', name: 'High', description: 'Complex, detailed work' },
+                        { id: 'high', name: t('models.effort_high', 'High'), description: t('models.effort_high_description', 'Complex, detailed work') },
                         {
                             id: 'max',
-                            name: 'Max',
-                            description: 'The hardest problems. Takes longest.',
+                            name: t('models.effort_max', 'Max'),
+                            description: t('models.effort_max_description', 'The hardest problems. Takes longest.'),
                             tooltip: {
-                                content: 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.'
+                                content: t('models.effort_max_tooltip', 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.')
                             }
                         }
                     ],
                     mode_options: [
-                        { id: 'extended', name: 'Extended', description: 'Always uses deep reasoning' },
-                        { id: 'off', name: 'Off' }
+                        { id: 'extended', name: t('models.extended', 'Extended'), description: t('models.extended_description', 'Always uses deep reasoning') },
+                        { id: 'off', name: t('models.off', 'Off') }
                     ]
                 },
                 hard_limit: 449000,
@@ -116,7 +121,7 @@
                 voice_model: 'claude-opus-4-8',
                 notice: {
                     title: null,
-                    text: 'Opus consumes usage limits faster than other models',
+                    text: t('models.opus_notice', 'Opus consumes usage limits faster than other models'),
                     cta: null,
                     is_dismissible: false
                 }
@@ -128,16 +133,16 @@
                 model: 'claude-opus-4-7',
                 name: 'Claude Opus 4.7',
                 inactive: false,
-                notice_text: 'Opus consumes usage limits faster than other models',
+                notice_text: t('models.opus_notice', 'Opus consumes usage limits faster than other models'),
                 paprika_modes: ['extended'],
                 thinking_modes: [
                     {
-                        description: 'Can think for more complex tasks',
+                        description: t('models.thinking_description', 'Can think for more complex tasks'),
                         id: 'auto',
                         mode: 'extended',
                         paprika_mode_value: 'extended',
-                        selection_title: 'Thinking',
-                        title: 'Thinking'
+                        selection_title: t('models.thinking', 'Thinking'),
+                        title: t('models.thinking', 'Thinking')
                     }
                 ],
                 hard_limit: 449000
@@ -146,7 +151,7 @@
                 id: 'claude-opus-4-7',
                 name: 'Opus 4.7',
                 short_name: 'Opus',
-                notice_text: 'Opus consumes usage limits faster than Sonnet and Haiku',
+                notice_text: t('models.opus_notice_sonnet_haiku', 'Opus consumes usage limits faster than Sonnet and Haiku'),
                 section: TARGET_SECTION,
                 capabilities: {
                     compass: true,
@@ -157,35 +162,35 @@
                 },
                 thinking: {
                     type: 'effort_and_mode',
-                    description: 'Higher effort means more thorough responses, but takes longer and uses your limits faster.',
+                    description: t('models.effort_description', 'Higher effort means more thorough responses, but takes longer and uses your limits faster.'),
                     effort_options: [
-                        { id: 'low', name: 'Low' },
-                        { id: 'medium', name: 'Medium' },
-                        { id: 'high', name: 'High' },
+                        { id: 'low', name: t('models.effort_low', 'Low') },
+                        { id: 'medium', name: t('models.effort_medium', 'Medium') },
+                        { id: 'high', name: t('models.effort_high', 'High') },
                         {
                             id: 'xhigh',
-                            name: 'Extra',
+                            name: t('models.effort_extra', 'Extra'),
                             recommended: true,
-                            badge: { message: 'Default', variant: 'neutral' }
+                            badge: { message: t('models.default_badge', 'Default'), variant: 'neutral' }
                         },
                         {
                             id: 'max',
-                            name: 'Max',
+                            name: t('models.effort_max', 'Max'),
                             tooltip: {
-                                content: 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.'
+                                content: t('models.effort_max_tooltip', 'May use excessive tokens resulting in long response times and may hit token limits. Use sparingly for the hardest tasks.')
                             }
                         }
                     ],
                     mode_options: [
-                        { id: 'auto', name: 'Thinking', description: 'Can think for more complex tasks' },
-                        { id: 'off', name: 'Off' }
+                        { id: 'auto', name: t('models.thinking', 'Thinking'), description: t('models.thinking_description', 'Can think for more complex tasks') },
+                        { id: 'off', name: t('models.off', 'Off') }
                     ]
                 },
                 hard_limit: 449000,
                 voice_model: 'claude-opus-5',
                 notice: {
                     title: null,
-                    text: 'Opus consumes usage limits faster than Sonnet and Haiku',
+                    text: t('models.opus_notice_sonnet_haiku', 'Opus consumes usage limits faster than Sonnet and Haiku'),
                     cta: null,
                     is_dismissible: false
                 }
@@ -198,10 +203,11 @@
     // Patch 1: legacy bootstrap config (kept for compatibility).
     function patchBootstrapConfig(data) {
         if (!data?.account?.memberships) return;
+        const extraModels = buildExtraModels();
         for (const membership of data.account.memberships) {
             const config = membership?.organization?.claude_ai_bootstrap_models_config;
             if (!Array.isArray(config)) continue;
-            for (const extra of EXTRA_MODELS) {
+            for (const extra of extraModels) {
                 const entry = extra.bootstrap;
                 if (!entry) continue;
                 const existing = config.find(e => e.model === entry.model);
@@ -217,9 +223,10 @@
     // Patch 2: the new top-level model_selector_config (what the dropdown actually reads).
     function patchModelSelectorConfig(data) {
         if (!Array.isArray(data?.model_selector_config)) return;
+        const extraModels = buildExtraModels();
         for (const surface of data.model_selector_config) {
             if (!Array.isArray(surface?.models)) continue;
-            for (const extra of EXTRA_MODELS) {
+            for (const extra of extraModels) {
                 const sel = extra.selector;
                 const existing = surface.models.find(m => m.id === sel.id);
                 if (existing) {
@@ -239,9 +246,10 @@
 
     function patchModelSelectorState(data) {
         if (!Array.isArray(data?.model_selector_state)) return;
+        const extraModels = buildExtraModels();
         for (const surface of data.model_selector_state) {
             if (!Array.isArray(surface?.thinking_by_model)) continue;
-            for (const extra of EXTRA_MODELS) {
+            for (const extra of extraModels) {
                 const id = extra.selector.id;
                 if (surface.thinking_by_model.some(t => t.id === id)) continue;
                 surface.thinking_by_model.push({

@@ -31,8 +31,8 @@
 		const btn = createClaudeButton(svgContent, 'icon-message');
 		btn.type = 'button';
 		btn.setAttribute('data-state', 'closed');
-		btn.setAttribute('aria-label', 'Advanced Edit');
-		createClaudeTooltip(btn, 'Advanced Edit', true);
+		btn.setAttribute('aria-label', localize('edit.advanced_edit'));
+		createClaudeTooltip(btn, localize('edit.advanced_edit'), true);
 		return btn;
 	}
 
@@ -74,25 +74,8 @@
 	}
 
 	function insertAdvancedEditButton(button, controlsContainer) {
-		// Find the native edit button by its unique SVG path (pencil icon)
-		const allButtons = controlsContainer.querySelectorAll('button[type="button"]');
-		let editButton = null;
-
-		for (const btn of allButtons) {
-			const ariaLabel = btn.getAttribute('aria-label');
-			if (ariaLabel === 'Edit') {
-				editButton = btn;
-				break;
-			}
-
-			// Also check for the path as a fallback
-			const svgPath = btn.querySelector('svg path');
-			if (svgPath && svgPath.getAttribute('d')?.startsWith('M9.728 2.88a1.5')) {
-				editButton = btn;
-				break;
-			}
-		}
-
+		// Find the native edit button by its testid - its aria-label is localized by claude.ai
+		const editButton = controlsContainer.querySelector('[data-testid="user-message-edit"]');
 		if (!editButton) return;
 
 		button.onclick = async (e) => {
@@ -104,7 +87,7 @@
 
 			// Fetching the conversation takes a moment; the modal both tells the user
 			// something is happening and blocks a second click on the button.
-			const loadingModal = createLoadingModal('Loading message...');
+			const loadingModal = createLoadingModal(localize('edit.loading_message'));
 			loadingModal.show();
 
 			try {
@@ -116,7 +99,7 @@
 				const existingMessage = findExistingMessage(controlsContainer, messages);
 				if (!existingMessage) {
 					loadingModal.destroy();
-					showClaudeAlert('Error', 'Could not find the message to edit.');
+					showClaudeAlert(localize('common.error'), localize('edit.message_not_found'));
 					return;
 				}
 
@@ -155,7 +138,8 @@
 	// The native edit UI is no longer a <form> with a submit button: it swaps the
 	// message body for a bare textarea and the message toolbar for [Cancel, Save].
 	function findNativeEditControls() {
-		const textarea = document.querySelector('textarea[aria-label="Edit message"]');
+		// Not by aria-label ("Edit message"): claude.ai localizes it. The row only holds a textarea while editing.
+		const textarea = document.querySelector('[data-cds="UserMessage"] textarea');
 		const row = textarea?.closest('[data-cds="UserMessage"]');
 		if (!row) return null;
 
@@ -180,7 +164,7 @@
 				console.error('Advanced edit: never found the native edit textarea, aborting');
 				pendingEditData = null;
 				cleanupEditState();
-				showClaudeAlert('Error', 'Could not open the message editor. The claude.ai UI may have changed.');
+				showClaudeAlert(localize('common.error'), localize('edit.editor_not_found'));
 				return;
 			}
 			setTimeout(() => autoSubmitEditWithText(newText, attempt + 1), 50);
@@ -221,20 +205,20 @@
 			const editorSection = buildEditorSection(editMessage.text);
 			content.appendChild(editorSection);
 
-			const modal = new ClaudeModal('Edit Message', content);
+			const modal = new ClaudeModal(localize('edit.modal_title'), content);
 
 			// Make modal wider
 			modal.modal.classList.remove('max-w-md');
 			modal.modal.classList.add('max-w-2xl');
 
 			// Add cancel button
-			modal.addCancel('Cancel', () => {
+			modal.addCancel(localize('common.cancel'), () => {
 				cleanupEditState();
 				reject(new Error('Edit cancelled by user'));
 			});
 
 			// Add confirm button
-			const submitBtn = modal.addConfirm('Submit Edit', async (btn) => {
+			const submitBtn = modal.addConfirm(localize('edit.submit_edit'), async (btn) => {
 				collectModalData();
 				resolve();
 				return true;
@@ -260,7 +244,7 @@
 		// Section header
 		const header = document.createElement('h3');
 		header.className = 'text-sm font-medium text-text-200 mb-2';
-		header.textContent = 'Files & Attachments';
+		header.textContent = localize('edit.files_attachments');
 		container.appendChild(header);
 
 		// Files list container - now with scrolling
@@ -295,14 +279,14 @@
 
 		const label = document.createElement('span');
 		label.className = 'text-sm font-medium text-text-200 mb-2 block';
-		label.textContent = 'Message';
+		label.textContent = localize('edit.message_label');
 		container.appendChild(label);
 
 		const promptTA = document.createElement('textarea');
 		promptTA.id = 'message-text';
 		promptTA.className = CLAUDE_CLASSES.INPUT;
 		promptTA.value = promptText;
-		promptTA.placeholder = 'Enter your message...';
+		promptTA.placeholder = localize('edit.message_placeholder');
 		promptTA.style.resize = 'none';
 		promptTA.style.minHeight = '150px';
 		promptTA.style.maxHeight = '400px';
@@ -367,12 +351,16 @@
 		// File name with uploading indicator
 		const name = document.createElement('span');
 		name.className = 'flex-1 text-sm text-text-100';
-		name.innerHTML = `${truncateFilename(file.name)} <span class="text-text-400 text-xs">(uploading...)</span>`;
+		name.textContent = truncateFilename(file.name) + ' ';
+		const uploadingTag = document.createElement('span');
+		uploadingTag.className = 'text-text-400 text-xs';
+		uploadingTag.textContent = localize('edit.uploading_tag');
+		name.appendChild(uploadingTag);
 		name.title = file.name;
 		item.appendChild(name);
 
 		// Remove button (disabled during upload)
-		const removeBtn = createClaudeButton('Remove', 'secondary');
+		const removeBtn = createClaudeButton(localize('edit.remove'), 'secondary');
 		removeBtn.classList.add('!min-w-0', '!px-2', '!h-7', '!text-xs');
 		removeBtn.disabled = true;
 		removeBtn.style.opacity = '0.5';
@@ -410,7 +398,7 @@
 		item.appendChild(name);
 
 		// Remove button
-		const removeBtn = createClaudeButton('Remove', 'secondary');
+		const removeBtn = createClaudeButton(localize('edit.remove'), 'secondary');
 		removeBtn.classList.add('!min-w-0', '!px-2', '!h-7', '!text-xs');
 		removeBtn.onclick = () => handleRemoveFile(item, file);
 		item.appendChild(removeBtn);
@@ -443,7 +431,7 @@
 		item.appendChild(name);
 
 		// Remove button
-		const removeBtn = createClaudeButton('Remove', 'secondary');
+		const removeBtn = createClaudeButton(localize('edit.remove'), 'secondary');
 		removeBtn.classList.add('!min-w-0', '!px-2', '!h-7', '!text-xs');
 		removeBtn.onclick = () => handleRemoveFile(item, attachment);
 		item.appendChild(removeBtn);
@@ -460,14 +448,14 @@
 		buttonsDiv.className = 'flex gap-2 flex-wrap';
 
 		// Add attachment button (text files) - updated description
-		const addAttachmentBtn = createClaudeButton('+ Add Text File (any text format)', 'secondary');
+		const addAttachmentBtn = createClaudeButton(localize('edit.add_text_file'), 'secondary');
 		addAttachmentBtn.style.minWidth = '200px';
 		addAttachmentBtn.style.flex = '1';
 		addAttachmentBtn.onclick = () => handleAddAttachment();
 		buttonsDiv.appendChild(addAttachmentBtn);
 
 		// Add file button (images, PDFs, etc)
-		const addFileBtn = createClaudeButton('+ Add File (images, PDFs, docs)', 'secondary');
+		const addFileBtn = createClaudeButton(localize('edit.add_file'), 'secondary');
 		addFileBtn.style.minWidth = '200px';
 		addFileBtn.style.flex = '1';
 		addFileBtn.onclick = () => handleAddFile();
@@ -618,7 +606,11 @@
 				icon.innerHTML = '❌';
 
 				const nameSpan = uploadingItem.querySelector('span.text-text-100');
-				nameSpan.innerHTML = `${truncateFilename(file.name)} <span class="text-red-600 text-xs">(upload failed)</span>`;
+				nameSpan.textContent = truncateFilename(file.name) + ' ';
+				const failedTag = document.createElement('span');
+				failedTag.className = 'text-red-600 text-xs';
+				failedTag.textContent = localize('edit.upload_failed_tag');
+				nameSpan.appendChild(failedTag);
 				nameSpan.title = file.name;
 
 				// Make remove button work
@@ -654,12 +646,12 @@
 
 		if (uploading && count > 0) {
 			modal.submitButton.disabled = true;
-			modal.submitButton.textContent = `Submit Edit (${count} uploading...)`;
+			modal.submitButton.textContent = localize('edit.submit_edit_uploading', { n: fmtNum(count) });
 			modal.submitButton.style.opacity = '0.5';
 			modal.submitButton.style.cursor = 'not-allowed';
 		} else {
 			modal.submitButton.disabled = false;
-			modal.submitButton.textContent = 'Submit Edit';
+			modal.submitButton.textContent = localize('edit.submit_edit');
 			modal.submitButton.style.opacity = '1';
 			modal.submitButton.style.cursor = 'pointer';
 		}

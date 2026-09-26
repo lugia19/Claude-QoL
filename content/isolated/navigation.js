@@ -66,19 +66,19 @@
 	// #region  NAME INPUT MODAL 
 	async function showNameInputModal(conversationId, currentLeafId) {
 		const name = await showClaudePrompt(
-			'Add Bookmark',
-			'Bookmark Name:',
-			'Enter bookmark name...',
+			localize('nav.add_bookmark_title'),
+			localize('nav.bookmark_name_label'),
+			localize('nav.bookmark_name_placeholder'),
 			'',
 			async (value) => {
 				if (!value) {
-					return 'Please enter a bookmark name';
+					return localize('nav.bookmark_name_required');
 				}
 
 				// Check for duplicate names
 				const bookmarks = await getBookmarks(conversationId);
 				if (bookmarks[value]) {
-					return 'A bookmark with this name already exists';
+					return localize('nav.bookmark_name_exists');
 				}
 
 				return true;
@@ -191,7 +191,7 @@
 
 			// Click handler for navigation
 			content.onclick = async () => {
-				const loadingModal = createLoadingModal('Navigating to bookmark...');
+				const loadingModal = createLoadingModal(localize('nav.navigating_to_bookmark'));
 				try {
 					loadingModal.show();
 
@@ -201,7 +201,7 @@
 					window.location.reload();
 				} catch (error) {
 					console.error('Navigation failed:', error);
-					showClaudeAlert('Navigation Error', 'Failed to navigate. The bookmark may be invalid.');
+					showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
 					loadingModal.destroy();
 				}
 			};
@@ -214,7 +214,7 @@
 			deleteBtn.classList.add('h-6', 'w-6', 'text-base', 'ml-1');
 			deleteBtn.onclick = async (e) => {
 				e.stopPropagation();
-				const confirmed = await showClaudeConfirm('Delete Bookmark', `Are you sure you want to delete the bookmark "${bookmark.name}"?`);
+				const confirmed = await showClaudeConfirm(localize('nav.delete_bookmark_title'), localize('nav.delete_bookmark_confirm', { name: bookmark.name }));
 				if (confirmed) {
 					await deleteBookmark(conversationId, bookmark.name);
 					onDelete();
@@ -240,7 +240,7 @@
 
 	//#region MAIN NAVIGATION MODAL
 	async function showNavigationModal() {
-		const loading = createLoadingModal('Loading conversation data...');
+		const loading = createLoadingModal(localize('nav.loading_conversation'));
 		loading.show();
 
 		let conversation;
@@ -248,9 +248,9 @@
 			conversation = await getConversation();
 		} catch (error) {
 			console.error('Failed to fetch conversation:', error);
-			loading.setTitle('Error');
-			loading.setContent('Failed to load conversation data. Please try again.');
-			loading.addConfirm('OK');
+			loading.setTitle(localize('common.error'));
+			loading.setContent(localize('nav.load_conversation_failed'));
+			loading.addConfirm(localize('common.ok'));
 			return;
 		}
 
@@ -261,8 +261,8 @@
 		const topButtonsRow = document.createElement('div');
 		topButtonsRow.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
 
-		const latestBtn = createClaudeButton('Go to Latest', 'secondary', async () => {
-			const loadingModal = createLoadingModal('Navigating to latest message...');
+		const latestBtn = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
+			const loadingModal = createLoadingModal(localize('nav.navigating_to_latest'));
 			loadingModal.show();
 
 			let latestMessage = null;
@@ -283,8 +283,8 @@
 			}
 		});
 
-		const longestBtn = createClaudeButton('Go to Longest', 'secondary', async () => {
-			const loadingModal = createLoadingModal('Navigating to longest branch...');
+		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
+			const loadingModal = createLoadingModal(localize('nav.navigating_to_longest'));
 			loadingModal.show();
 
 			const rootId = "00000000-0000-4000-8000-000000000000";
@@ -314,7 +314,7 @@
 			if (Object.keys(bookmarks).length === 0) {
 				const emptyMsg = document.createElement('div');
 				emptyMsg.className = 'text-center text-text-400 py-8';
-				emptyMsg.textContent = 'No bookmarks yet. Use the bookmark button on messages to add one.';
+				emptyMsg.textContent = localize('nav.no_bookmarks');
 				treeContainer.appendChild(emptyMsg);
 				return;
 			}
@@ -333,7 +333,7 @@
 
 			const rootLabel = document.createElement('span');
 			rootLabel.className = 'text-sm text-text-200';
-			rootLabel.textContent = 'Root';
+			rootLabel.textContent = localize('nav.root');
 			rootContent.appendChild(rootLabel);
 
 			rootNode.appendChild(rootContent);
@@ -355,8 +355,8 @@
 		loading.destroy();
 
 		// Create and show modal
-		const modal = new ClaudeModal('Navigation', contentDiv);
-		modal.addCancel('Close');
+		const modal = new ClaudeModal(localize('nav.navigation'), contentDiv);
+		modal.addCancel(localize('common.close'));
 		modal.modal.classList.remove('max-w-md');
 		modal.modal.classList.add('max-w-2xl');
 		modal.show();
@@ -378,7 +378,7 @@
 	// #endregion
 	// #region  USER NAVIGATION BUTTONS (MessageButtonBar)
 	function findMessageFromButton(button) {
-		const actionsGroup = button.closest('[role="toolbar"][aria-label="Message actions"], [role="group"][aria-label="Message actions"]');
+		const actionsGroup = button.closest('[role="toolbar"][data-cds="MessageActions"], [role="group"][aria-label="Message actions"]');
 		if (!actionsGroup) return null;
 		const messageContainer = actionsGroup.closest('.group');
 		if (!messageContainer) return null;
@@ -483,8 +483,8 @@
 
 		const button = createClaudeButton(svgContent, 'icon-message');
 		button.type = 'button';
-		button.setAttribute('aria-label', 'Previous user message');
-		createClaudeTooltip(button, 'Previous user message');
+		button.setAttribute('aria-label', localize('nav.previous_user_message'));
+		createClaudeTooltip(button, localize('nav.previous_user_message'));
 
 		button.onclick = (e) => {
 			e.preventDefault();
@@ -507,8 +507,8 @@
 
 		const button = createClaudeButton(svgContent, 'icon-message');
 		button.type = 'button';
-		button.setAttribute('aria-label', 'Next user message');
-		createClaudeTooltip(button, 'Next user message');
+		button.setAttribute('aria-label', localize('nav.next_user_message'));
+		createClaudeTooltip(button, localize('nav.next_user_message'));
 
 		button.onclick = (e) => {
 			e.preventDefault();
@@ -535,9 +535,9 @@
 		const button = createClaudeButton(svgContent, 'icon-message');
 		button.type = 'button';
 		button.setAttribute('data-state', 'closed');
-		button.setAttribute('aria-label', 'Bookmark this message');
+		button.setAttribute('aria-label', localize('nav.bookmark_this_message'));
 
-		createClaudeTooltip(button, 'Bookmark this message');
+		createClaudeTooltip(button, localize('nav.bookmark_this_message'));
 
 		button.onclick = async (e) => {
 			e.preventDefault();
@@ -547,7 +547,7 @@
 			const messageUuid = messageContainer?.dataset.messageUuid;
 
 			if (!messageUuid) {
-				showClaudeAlert('Error', 'Could not find message UUID');
+				showClaudeAlert(localize('common.error'), localize('nav.message_uuid_not_found'));
 				return;
 			}
 
@@ -555,7 +555,7 @@
 
 			try {
 				await showNameInputModal(conversationId, messageUuid);
-				showClaudeAlert('Success', 'Bookmark added!');
+				showClaudeAlert(localize('nav.success_title'), localize('nav.bookmark_added'));
 			} catch (error) {
 				// User cancelled, do nothing
 			}
@@ -626,7 +626,7 @@
 		ButtonBar.register({
 			buttonClass: 'navigation-button',
 			createFn: createNavigationButton,
-			tooltip: 'Navigation',
+			tooltip: localize('nav.navigation'),
 			pages: ['chat'],
 		});
 		MessageButtonBar.register({

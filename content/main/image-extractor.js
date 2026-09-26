@@ -1,6 +1,7 @@
-// image-extractor.js — Auto-expands tool result blocks that contain generated images.
-// MAIN world: intercepts fetch to mark image-containing tool results, uses ButtonBar for toggle.
-// Two-mode approach: discovery (expand all, find images, mark, collapse all) then steady-state (keep marked expanded).
+// image-extractor.js — Turns image tool results (MCP/ComfyUI etc.) into inline image galleries.
+// MAIN world: rewrites the conversation GET on load and the completion stream live, splicing a
+// synthetic image_search tool_use + tool_result (carrying an image_gallery) after each image result.
+// Settings come from a localStorage mirror written by content/isolated/image-gallery.js.
 'use strict';
 
 // ==== Preview dimension resolution ====
@@ -194,11 +195,16 @@ function chunkGalleryEntries(entries) {
 	return chunks;
 }
 
+// Label for a gallery's tool block: singular or plural by image count.
+function generatedLabel(entries) {
+	return entries.length > 1 ? localize('images.generated_images') : localize('images.generated_image');
+}
+
 // Result text for a gallery: names the prompt when every image in it came from the same one.
 function galleryText(entries) {
 	const prompts = new Set(entries.map((e) => e.prompt));
 	const prompt = prompts.size === 1 ? [...prompts][0] : '';
-	return prompt ? 'Generated image for: ' + prompt : 'Generated image' + (entries.length > 1 ? 's' : '');
+	return prompt ? localize('images.generated_for', { prompt }) : generatedLabel(entries);
 }
 
 // image_gallery item for a generated image. Width is scaled to 3840 so it renders full-width.
@@ -210,7 +216,7 @@ function buildGalleryImage(fileUuid, imageUrl, dims, prompt) {
 		id: fileUuid,
 		url: imageUrl,
 		thumbnail_url: imageUrl,
-		title: prompt ? 'Generated: ' + prompt.substring(0, 100) : '',
+		title: prompt ? localize('images.generated_title', { prompt: prompt.substring(0, 100) }) : '',
 		source: '',
 		page_url: imageUrl,
 		width: scaledW,
@@ -233,7 +239,7 @@ function buildGalleryPair(entries) {
 			id: toolUseId,
 			name: 'image_search',
 			input: {},
-			message: 'Generated image' + (entries.length > 1 ? 's' : '')
+			message: generatedLabel(entries)
 		},
 		{
 			type: 'tool_result',
@@ -307,7 +313,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 				id: toolUseId,
 				name: 'image_search',
 				input: {},
-				message: 'Generated image' + (entries.length > 1 ? 's' : ''),
+				message: generatedLabel(entries),
 				integration_name: null,
 				integration_icon_url: null,
 				icon_name: null,
@@ -737,20 +743,10 @@ window.fetch = async (...args) => {
 	return _imageExtractorOriginalFetch(...args);
 };
 
-// Inject styles for tool result images displayed inside expanded blocks
+// Inject styles for the injected image galleries
 (function () {
 	const style = document.createElement('style');
 	style.textContent = `
-		[data-message-uuid] div.overflow-y-auto:has(img[alt="Tool result"]) {
-			max-height: none !important;
-			overflow: visible !important;
-		}
-		[data-message-uuid] img[alt="Tool result"] {
-			max-width: 600px !important;
-			max-height: none !important;
-			width: 100% !important;
-			border-radius: 8px;
-		}
 		/* Make injected inline image galleries full width */
 		div.my-2 > button:has(> img[src*="/files/"][src$="/preview"]) {
 			width: 85% !important;

@@ -79,21 +79,21 @@
 
 	async function updatePresetButtonAppearance() {
 		const activeId = await getCurrentPresetId();
-		let label = 'None';
+		let label = localize('prefs.none');
 		if (activeId === 'unsaved') {
-			label = 'Unsaved';
+			label = localize('prefs.unsaved');
 		} else if (activeId !== 'none') {
 			const presets = await getStoredPresets();
 			if (presets[activeId]) label = presets[activeId].name;
 		}
-		ButtonBar.updateTooltip('preset-switcher-button', `Preferences preset: ${label}`);
+		ButtonBar.updateTooltip('preset-switcher-button', localize('prefs.preset_tooltip', { name: label }));
 		const button = document.querySelector('.preset-switcher-button');
 		if (button) button.style.color = activeId === 'none' ? '' : '#0084ff';
 	}
 
 	// ======== LIST MODAL ========
 	async function showPresetListModal() {
-		const loadingModal = createLoadingModal('Loading presets...');
+		const loadingModal = createLoadingModal(localize('prefs.loading_presets'));
 		loadingModal.show();
 
 		try {
@@ -109,7 +109,7 @@
 			contentContainer.appendChild(list);
 
 			async function applyPreset(content) {
-				const applyingModal = createLoadingModal('Applying preferences...');
+				const applyingModal = createLoadingModal(localize('prefs.applying_preferences'));
 				applyingModal.show();
 				try {
 					await setPreferences(content);
@@ -126,10 +126,10 @@
 
 				// "None" row — always first
 				list.appendChild(createPresetRow({
-					id: 'none', name: 'None', isActive: nowActiveId === 'none',
+					id: 'none', name: localize('prefs.none'), isActive: nowActiveId === 'none',
 					onApply: async () => {
 						if (nowActiveId === 'unsaved') {
-							if (!await showClaudeConfirm('Unsaved Preferences', 'Current preferences are unsaved and will be lost. Switch anyway?')) return;
+							if (!await showClaudeConfirm(localize('prefs.unsaved_preferences_title'), localize('prefs.unsaved_preferences_confirm'))) return;
 						}
 						await applyPreset('');
 					}
@@ -139,7 +139,7 @@
 				if (nowActiveId === 'unsaved') {
 					const unsavedPrefs = await getCurrentPreferences();
 					list.appendChild(createPresetRow({
-						id: 'unsaved', name: 'Unsaved preferences', isActive: true, isUnsaved: true,
+						id: 'unsaved', name: localize('prefs.unsaved_preferences'), isActive: true, isUnsaved: true,
 						onEdit: () => showEditPresetModal(null, unsavedPrefs, renderList),
 					}));
 				}
@@ -150,14 +150,14 @@
 						id, name: preset.name, isActive: nowActiveId === id,
 						onApply: async () => {
 							if (nowActiveId === 'unsaved') {
-								if (!await showClaudeConfirm('Unsaved Preferences', 'Current preferences are unsaved and will be lost. Switch anyway?')) return;
+								if (!await showClaudeConfirm(localize('prefs.unsaved_preferences_title'), localize('prefs.unsaved_preferences_confirm'))) return;
 							}
 							await applyPreset(preset.content);
 						},
 						onEdit: () => showEditPresetModal(id, null, renderList),
 						onDelete: async () => {
-							if (!await showClaudeConfirm('Delete Preset', `Delete preset "${preset.name}"?`)) return;
-							const deletingModal = createLoadingModal('Deleting preset...');
+							if (!await showClaudeConfirm(localize('prefs.delete_preset_title'), localize('prefs.delete_preset_confirm', { name: preset.name }))) return;
+							const deletingModal = createLoadingModal(localize('prefs.deleting_preset'));
 							deletingModal.show();
 							try {
 								await deletePreset(id);
@@ -174,7 +174,7 @@
 			await renderList();
 
 			// "+ New Preset" button
-			const newBtn = createClaudeButton('+ New Preset', 'secondary');
+			const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
 			newBtn.classList.add('mt-3');
 			newBtn.onclick = () => showEditPresetModal(null, null, renderList);
 			contentContainer.appendChild(newBtn);
@@ -182,18 +182,18 @@
 			// Info text
 			const infoText = document.createElement('div');
 			infoText.className = CLAUDE_CLASSES.TEXT_MUTED + ' mt-4';
-			infoText.textContent = 'Changing preferences will reset the caching status of the conversation.';
+			infoText.textContent = localize('prefs.caching_reset_info');
 			contentContainer.appendChild(infoText);
 
-			const modal = new ClaudeModal('Manage Preference Presets', contentContainer);
+			const modal = new ClaudeModal(localize('prefs.manage_presets_title'), contentContainer);
 			modal.modal.classList.remove('max-w-md');
 			modal.modal.classList.add('max-w-lg');
-			modal.addCancel('Close');
+			modal.addCancel(localize('common.close'));
 			modal.show();
 		} catch (error) {
 			console.error('Error loading presets:', error);
 			loadingModal.destroy();
-			showClaudeAlert('Error', 'Failed to load presets. Please try again.');
+			showClaudeAlert(localize('common.error'), localize('prefs.load_presets_failed'));
 		}
 	}
 
@@ -224,14 +224,14 @@
 		row.appendChild(nameSpan);
 
 		if (onEdit) {
-			const editBtn = createClaudeButton('Edit', 'secondary');
+			const editBtn = createClaudeButton(localize('prefs.edit'), 'secondary');
 			editBtn.classList.add('!min-w-0', '!px-2', '!h-7', '!text-xs');
 			editBtn.onclick = (e) => { e.stopPropagation(); onEdit(); };
 			row.appendChild(editBtn);
 		}
 
 		if (onDelete) {
-			const deleteBtn = createClaudeButton('Delete', 'secondary');
+			const deleteBtn = createClaudeButton(localize('prefs.delete'), 'secondary');
 			deleteBtn.classList.add('!min-w-0', '!px-2', '!h-7', '!text-xs');
 			deleteBtn.onclick = (e) => { e.stopPropagation(); onDelete(); };
 			row.appendChild(deleteBtn);
@@ -260,46 +260,46 @@
 
 		const nameLabel = document.createElement('label');
 		nameLabel.className = CLAUDE_CLASSES.LABEL;
-		nameLabel.textContent = 'Preset Name';
+		nameLabel.textContent = localize('prefs.preset_name_label');
 		contentContainer.appendChild(nameLabel);
 
-		const nameInput = createClaudeInput({ placeholder: 'Preset name', value: existingName });
+		const nameInput = createClaudeInput({ placeholder: localize('prefs.preset_name_placeholder'), value: existingName });
 		nameInput.classList.add('mb-4');
 		contentContainer.appendChild(nameInput);
 
 		const contentLabel = document.createElement('label');
 		contentLabel.className = CLAUDE_CLASSES.LABEL;
-		contentLabel.textContent = 'Content';
+		contentLabel.textContent = localize('prefs.content_label');
 		contentContainer.appendChild(contentLabel);
 
 		const textarea = document.createElement('textarea');
 		textarea.className = 'bg-bg-000 border border-border-300 p-3 leading-5 rounded-[0.6rem] transition-colors hover:border-border-200 focus:border-border-200 focus:outline-none placeholder:text-text-500 w-full';
 		textarea.style.resize = 'vertical';
 		textarea.rows = 8;
-		textarea.placeholder = 'Enter your preferences here...';
+		textarea.placeholder = localize('prefs.content_placeholder');
 		textarea.setAttribute('data-1p-ignore', 'true');
 		textarea.value = existingContent;
 		contentContainer.appendChild(textarea);
 
-		const modal = new ClaudeModal(presetId ? 'Edit Preset' : 'New Preset', contentContainer);
+		const modal = new ClaudeModal(presetId ? localize('prefs.edit_preset_title') : localize('prefs.new_preset_title'), contentContainer);
 		modal.modal.classList.remove('max-w-md');
 		modal.modal.classList.add('max-w-xl');
 
 		modal.addCancel();
-		modal.addConfirm('Save & Apply', async () => {
+		modal.addConfirm(localize('prefs.save_and_apply'), async () => {
 			const name = nameInput.value.trim();
 			if (!name) {
-				showClaudeAlert('Name required', 'Please enter a name for this preset.');
+				showClaudeAlert(localize('prefs.name_required_title'), localize('prefs.name_required'));
 				return false;
 			}
 			const content = textarea.value;
-			const savingModal = createLoadingModal('Applying preferences...');
+			const savingModal = createLoadingModal(localize('prefs.applying_preferences'));
 			savingModal.show();
 			try {
 				await savePreset(presetId, name, content);
 				const ok = await setPreferences(content);
 				if (!ok) {
-					showClaudeAlert('Error', 'Failed to update preferences. Please try again.');
+					showClaudeAlert(localize('common.error'), localize('prefs.update_preferences_failed'));
 					return false;
 				}
 				if (onSaved) await onSaved();
@@ -316,7 +316,7 @@
 		ButtonBar.register({
 			buttonClass: 'preset-switcher-button',
 			createFn: createPresetButton,
-			tooltip: 'Preferences preset: None',
+			tooltip: localize('prefs.preset_tooltip', { name: localize('prefs.none') }),
 			forceDisplayOnMobile: false,
 			pages: ['chat', 'home'],
 			onInjected: () => updatePresetButtonAppearance(),

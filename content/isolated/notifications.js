@@ -201,7 +201,7 @@ class FloatingCard {
 	}
 
 	addKofiButton() {
-		this.addImageButton('https://ko-fi.com/R6R14IUBY', 'kofi-button.png', 'Buy Me a Coffee at ko-fi.com');
+		this.addImageButton('https://ko-fi.com/R6R14IUBY', 'kofi-button.png', localize('notif.kofi_alt'));
 	}
 
 	remove() {
@@ -231,7 +231,7 @@ class VersionNotificationCard extends FloatingCard {
 
 		const message = document.createElement('div');
 		message.className = 'qol-mb-2';
-		message.textContent = `Updated to v${this.currentVersion}!`;
+		message.textContent = localize('notif.updated_to', { version: this.currentVersion });
 
 		this.element.appendChild(dragHandle);
 		this.element.appendChild(message);
@@ -242,7 +242,7 @@ class VersionNotificationCard extends FloatingCard {
 			patchContainer.style.maxHeight = '150px';
 
 			const patchTitle = document.createElement('div');
-			patchTitle.textContent = "What's New:";
+			patchTitle.textContent = localize('notif.whats_new');
 			patchTitle.style.fontWeight = 'bold';
 			patchTitle.className = 'qol-mb-1';
 			patchContainer.appendChild(patchTitle);
@@ -269,7 +269,7 @@ class VersionNotificationCard extends FloatingCard {
 		patchNotesLink.target = '_blank';
 		patchNotesLink.className = 'qol-link qol-block qol-mb-2';
 		patchNotesLink.style.color = QOL_BLUE_HIGHLIGHT;
-		patchNotesLink.textContent = 'View full release notes';
+		patchNotesLink.textContent = localize('notif.view_release_notes');
 		this.element.appendChild(patchNotesLink);
 
 		this.addKofiButton();
@@ -295,12 +295,12 @@ class RateNotificationCard extends FloatingCard {
 
 		const message = document.createElement('div');
 		message.className = 'qol-mb-2';
-		message.textContent = 'Enjoying Claude QoL?';
+		message.textContent = localize('notif.enjoying');
 
 		const supportMessage = document.createElement('div');
 		supportMessage.className = 'qol-mb-2';
 		supportMessage.style.fontWeight = 'bold';
-		supportMessage.textContent = 'Consider leaving a rating!';
+		supportMessage.textContent = localize('notif.consider_rating');
 
 		this.element.appendChild(dragHandle);
 		this.element.appendChild(message);
@@ -310,7 +310,7 @@ class RateNotificationCard extends FloatingCard {
 		const rateUrl = isChrome
 			? 'https://chromewebstore.google.com/detail/claude-qol/dkdnancajokhfclpjpplkhlkbhaeejob'
 			: 'https://addons.mozilla.org/en-US/firefox/addon/claude-qol/';
-		this.addImageButton(rateUrl, 'rate-badge.png', 'Rate this extension');
+		this.addImageButton(rateUrl, 'rate-badge.png', localize('notif.rate_alt'));
 
 		this.addCloseButton();
 		this.makeCardDraggable(dragHandle);

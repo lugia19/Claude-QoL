@@ -21,6 +21,15 @@
 		if (at < text.length) el.appendChild(document.createTextNode(text.slice(at)));
 	}
 
+	// "N messages ago" / "Branched N messages ago" label for a search result
+	function formatPosition(result) {
+		const many = result.position > 1;
+		if (result.is_branched) {
+			return localize(many ? 'search.branched_messages_ago' : 'search.branched_message_ago', { n: fmtNum(result.position) });
+		}
+		return localize(many ? 'search.messages_ago' : 'search.message_ago', { n: fmtNum(result.position) });
+	}
+
 	// ======== SEARCH FUNCTION ========
 	async function searchMessages(query, conversation) {
 		if (!query || query.trim() === '') {
@@ -130,7 +139,7 @@
 			const header = document.createElement('div');
 			header.className = 'text-sm text-text-200 mb-2';
 			const roleIcon = role === 'human' ? '👤' : '🤖';
-			const roleName = role === 'human' ? 'User' : 'Claude';
+			const roleName = role === 'human' ? localize('search.role_user') : 'Claude';
 			header.textContent = `${roleIcon} ${label}`;
 			block.appendChild(header);
 
@@ -148,9 +157,7 @@
 		}
 
 		// Position text for matched message label
-		const positionText = result.is_branched
-			? `Branched ${result.position} ${result.position > 1 ? "messages" : "message"} ago`
-			: `${result.position} ${result.position > 1 ? "messages" : "message"} ago`;
+		const positionText = formatPosition(result);
 
 		let matchedBlock = null;
 
@@ -160,7 +167,7 @@
 			matchedBlock = createMessageBlock(
 				result.full_message_text,
 				result.role,
-				`Matched Message (${positionText})`,
+				localize('search.matched_message', { position: positionText }),
 				true
 			);
 			if (matchedBlock) messagesContainer.appendChild(matchedBlock);
@@ -169,7 +176,7 @@
 				const nextBlock = createMessageBlock(
 					result.next_message_text,
 					result.next_message_role,
-					'Response',
+					localize('search.response'),
 					false
 				);
 				if (nextBlock) messagesContainer.appendChild(nextBlock);
@@ -180,7 +187,7 @@
 				const prevBlock = createMessageBlock(
 					result.prev_message_text,
 					result.prev_message_role,
-					'Question',
+					localize('search.question'),
 					false
 				);
 				if (prevBlock) messagesContainer.appendChild(prevBlock);
@@ -189,7 +196,7 @@
 			matchedBlock = createMessageBlock(
 				result.full_message_text,
 				result.role,
-				`Matched Message (${positionText})`,
+				localize('search.matched_message', { position: positionText }),
 				true
 			);
 			if (matchedBlock) messagesContainer.appendChild(matchedBlock);
@@ -197,12 +204,12 @@
 
 		contentDiv.appendChild(messagesContainer);
 
-		const modal = new ClaudeModal('Message Context', contentDiv);
+		const modal = new ClaudeModal(localize('search.message_context'), contentDiv);
 
-		modal.addCancel('Cancel');
-		modal.addConfirm('Go to Message', async () => {
+		modal.addCancel();
+		modal.addConfirm(localize('search.go_to_message'), async () => {
 			// Show loading modal
-			const loadingModal = createLoadingModal('Navigating to message...');
+			const loadingModal = createLoadingModal(localize('search.navigating_to_message'));
 			loadingModal.show();
 
 			// Human messages carry no data-message-uuid in the DOM, but
@@ -229,7 +236,7 @@
 	// ======== MAIN SEARCH MODAL ========
 	async function showSearchModal() {
 		// Show loading modal
-		const loadingModal = createLoadingModal('Loading conversation...');
+		const loadingModal = createLoadingModal(localize('search.loading_conversation'));
 		loadingModal.show();
 
 		// Fetch conversation data
@@ -248,7 +255,7 @@
 			loadingModal.destroy();
 
 			// Show error modal
-			showClaudeAlert('Error', 'Failed to load conversation data.')
+			showClaudeAlert(localize('common.error'), localize('search.load_conversation_failed'))
 			return;
 		}
 
@@ -262,7 +269,7 @@
 		const topButtonsRow = document.createElement('div');
 		topButtonsRow.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
 
-		const latestBtn = createClaudeButton('Go to Latest', 'secondary', async () => {
+		const latestBtn = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
 			let latestMessage = null;
 			let latestTimestamp = 0;
 
@@ -281,7 +288,7 @@
 			}
 		});
 
-		const longestBtn = createClaudeButton('Go to Longest', 'secondary', async () => {
+		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
 			const rootId = "00000000-0000-4000-8000-000000000000";
 			const longestLeaf = conversation.findLongestLeaf(rootId);
 			await conversation.setCurrentLeaf(longestLeaf.leafId);
@@ -300,11 +307,11 @@
 
 		const searchInput = createClaudeInput({
 			type: 'text',
-			placeholder: 'Search messages... (/regex/)',
+			placeholder: localize('search.search_placeholder'),
 		});
 		searchInput.className += ' flex-1';
 
-		const searchBtn = createClaudeButton('Search', 'primary');
+		const searchBtn = createClaudeButton(localize('search.search'), 'primary');
 
 		searchRow.appendChild(searchInput);
 		searchRow.appendChild(searchBtn);
@@ -331,7 +338,7 @@
 			if (results.length === 0) {
 				const noResults = document.createElement('div');
 				noResults.className = 'text-center text-text-400 py-8';
-				noResults.textContent = `No matches found for "${query}"`;
+				noResults.textContent = localize('search.no_matches', { query });
 				resultsContainer.appendChild(noResults);
 				return;
 			}
@@ -347,11 +354,9 @@
 				const header = document.createElement('div');
 				header.className = 'text-sm text-text-200 mb-1';
 				const roleIcon = result.role === 'human' ? '👤' : '🤖';
-				const roleName = result.role === 'human' ? 'User' : 'Claude';
+				const roleName = result.role === 'human' ? localize('search.role_user') : 'Claude';
 				const relativeTime = getRelativeTime(result.timestamp);
-				const positionText = result.is_branched
-					? `Branched ${result.position} ${result.position > 1 ? "messages" : "message"} ago`
-					: `${result.position} ${result.position > 1 ? "messages" : "message"} ago`;
+				const positionText = formatPosition(result);
 
 				header.textContent = `${roleIcon} ${roleName} (${positionText} · ${relativeTime})`;
 
@@ -381,8 +386,8 @@
 		});
 
 		// Create and show the search modal
-		const modal = new ClaudeModal('Search Conversation', contentDiv);
-		modal.addCancel('Close');
+		const modal = new ClaudeModal(localize('search.search_conversation'), contentDiv);
+		modal.addCancel(localize('common.close'));
 
 		// Override the max-width
 		modal.modal.classList.remove('max-w-md');
@@ -428,7 +433,7 @@
 		ButtonBar.register({
 			buttonClass: 'search-button',
 			createFn: createSearchButton,
-			tooltip: 'Search Conversation',
+			tooltip: localize('search.search_conversation'),
 			pages: ['chat'],
 		});
 	}

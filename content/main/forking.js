@@ -33,9 +33,9 @@ If this is a writing or creative discussion, include sections for characters, pl
 		const button = createClaudeButton(svgContent, 'icon-message');
 		button.type = 'button';
 		button.setAttribute('data-state', 'closed');
-		button.setAttribute('aria-label', 'Fork from here');
+		button.setAttribute('aria-label', localize('fork.fork_from_here'));
 
-		createClaudeTooltip(button, 'Fork from here');
+		createClaudeTooltip(button, localize('fork.fork_from_here'));
 
 		button.onclick = async (e) => {
 			e.preventDefault();
@@ -45,7 +45,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			const messageUuid = messageContainer?.dataset.messageUuid;
 
 			if (!messageUuid) {
-				showClaudeAlert('Error', 'Could not find message UUID - try reloading the page.');
+				showClaudeAlert(localize('common.error'), localize('fork.no_message_uuid'));
 				return;
 			}
 
@@ -72,7 +72,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			})
 			.catch(err => {
 				console.error('Failed to pre-fetch messages for token estimate:', err);
-				tokenLabel.textContent = '(unavailable)';
+				tokenLabel.textContent = localize('fork.tokens_unavailable');
 			});
 
 		// === Two-panel layout ===
@@ -92,10 +92,10 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// Slider section
 		const rawTextContainer = document.createElement('div');
 		rawTextContainer.className = 'mb-4 space-y-2 border border-border-300 rounded p-3';
-		const rawTextSlider = createClaudeSlider('Preserve X% of recent messages verbatim:', 20, {
+		const rawTextSlider = createClaudeSlider(localize('fork.preserve_label'), 20, {
 			step: 10,
-			leftLabel: 'Summarize all',
-			rightLabel: 'Summarize none'
+			leftLabel: localize('fork.summarize_all'),
+			rightLabel: localize('fork.summarize_none')
 		});
 		rawTextSlider.input.id = 'rawTextPercentage';
 		rawTextContainer.appendChild(rawTextSlider.container);
@@ -104,10 +104,10 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// File toggle + sub-toggle
 		const includeFilesContainer = document.createElement('div');
 		includeFilesContainer.className = 'mb-4';
-		const includeFilesToggle = createClaudeToggle('Forward files', true);
+		const includeFilesToggle = createClaudeToggle(localize('fork.forward_files'), true);
 		includeFilesToggle.input.id = 'includeFiles';
 		includeFilesContainer.appendChild(includeFilesToggle.container);
-		const keepFilesFromSummarizedToggle = createClaudeToggle('Forward files from summarized section', false);
+		const keepFilesFromSummarizedToggle = createClaudeToggle(localize('fork.forward_files_summarized'), false);
 		keepFilesFromSummarizedToggle.container.classList.add('pl-4');
 		keepFilesFromSummarizedToggle.container.style.transition = 'opacity 0.2s';
 		keepFilesFromSummarizedToggle.input.id = 'keepFilesFromSummarized';
@@ -117,10 +117,10 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// Tool calls toggle + sub-toggle
 		const includeToolCallsContainer = document.createElement('div');
 		includeToolCallsContainer.className = 'mb-4';
-		const includeToolCallsToggle = createClaudeToggle('Forward tool calls', false);
+		const includeToolCallsToggle = createClaudeToggle(localize('fork.forward_tool_calls'), false);
 		includeToolCallsToggle.input.id = 'includeToolCalls';
 		includeToolCallsContainer.appendChild(includeToolCallsToggle.container);
-		const keepToolCallsFromSummarizedToggle = createClaudeToggle('Forward tool calls from summarized section', false);
+		const keepToolCallsFromSummarizedToggle = createClaudeToggle(localize('fork.forward_tool_calls_summarized'), false);
 		keepToolCallsFromSummarizedToggle.container.classList.add('pl-4');
 		keepToolCallsFromSummarizedToggle.container.style.transition = 'opacity 0.2s';
 		keepToolCallsFromSummarizedToggle.input.id = 'keepToolCallsFromSummarized';
@@ -128,7 +128,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 		leftPanel.appendChild(includeToolCallsContainer);
 
 		// Use above model for summarization toggle
-		const useSelectedModelToggle = createClaudeToggle('Use above model for summarization instead of Haiku (High usage!)', false);
+		const useSelectedModelToggle = createClaudeToggle(localize('fork.use_selected_model'), false);
 		useSelectedModelToggle.input.id = 'useSelectedModelForSummary';
 		useSelectedModelToggle.container.style.transition = 'opacity 0.2s';
 		leftPanel.appendChild(useSelectedModelToggle.container);
@@ -161,7 +161,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 		const tokenLabel = document.createElement('span');
 		tokenLabel.className = 'text-sm text-text-400';
-		tokenLabel.textContent = 'Calculating...';
+		tokenLabel.textContent = localize('fork.calculating');
 
 		tokenRow.appendChild(percentInput);
 		tokenRow.appendChild(percentSymbol);
@@ -178,12 +178,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// Summary prompt
 		const promptLabel = document.createElement('label');
 		promptLabel.className = CLAUDE_CLASSES.LABEL;
-		promptLabel.textContent = 'Summary Prompt:';
+		promptLabel.textContent = localize('fork.summary_prompt_label');
 		rightPanel.appendChild(promptLabel);
 
 		const promptInput = document.createElement('textarea');
 		promptInput.className = CLAUDE_CLASSES.INPUT;
-		promptInput.placeholder = 'Enter custom summary prompt...';
+		promptInput.placeholder = localize('fork.summary_prompt_placeholder');
 		promptInput.value = defaultSummaryPrompt;
 		promptInput.rows = 8;
 		promptInput.style.resize = 'vertical';
@@ -225,12 +225,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 			if (totalTokens === null || !fetchedMessages) return;
 
 			const keepTokens = Math.ceil(totalTokens * pct / 100);
-			tokenLabel.textContent = `~${keepTokens.toLocaleString()} verbatim / ~${totalTokens.toLocaleString()} total tokens`;
+			tokenLabel.textContent = localize('fork.token_estimate', { keep: fmtNum(keepTokens), total: fmtNum(totalTokens) });
 
 			if (pct >= 100) {
 				previewContainer.textContent = '';
 			} else if (pct === 0) {
-				previewContainer.textContent = 'All messages will be summarized';
+				previewContainer.textContent = localize('fork.all_summarized');
 			} else {
 				const splitIdx = calculateSplitIndex(fetchedMessages, pct);
 				if (splitIdx === 0 || splitIdx >= fetchedMessages.length) {
@@ -239,7 +239,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 					const firstKept = fetchedMessages[splitIdx];
 					const text = ClaudeConversation.extractMessageText(firstKept);
 					const truncated = text.length > 100 ? text.substring(0, 100) + '...' : text;
-					previewContainer.textContent = `Verbatim starts from: "${truncated}" (msg ${splitIdx + 1} of ${fetchedMessages.length})`;
+					previewContainer.textContent = localize('fork.verbatim_starts_from', { text: truncated, n: fmtNum(splitIdx + 1), total: fmtNum(fetchedMessages.length) });
 				}
 			}
 		}
@@ -270,12 +270,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 		updateDisplay();
 
 		// Create modal
-		const modal = new ClaudeModal('Choose Model for Fork', content);
+		const modal = new ClaudeModal(localize('fork.modal_title'), content);
 		modal.modal.classList.remove('max-w-md');
 		modal.modal.classList.add('max-w-3xl');
 
 		modal.addCancel();
-		modal.addConfirm('Fork Chat', async () => {
+		modal.addConfirm(localize('fork.fork_chat'), async () => {
 			pendingFork.model = modelSelect.value;
 			pendingFork.rawTextPercentage = totalTokens !== null
 				? getCurrentPercent()
@@ -298,7 +298,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 	//#endregion
 
 	async function forkConversationClicked(messageUuid) {
-		const loadingModal = createLoadingModal('Preparing to fork conversation...');
+		const loadingModal = createLoadingModal(localize('fork.preparing'));
 		loadingModal.show();
 		pendingFork.loadingModal = loadingModal;
 
@@ -308,7 +308,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 			console.log('Forking conversation', conversationId, 'from message', messageUuid, 'with model', pendingFork.model);
 
-			loadingModal.setContent(createLoadingContent('Getting conversation messages...'));
+			loadingModal.setContent(createLoadingContent(localize('fork.getting_messages')));
 
 			let { conversation, conversationData, messages } =
 				await getConversationMessages(orgId, conversationId, messageUuid);
@@ -326,7 +326,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 			// Apply summary if needed
 			if (pendingFork.rawTextPercentage < 100) {
-				loadingModal.setContent(createLoadingContent('Generating conversation summary...'));
+				loadingModal.setContent(createLoadingContent(localize('fork.generating_summary')));
 
 				// Normalize FIRST - break up oversized messages
 				messages = normalizeOversizedMessages(messages);
@@ -407,7 +407,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				}
 			}
 
-			loadingModal.setContent(createLoadingContent('Creating forked conversation...'));
+			loadingModal.setContent(createLoadingContent(localize('fork.creating')));
 
 			// Clean up messages based on toggles
 			if (!pendingFork.includeAttachments) {
@@ -441,7 +441,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			);
 
 			console.log('Forked conversation created:', newUuid);
-			loadingModal.setContent(createLoadingContent('Fork complete! Redirecting...'));
+			loadingModal.setContent(createLoadingContent(localize('fork.complete_redirecting')));
 
 			if (failedFiles && failedFiles.length > 0) {
 				// Show warning modal - redirect happens on OK click
@@ -457,10 +457,10 @@ If this is a writing or creative discussion, include sections for characters, pl
 				return;
 			}
 			console.error('Failed to fork conversation:', error);
-			loadingModal.setTitle('Error');
-			loadingModal.setContent(`Failed to fork conversation: ${error.message}`);
+			loadingModal.setTitle(localize('common.error'));
+			loadingModal.setContent(localize('fork.fork_failed', { error: error.message }));
 			loadingModal.clearButtons();
-			loadingModal.addConfirm('OK');
+			loadingModal.addConfirm(localize('common.ok'));
 		} finally {
 			pendingFork = {
 				model: null,
@@ -535,7 +535,10 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 	function showFailedFilesModal(failedFiles, newUuid) {
 		const content = document.createElement('div');
-		content.innerHTML = '<p class="mb-2">The following files could not be transferred to the forked conversation:</p>';
+		const intro = document.createElement('p');
+		intro.className = 'mb-2';
+		intro.textContent = localize('fork.files_not_transferred');
+		content.appendChild(intro);
 
 		const fileList = document.createElement('ul');
 		fileList.className = 'list-disc pl-5 space-y-1';
@@ -546,16 +549,16 @@ If this is a writing or creative discussion, include sections for characters, pl
 		});
 		content.appendChild(fileList);
 
-		const modal = new ClaudeModal('File Transfer Warning', content);
-		modal.addConfirm('OK', () => {
+		const modal = new ClaudeModal(localize('fork.file_transfer_warning'), content);
+		modal.addConfirm(localize('common.ok'), () => {
 			window.location.href = `/chat/${newUuid}`;
 		});
 		modal.show();
 	}
 
 	async function createFork(orgId, messages, chatName, projectUuid, forkAttachments) {
-		if (!chatName || chatName.trim() === '') chatName = "Untitled";
-		const newName = `Fork of ${chatName}`;
+		if (!chatName || chatName.trim() === '') chatName = localize('fork.untitled');
+		const newName = localize('fork.fork_of', { name: chatName });
 		const model = pendingFork.model;
 
 		const settings = await warnAboutSettingsMismatch(pendingFork.sourceSettings);
@@ -597,12 +600,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 				} catch (error) {
 					console.log(`Failed to transfer file ${f.file_name}:`, error);
 					const choice = await showClaudeThreeOption(
-						'File Upload Failed',
-						`Failed to upload "${f.file_name}":\n${error.message}`,
+						localize('fork.upload_failed_title'),
+						localize('fork.upload_failed', { name: f.file_name, error: error.message }),
 						{
-							left: { text: 'Give Up' },
-							middle: { text: 'Skip File' },
-							right: { text: 'Retry', variant: 'primary' }
+							left: { text: localize('fork.give_up') },
+							middle: { text: localize('common.skip_file') },
+							right: { text: localize('fork.retry'), variant: 'primary' }
 						}
 					);
 					if (choice === 'left') {
@@ -772,12 +775,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 				} catch (error) {
 					console.warn(`Failed file ${f.file_name} during summarization:`, error);
 					const choice = await showClaudeThreeOption(
-						'File Upload Failed',
-						`Failed to upload "${f.file_name}" during summarization:\n${error.message}`,
+						localize('fork.upload_failed_title'),
+						localize('fork.upload_failed_summarization', { name: f.file_name, error: error.message }),
 						{
-							left: { text: 'Give Up' },
-							middle: { text: 'Skip File' },
-							right: { text: 'Retry', variant: 'primary' }
+							left: { text: localize('fork.give_up') },
+							middle: { text: localize('common.skip_file') },
+							right: { text: localize('fork.retry'), variant: 'primary' }
 						}
 					);
 					if (choice === 'left') {
@@ -982,7 +985,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// Initial modal state
 		if (pendingFork.loadingModal) {
 			pendingFork.loadingModal.setContent(
-				createLoadingContent(`Summarizing conversation...\nCurrent progress: 0 / ${totalTokens.toLocaleString()} tokens`)
+				createLoadingContent(localize('fork.summarizing_progress', { done: fmtNum(0), total: fmtNum(totalTokens) }))
 			);
 		}
 
@@ -1012,7 +1015,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 				if (pendingFork.loadingModal) {
 					pendingFork.loadingModal.setContent(
-						createLoadingContent(`Summarizing conversation...\nCurrent progress: ${processedTokens.toLocaleString()} / ${totalTokens.toLocaleString()} tokens`)
+						createLoadingContent(localize('fork.summarizing_progress', { done: fmtNum(processedTokens), total: fmtNum(totalTokens) }))
 					);
 				}
 
@@ -1144,7 +1147,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			// Indicator text - larger and more visible
 			const indicator = document.createElement('div');
 			indicator.className = 'mb-1 text-text-200 text-center text-lg font-semibold';
-			indicator.textContent = `Summary 1 of ${summaryTexts.length}`;
+			indicator.textContent = localize('fork.summary_n_of_total', { n: fmtNum(1), total: fmtNum(summaryTexts.length) });
 			content.appendChild(indicator);
 
 			// Token counter
@@ -1154,7 +1157,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 			function updateTokenCount(text) {
 				const tokens = Math.ceil(text.length / 4);
-				tokenCounter.textContent = `~${tokens.toLocaleString()} tokens`;
+				tokenCounter.textContent = localize('fork.approx_tokens', { n: fmtNum(tokens) });
 			}
 
 			// Create all textareas (only first visible)
@@ -1183,12 +1186,12 @@ If this is a writing or creative discussion, include sections for characters, pl
 			const navContainer = document.createElement('div');
 			navContainer.className = 'flex items-center justify-between mt-3';
 
-			const leftBtn = createClaudeButton('← Previous', 'secondary');
+			const leftBtn = createClaudeButton(localize('fork.previous'), 'secondary');
 			leftBtn.disabled = true;
 			leftBtn.style.opacity = '0.5';
 			leftBtn.style.cursor = 'not-allowed';
 
-			const editWithClaudeBtn = createClaudeButton('Edit with Claude', 'secondary');
+			const editWithClaudeBtn = createClaudeButton(localize('fork.edit_with_claude'), 'secondary');
 
 			// Style it orange
 			editWithClaudeBtn.style.backgroundColor = 'hsl(var(--accent-main-100))';
@@ -1202,7 +1205,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				editWithClaudeBtn.style.backgroundColor = 'hsl(var(--accent-main-100))';
 			});
 
-			const rightBtn = createClaudeButton('Next →', 'secondary');
+			const rightBtn = createClaudeButton(localize('fork.next'), 'secondary');
 			if (summaryTexts.length <= 1) {
 				rightBtn.disabled = true;
 				rightBtn.style.opacity = '0.5';
@@ -1210,7 +1213,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			}
 
 			function updateNavigation() {
-				indicator.textContent = `Summary ${currentIndex + 1} of ${summaryTexts.length}`;
+				indicator.textContent = localize('fork.summary_n_of_total', { n: fmtNum(currentIndex + 1), total: fmtNum(summaryTexts.length) });
 				updateTokenCount(textareas[currentIndex].value);
 
 				leftBtn.disabled = currentIndex === 0;
@@ -1240,13 +1243,13 @@ If this is a writing or creative discussion, include sections for characters, pl
 			editWithClaudeBtn.onclick = async () => {
 				let editPrompt;
 				try {
-					editPrompt = await showClaudePrompt('How should Claude edit this summary?', '');
+					editPrompt = await showClaudePrompt(localize('fork.edit_prompt'), '');
 				} catch (e) {
 					return; // User cancelled
 				}
 				if (!editPrompt) return;
 
-				const loadingModal = createLoadingModal('Rewriting summary with Claude...');
+				const loadingModal = createLoadingModal(localize('fork.rewriting'));
 				loadingModal.show();
 
 				try {
@@ -1317,7 +1320,7 @@ Provide the complete rewritten summary.`;
 					loadingModal.destroy();
 				} catch (error) {
 					loadingModal.destroy();
-					showClaudeAlert('Error', `Failed to rewrite summary: ${error.message}`);
+					showClaudeAlert(localize('common.error'), localize('fork.rewrite_failed', { error: error.message }));
 				}
 			};
 
@@ -1327,15 +1330,15 @@ Provide the complete rewritten summary.`;
 			content.appendChild(navContainer);
 
 			// Create modal
-			const modal = new ClaudeModal('Review Summaries', content);
+			const modal = new ClaudeModal(localize('fork.review_summaries'), content);
 			modal.modal.classList.remove('max-w-md');
 			modal.modal.classList.add('max-w-2xl');
 
-			modal.addCancel('Cancel', () => {
+			modal.addCancel(localize('common.cancel'), () => {
 				reject(new Error('USER_CANCELLED'));
 			});
 
-			modal.addConfirm('Submit', () => {
+			modal.addConfirm(localize('fork.submit'), () => {
 				const editedTexts = textareas.map(ta => ta.value);
 				resolve(editedTexts);
 				return true;

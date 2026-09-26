@@ -47,7 +47,7 @@
 			}
 
 			if (!plainText) {
-				window.postMessage({ type: 'rich-copy-error', error: 'No text content found' }, '*');
+				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, '*');
 				return prevWrite.call(navigator.clipboard, data);
 			}
 
@@ -69,7 +69,7 @@
 
 		try {
 			if (!text) {
-				window.postMessage({ type: 'rich-copy-error', error: 'No text content found' }, '*');
+				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, '*');
 				return prevWriteText.call(navigator.clipboard, text);
 			}
 

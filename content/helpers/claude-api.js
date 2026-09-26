@@ -915,7 +915,7 @@ class ClaudeConversation {
 		conv.conversationData = {
 			chat_messages: chatMessages,
 			current_leaf_message_uuid: chatMessages.at(-1).uuid,
-			name: 'Reconstructed from chatlog',
+			name: localize('ui.reconstructed_from_chatlog'),
 			updated_at: timestamp
 		};
 

@@ -203,7 +203,7 @@
 	//#region Settings Modal
 	async function createSettingsModal() {
 		// Show loading modal immediately
-		const loadingModal = createLoadingModal('Loading settings...');
+		const loadingModal = createLoadingModal(localize('tts.loading_settings'));
 		loadingModal.show();
 
 		try {
@@ -259,7 +259,7 @@
 			providerSection.className = 'mb-4';
 			const providerLabel = document.createElement('label');
 			providerLabel.className = CLAUDE_CLASSES.LABEL;
-			providerLabel.textContent = 'TTS Provider';
+			providerLabel.textContent = localize('tts.provider_label');
 			providerSection.appendChild(providerLabel);
 			const providerSelect = createClaudeSelect(providerOptions, settings.provider);
 			providerSelect.id = 'providerSelect';
@@ -270,7 +270,7 @@
 			const nativeNote = document.createElement('p');
 			nativeNote.id = 'ttsNativeNote';
 			nativeNote.className = CLAUDE_CLASSES.TEXT_MUTED + ' mb-4';
-			nativeNote.textContent = "Using Claude's built-in voice (set it in Claude's own settings). Pick ElevenLabs or OpenAI to use a custom voice.";
+			nativeNote.textContent = localize('tts.native_note');
 			nativeNote.style.display = isNative(settings.provider) ? 'block' : 'none';
 			content.appendChild(nativeNote);
 
@@ -281,12 +281,12 @@
 			apiKeySection.style.display = currentProviderInfo.requiresApiKey ? 'block' : 'none';
 			const apiKeyLabel = document.createElement('label');
 			apiKeyLabel.className = CLAUDE_CLASSES.LABEL;
-			apiKeyLabel.textContent = 'API Key';
+			apiKeyLabel.textContent = localize('tts.api_key_label');
 			apiKeySection.appendChild(apiKeyLabel);
 			const apiKeyInput = createClaudeInput({
 				type: 'password',
 				value: settings.apiKey || '',
-				placeholder: 'Enter your API key'
+				placeholder: localize('tts.api_key_placeholder')
 			});
 			apiKeyInput.id = 'apiKeyInput';
 			apiKeySection.appendChild(apiKeyInput);
@@ -299,7 +299,7 @@
 			baseUrlSection.style.display = settings.provider === 'openai' ? 'block' : 'none';
 			const baseUrlLabel = document.createElement('label');
 			baseUrlLabel.className = CLAUDE_CLASSES.LABEL;
-			baseUrlLabel.textContent = 'Base URL (optional)';
+			baseUrlLabel.textContent = localize('tts.base_url_label');
 			baseUrlSection.appendChild(baseUrlLabel);
 			const baseUrlInput = createClaudeInput({
 				type: 'text',
@@ -310,7 +310,7 @@
 			baseUrlSection.appendChild(baseUrlInput);
 			const baseUrlHint = document.createElement('p');
 			baseUrlHint.className = 'text-text-500 text-xs mt-1';
-			baseUrlHint.textContent = 'For OpenAI-compatible APIs (LocalAI, vLLM, etc.)';
+			baseUrlHint.textContent = localize('tts.base_url_hint');
 			baseUrlSection.appendChild(baseUrlHint);
 			content.appendChild(baseUrlSection);
 
@@ -321,12 +321,12 @@
 			voiceSection.style.display = isNative(settings.provider) ? 'none' : 'block';
 			const voiceLabel = document.createElement('label');
 			voiceLabel.className = CLAUDE_CLASSES.LABEL;
-			voiceLabel.textContent = 'Voice';
+			voiceLabel.textContent = localize('tts.voice_label');
 			voiceSection.appendChild(voiceLabel);
 
 			const voiceOptions = voices.length > 0
 				? voices.map(v => ({ value: v.voice_id, label: v.name }))
-				: [{ value: '', label: currentProviderInfo.requiresApiKey ? 'Set an API key...' : 'Loading...' }];
+				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('common.loading') }];
 			const voiceSelect = createClaudeSearchableSelect(voiceOptions, settings.voice || '');
 			voiceSelect.id = 'voiceSelect';
 			voiceSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;
@@ -335,7 +335,7 @@
 			const elevenVoiceHint = document.createElement('p');
 			elevenVoiceHint.id = 'elevenVoiceHint';
 			elevenVoiceHint.className = 'text-text-500 text-xs mt-1';
-			elevenVoiceHint.textContent = 'Uses this voice’s last-used settings (stability, style, speed…) — adjust them on the ElevenLabs playground at elevenlabs.io.';
+			elevenVoiceHint.textContent = localize('tts.eleven_voice_hint');
 			elevenVoiceHint.style.display = settings.provider === 'elevenlabs' ? 'block' : 'none';
 			voiceSection.appendChild(elevenVoiceHint);
 			content.appendChild(voiceSection);
@@ -346,12 +346,12 @@
 			modelSection.id = 'modelSelectSection';
 			const modelLabel = document.createElement('label');
 			modelLabel.className = CLAUDE_CLASSES.LABEL;
-			modelLabel.textContent = 'Model';
+			modelLabel.textContent = localize('tts.model_label');
 			modelSection.appendChild(modelLabel);
 
 			const modelOptions = models.length > 0
 				? models.map(m => ({ value: m.model_id, label: m.name }))
-				: [{ value: '', label: currentProviderInfo.requiresApiKey ? 'Set an API key...' : 'Loading...' }];
+				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('common.loading') }];
 			const modelSelect = createClaudeSelect(modelOptions, settings.model || '');
 			modelSelect.id = 'modelSelect';
 			modelSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;
@@ -366,7 +366,7 @@
 			modelCustomSection.style.display = (!isNative(settings.provider) && useCustomModel(settings.provider, settings.openaiBaseUrl)) ? 'block' : 'none';
 			const modelCustomLabel = document.createElement('label');
 			modelCustomLabel.className = CLAUDE_CLASSES.LABEL;
-			modelCustomLabel.textContent = 'Model';
+			modelCustomLabel.textContent = localize('tts.model_label');
 			modelCustomSection.appendChild(modelCustomLabel);
 			const modelCustomInput = createClaudeInput({
 				type: 'text',
@@ -377,18 +377,18 @@
 			modelCustomSection.appendChild(modelCustomInput);
 			const modelCustomHint = document.createElement('p');
 			modelCustomHint.className = 'text-text-500 text-xs mt-1';
-			modelCustomHint.textContent = 'Model name for the custom endpoint';
+			modelCustomHint.textContent = localize('tts.custom_model_hint');
 			modelCustomSection.appendChild(modelCustomHint);
 			content.appendChild(modelCustomSection);
 
 			// Auto-speak toggle
 			const autoSpeakSection = document.createElement('div');
 			autoSpeakSection.className = 'mb-4';
-			const autoSpeakToggle = createClaudeToggle('Auto-speak on new message', settings.autoSpeak, null);
+			const autoSpeakToggle = createClaudeToggle(localize('tts.auto_speak'), settings.autoSpeak, null);
 			autoSpeakSection.appendChild(autoSpeakToggle.container);
 			const autoSpeakNote = document.createElement('p');
 			autoSpeakNote.className = CLAUDE_CLASSES.TEXT_MUTED + ' mt-1';
-			autoSpeakNote.textContent = 'Only works on normal chats (not cowork, not code)';
+			autoSpeakNote.textContent = localize('tts.auto_speak_note');
 			autoSpeakSection.appendChild(autoSpeakNote);
 			content.appendChild(autoSpeakSection);
 
@@ -398,14 +398,14 @@
 
 			const perChatHeading = document.createElement('h4');
 			perChatHeading.className = 'text-sm font-semibold text-text-200 mb-3';
-			perChatHeading.textContent = 'Per-Chat Settings';
+			perChatHeading.textContent = localize('tts.per_chat_heading');
 			perChatSection.appendChild(perChatHeading);
 
 			// Quotes only toggle
 			const quotesSection = document.createElement('div');
 			quotesSection.className = 'mb-4';
-			const quotesOnlyToggle = createClaudeToggle('Only speak quoted text', chatQuotesOnly, null);
-			createClaudeTooltip(quotesOnlyToggle.container, 'Quick dialogue-only playback using regex (instant, no API call)');
+			const quotesOnlyToggle = createClaudeToggle(localize('tts.quotes_only'), chatQuotesOnly, null);
+			createClaudeTooltip(quotesOnlyToggle.container, localize('tts.quotes_only_tooltip'));
 			quotesSection.appendChild(quotesOnlyToggle.container);
 			perChatSection.appendChild(quotesSection);
 
@@ -414,11 +414,11 @@
 			overrideSection.className = 'mb-4';
 			const overrideLabel = document.createElement('label');
 			overrideLabel.className = CLAUDE_CLASSES.LABEL;
-			overrideLabel.textContent = 'Voice Override';
+			overrideLabel.textContent = localize('tts.voice_override_label');
 			overrideSection.appendChild(overrideLabel);
 
 			const overrideOptions = [
-				{ value: '', label: 'Use default voice' },
+				{ value: '', label: localize('tts.use_default_voice') },
 				...voiceOptions.filter(opt => opt.value) // Exclude "Set an API key..." option
 			];
 			const chatVoiceOverrideSelect = createClaudeSearchableSelect(overrideOptions, chatVoiceOverride);
@@ -435,13 +435,13 @@
 
 			const actorToggleContainer = document.createElement('div');
 			actorToggleContainer.className = 'flex-1';
-			const actorModeToggle = createClaudeToggle('Actor mode', actorModeEnabled, null);
-			createClaudeTooltip(actorModeToggle.container, 'Multi-voice character assignment with AI attribution (+latency)');
+			const actorModeToggle = createClaudeToggle(localize('tts.actor_mode'), actorModeEnabled, null);
+			createClaudeTooltip(actorModeToggle.container, localize('tts.actor_mode_tooltip'));
 			actorToggleContainer.appendChild(actorModeToggle.container);
 
 			actorContainer.appendChild(actorToggleContainer);
 
-			const configureActorsBtn = createClaudeButton('Configure Characters', 'secondary');
+			const configureActorsBtn = createClaudeButton(localize('tts.configure_characters'), 'secondary');
 			configureActorsBtn.id = 'configureActorsBtn';
 			configureActorsBtn.style.display = actorModeEnabled ? 'block' : 'none';
 			configureActorsBtn.classList.add('ml-2');
@@ -456,10 +456,10 @@
 			}
 
 			// Create modal with new class
-			const modal = new ClaudeModal('TTS Settings', content);
+			const modal = new ClaudeModal(localize('tts.settings_title'), content);
 
-			modal.addCancel('Cancel');
-			modal.addConfirm('Save', async () => {
+			modal.addCancel();
+			modal.addConfirm(localize('common.save'), async () => {
 				const newSettings = {
 					provider: providerSelect.value,
 					apiKey: apiKeyInput.value.trim(),
@@ -481,11 +481,11 @@
 						: await tempProvider.testApiKey(newSettings.apiKey);
 
 					if (!isValid) {
-						showClaudeAlert('API Key Error', `Invalid ${providerInfo.name} API key. Please check your key and try again.`);
+						showClaudeAlert(localize('tts.api_key_error_title'), localize('tts.invalid_provider_key', { provider: providerInfo.name }));
 						return false; // Don't save, keep modal open
 					}
 				} else if (providerInfo.requiresApiKey && !newSettings.apiKey) {
-					showClaudeAlert('API Key Required', `${providerInfo.name} requires an API key. Please enter one.`);
+					showClaudeAlert(localize('tts.api_key_required_title'), localize('tts.api_key_required', { provider: providerInfo.name }));
 					return false; // Don't save, keep modal open
 				}
 
@@ -576,14 +576,14 @@
 				if (newProviderInfo.requiresApiKey) {
 					const currentApiKey = apiKeyInput.value.trim();
 					if (!currentApiKey) {
-						voiceSelect.populateOptions([{ value: '', label: 'Set an API key...' }]);
-						modelSelect.populateOptions([{ value: '', label: 'Set an API key...' }]);
+						voiceSelect.populateOptions([{ value: '', label: localize('tts.set_api_key_option') }]);
+						modelSelect.populateOptions([{ value: '', label: localize('tts.set_api_key_option') }]);
 						return;
 					}
 				}
 
 				// Show loading modal
-				const loadingModal = createLoadingModal('Loading voices and models...');
+				const loadingModal = createLoadingModal(localize('tts.loading_voices_models'));
 				loadingModal.show();
 
 				try {
@@ -614,7 +614,7 @@
 				} catch (error) {
 					console.error('Failed to load provider data:', error);
 					loadingModal.destroy();
-					showClaudeAlert('Loading Error', 'Failed to load provider data');
+					showClaudeAlert(localize('tts.loading_error_title'), localize('tts.load_provider_failed'));
 				}
 			});
 
@@ -628,7 +628,7 @@
 
 				if (newKey) {
 					// Show loading modal
-					const loadingModal = createLoadingModal('Validating API key...');
+					const loadingModal = createLoadingModal(localize('tts.validating_key'));
 					loadingModal.show();
 
 					const tempProvider = initializeProvider(currentProviderKey, null);
@@ -649,7 +649,7 @@
 						voiceSelect.populateOptions(newVoiceOptions);
 
 						chatVoiceOverrideSelect.populateOptions([
-							{ value: '', label: 'Use default voice' },
+							{ value: '', label: localize('tts.use_default_voice') },
 							...newVoiceOptions
 						]);
 
@@ -659,7 +659,7 @@
 						loadingModal.destroy();
 					} else {
 						loadingModal.destroy();
-						showClaudeAlert('API Key Error', 'Invalid API key');
+						showClaudeAlert(localize('tts.api_key_error_title'), localize('tts.invalid_key'));
 						e.target.value = settings.apiKey || '';
 					}
 				}
@@ -676,14 +676,14 @@
 
 		} catch (error) {
 			loadingModal.destroy();
-			showClaudeAlert('Error', 'Failed to load settings: ' + error.message);
+			showClaudeAlert(localize('common.error'), localize('tts.load_settings_failed', { error: error.message }));
 			console.error('Settings modal error:', error);
 		}
 	}
 
 	async function createActorConfigModal(apiKey, providerKey) {
 		// Show loading modal immediately
-		const loadingModal = createLoadingModal('Loading voices...');
+		const loadingModal = createLoadingModal(localize('tts.loading_voices'));
 		loadingModal.show();
 
 		try {
@@ -712,7 +712,7 @@
 			loadingModal.destroy();
 
 			const voiceOptions = [
-				{ value: '', label: 'None' },
+				{ value: '', label: localize('tts.voice_none') },
 				...voices.map(v => ({ value: v.voice_id, label: v.name }))
 			];
 
@@ -728,7 +728,7 @@
 
 			const instructionText = document.createElement('p');
 			instructionText.className = 'text-sm text-text-300';
-			instructionText.textContent = 'Assign voices to character names. If a voice is "None", that character\'s dialog will not be spoken.';
+			instructionText.textContent = localize('tts.actor_instructions');
 			headerDiv.appendChild(instructionText);
 
 			// Control buttons
@@ -736,14 +736,14 @@
 			controlButtons.className = 'flex justify-end gap-2 mb-3';
 
 			const addBtn = createClaudeButton(
-				'<span class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>Add Character</span>',
+				'<span class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>' + localize('tts.add_character') + '</span>',
 				'secondary',
 				null,
 				true
 			);
 
 			const removeBtn = createClaudeButton(
-				'<span class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 16 16"><path d="M3 8h10" stroke-linecap="round"/></svg>Remove Last</span>',
+				'<span class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 16 16"><path d="M3 8h10" stroke-linecap="round"/></svg>' + localize('tts.remove_last') + '</span>',
 				'secondary',
 				null,
 				true
@@ -759,7 +759,7 @@
 			// Table header
 			const tableHeader = document.createElement('div');
 			tableHeader.className = 'grid grid-cols-3 gap-4 p-3 bg-bg-100 border-b border-border-300 font-medium text-sm';
-			tableHeader.innerHTML = '<div>Character Name</div><div>Gender</div><div>Voice</div>';
+			tableHeader.innerHTML = `<div>${localize('tts.character_name')}</div><div>${localize('tts.gender')}</div><div>${localize('tts.voice_label')}</div>`;
 
 			// Characters list container
 			const charactersList = document.createElement('div');
@@ -771,7 +771,7 @@
 
 			const tipText = document.createElement('div');
 			tipText.className = 'mt-3 text-xs text-text-400';
-			tipText.textContent = 'Tip: Set Narrator to "None" to only speak dialogue. Set it to a voice to include narration.';
+			tipText.textContent = localize('tts.actor_tip');
 
 			charactersSection.appendChild(headerDiv);
 			charactersSection.appendChild(controlButtons);
@@ -780,7 +780,7 @@
 			if (voices.length === 0 && apiKey) {
 				const warningDiv = document.createElement('div');
 				warningDiv.className = 'mb-3 p-2 bg-accent-100 border border-accent-200 rounded text-sm text-accent-600';
-				warningDiv.textContent = 'Could not load voices. Please check your API key.';
+				warningDiv.textContent = localize('tts.voices_load_failed');
 				charactersSection.appendChild(warningDiv);
 			}
 
@@ -799,7 +799,7 @@
 
 				const nameInput = createClaudeInput({
 					type: 'text',
-					placeholder: 'e.g., Alice',
+					placeholder: localize('tts.character_name_placeholder'),
 					value: character.name || ''
 				});
 				nameInput.classList.add('character-name');
@@ -809,9 +809,9 @@
 				}
 
 				const genderOptions = [
-					{ value: 'male', label: 'Male' },
-					{ value: 'female', label: 'Female' },
-					{ value: 'other', label: 'Other' }
+					{ value: 'male', label: localize('tts.gender_male') },
+					{ value: 'female', label: localize('tts.gender_female') },
+					{ value: 'other', label: localize('tts.gender_other') }
 				];
 				const genderSelect = createClaudeSelect(genderOptions, character.gender || 'male');
 				genderSelect.classList.add('character-gender');
@@ -861,10 +861,10 @@
 			};
 
 			// Create the modal
-			const modal = new ClaudeModal('Character Voice Configuration', contentContainer);
+			const modal = new ClaudeModal(localize('tts.actor_config_title'), contentContainer);
 
-			modal.addCancel('Cancel');
-			modal.addConfirm('Save', async () => {
+			modal.addCancel();
+			modal.addConfirm(localize('common.save'), async () => {
 				const characterRows = charactersList.querySelectorAll('.character-row');
 				const charactersData = Array.from(characterRows)
 					.map(row => ({
@@ -887,7 +887,7 @@
 
 		} catch (error) {
 			loadingModal.destroy();
-			showClaudeAlert('Error', 'Failed to load character configuration: ' + error.message);
+			showClaudeAlert(localize('common.error'), localize('tts.actor_config_failed', { error: error.message }));
 			console.error('Actor config modal error:', error);
 		}
 	}
@@ -993,7 +993,7 @@
 		ButtonBar.register({
 			buttonClass: 'tts-settings-button',
 			createFn: createSettingsButton,
-			tooltip: 'TTS Settings',
+			tooltip: localize('tts.settings_title'),
 			forceDisplayOnMobile: true,
 			pages: ['chat', 'home', 'coworkHome', 'coworkChat'],
 		});

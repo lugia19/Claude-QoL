@@ -45,7 +45,6 @@ const SETTINGS_KEYS = {
 		BOOKMARKS: { key: 'navigation_bookmarks', default: {}, type: 'object' },
 	},
 	IMAGE_EXTRACTOR: {
-		AUTO_EXPAND: { key: 'image_auto_expand', default: false, type: 'boolean' },
 		ENABLED: { key: 'image_gallery_enabled', default: true, type: 'boolean' },
 		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },
 		LIMIT: { key: 'image_gallery_limit', default: 3, type: 'number' },
@@ -63,6 +62,10 @@ const SETTINGS_KEYS = {
 	BANNER_WATCHER: {
 		// Cache of org flags, refetched from /api/organizations on every poll — nothing to preserve.
 		STORED_FLAGS: { key: 'banner_stored_flags', default: {}, type: 'object', local: true },
+	},
+	I18N: {
+		// '' = Auto (follow the claude.ai account language). Mirrored to localStorage, see i18n.js.
+		LANGUAGE: { key: 'ui_language', default: '', type: 'string' },
 	},
 };
 

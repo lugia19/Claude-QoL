@@ -18,13 +18,14 @@
 		const months = Math.floor(days / 30);
 		const years = Math.floor(days / 365);
 
-		if (years > 0) return `${years}y ago`;
-		if (months > 0) return `${months}mo ago`;
-		if (weeks > 0) return `${weeks}w ago`;
-		if (days > 0) return `${days}d ago`;
-		if (hours > 0) return `${hours}h ago`;
-		if (minutes > 0) return `${minutes}m ago`;
-		return 'just now';
+		const rtf = new Intl.RelativeTimeFormat(currentLocale(), { numeric: 'auto', style: 'narrow' });
+		if (years > 0) return rtf.format(-years, 'year');
+		if (months > 0) return rtf.format(-months, 'month');
+		if (weeks > 0) return rtf.format(-weeks, 'week');
+		if (days > 0) return rtf.format(-days, 'day');
+		if (hours > 0) return rtf.format(-hours, 'hour');
+		if (minutes > 0) return rtf.format(-minutes, 'minute');
+		return rtf.format(0, 'second');
 	};
 
 	window.ClaudeSearchShared.simplifyText = function (text) {

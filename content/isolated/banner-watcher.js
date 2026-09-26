@@ -2,9 +2,9 @@
 	'use strict';
 
 	const FLAG_SEVERITY = {
-		'consumer_first_warning': { level: 1, color: '#eab308', label: 'First Warning' },
-		'consumer_second_warning': { level: 2, color: '#f97316', label: 'Second Warning' },
-		'consumer_restricted_mode': { level: 3, color: '#ef4444', label: 'Restricted Mode' },
+		'consumer_first_warning': { level: 1, color: '#eab308', label: localize('banner.first_warning') },
+		'consumer_second_warning': { level: 2, color: '#f97316', label: localize('banner.second_warning') },
+		'consumer_restricted_mode': { level: 3, color: '#ef4444', label: localize('banner.restricted_mode') },
 	};
 	const DEFAULT_COLOR = '#eab308';
 
@@ -85,11 +85,11 @@
 
 	function formatRelativeTime(expiresAt) {
 		const diff = new Date(expiresAt).getTime() - Date.now();
-		if (diff <= 0) return 'expired';
+		if (diff <= 0) return localize('banner.expired');
 		const hours = Math.floor(diff / 3600000);
 		const minutes = Math.floor((diff % 3600000) / 60000);
-		if (hours > 0) return `${hours}h ${minutes}m remaining`;
-		return `${minutes}m remaining`;
+		if (hours > 0) return localize('banner.remaining_hm', { hours, minutes });
+		return localize('banner.remaining_m', { minutes });
 	}
 
 	function showFlagsModal() {
@@ -117,9 +117,9 @@
 			const expiry = document.createElement('span');
 			expiry.className = 'text-xs text-text-500';
 			if (flag.expires_at) {
-				expiry.textContent = `Expires: ${new Date(flag.expires_at).toLocaleString()} (${formatRelativeTime(flag.expires_at)})`;
+				expiry.textContent = localize('banner.expires', { date: new Date(flag.expires_at).toLocaleString(currentLocale()), relative: formatRelativeTime(flag.expires_at) });
 			} else {
-				expiry.textContent = 'No expiry';
+				expiry.textContent = localize('banner.no_expiry');
 			}
 
 			info.appendChild(name);
@@ -129,8 +129,8 @@
 			content.appendChild(row);
 		}
 
-		const modal = new ClaudeModal('Active Usage Flags', content);
-		modal.addCancel('Close');
+		const modal = new ClaudeModal(localize('banner.modal_title'), content);
+		modal.addCancel(localize('common.close'));
 		modal.show();
 	}
 
@@ -144,7 +144,7 @@
 		ButtonBar.register({
 			buttonClass: 'banner-watcher-button',
 			createFn: createBannerWatcherButton,
-			tooltip: 'Usage flags',
+			tooltip: localize('banner.tooltip'),
 			pages: ['chat', 'home', 'coworkHome', 'coworkChat'],
 			// Hidden with no active flags (see updateButton) - in the More menu too.
 			menuVisible: () => _activeFlags.length > 0,

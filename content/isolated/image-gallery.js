@@ -51,11 +51,11 @@
 		const content = document.createElement('div');
 		content.className = 'space-y-4';
 
-		const enabledToggle = createClaudeToggle('Show generated images as galleries', settings.enabled, null);
+		const enabledToggle = createClaudeToggle(localize('gallery.show_as_galleries'), settings.enabled, null);
 		content.appendChild(enabledToggle.container);
 		const enabledHint = document.createElement('p');
 		enabledHint.className = 'text-text-500 text-xs mt-1';
-		enabledHint.textContent = 'Turns image tool results into inline galleries.';
+		enabledHint.textContent = localize('gallery.enabled_hint');
 		content.appendChild(enabledHint);
 
 		const limitSection = document.createElement('div');
@@ -68,14 +68,14 @@
 			limitInput.disabled = !on;
 			limitInput.classList.toggle('opacity-50', !on);
 		};
-		const limitToggle = createClaudeToggle('Limit images per gallery', settings.limitEnabled, setLimitEnabled);
+		const limitToggle = createClaudeToggle(localize('gallery.limit_toggle'), settings.limitEnabled, setLimitEnabled);
 		limitSection.appendChild(limitToggle.container);
 
 		const limitField = document.createElement('div');
 		limitField.className = 'mt-3';
 		const limitLabel = document.createElement('label');
 		limitLabel.className = CLAUDE_CLASSES.LABEL;
-		limitLabel.textContent = 'Images per gallery';
+		limitLabel.textContent = localize('gallery.images_per_gallery');
 		limitField.appendChild(limitLabel);
 		limitField.appendChild(limitInput);
 		limitSection.appendChild(limitField);
@@ -83,18 +83,18 @@
 
 		const note = document.createElement('p');
 		note.className = CLAUDE_CLASSES.TEXT_MUTED + ' mt-2';
-		note.textContent = 'Note: Only up to 3 images are displayed inline in a gallery.';
+		note.textContent = localize('gallery.inline_note');
 		limitSection.appendChild(note);
 
 		content.appendChild(limitSection);
 
-		const modal = new ClaudeModal('Image Gallery Settings', content);
-		modal.addCancel('Cancel');
-		modal.addConfirm('Save', async () => {
+		const modal = new ClaudeModal(localize('gallery.settings_title'), content);
+		modal.addCancel();
+		modal.addConfirm(localize('common.save'), async () => {
 			const limitEnabled = limitToggle.input.checked;
 			const limit = parseInt(limitInput.value, 10);
 			if (limitEnabled && !(limit >= 1)) {
-				showClaudeAlert('Invalid limit', 'Images per gallery must be a whole number of at least 1.');
+				showClaudeAlert(localize('gallery.invalid_limit_title'), localize('gallery.invalid_limit'));
 				return false;
 			}
 			await saveSettings({
@@ -149,7 +149,7 @@
 		ButtonBar.register({
 			buttonClass: 'image-gallery-button',
 			createFn: createSettingsButton,
-			tooltip: 'Image Gallery Settings',
+			tooltip: localize('gallery.settings_title'),
 			pages: ['chat', 'home'],
 		});
 		writeConfigMirror();

@@ -3,6 +3,19 @@
 	'use strict';
 	const channel = new BroadcastChannel('pref-switcher-updates');
 
+	// An account language change arrives here as { locale: 'ja-JP', ... }. Refresh the 24h locale
+	// cache from the request body so i18n.js picks the new language up on the next load.
+	function updateLocaleCache(body) {
+		try {
+			const locale = JSON.parse(body)?.locale;
+			if (!SUPPORTED_LOCALES.includes(locale)) return;
+			localStorage.setItem('claude_qol_locale_cache', JSON.stringify({
+				locale,
+				expiry: Date.now() + 24 * 60 * 60 * 1000
+			}));
+		} catch (e) { /* not JSON / no locale - nothing to do */ }
+	}
+
 	const originalFetch = window.fetch;
 	window.fetch = async function (...args) {
 		const [input, options] = args;
@@ -24,6 +37,7 @@
 			const response = await originalFetch.apply(this, args);
 			if (response.ok) {
 				channel.postMessage({ type: 'preferences-changed' });
+				updateLocaleCache(options.body);
 			}
 
 			return response;

@@ -36,7 +36,7 @@
 		button.setAttribute('data-file-id', fileId);
 		button.setAttribute('data-is-attachment', isAttachment);
 
-		createClaudeTooltip(button, 'Download');
+		createClaudeTooltip(button, localize('download.download'));
 
 		button.onclick = async (e) => {
 			e.stopPropagation();
@@ -62,7 +62,7 @@
 			}
 		} catch (error) {
 			console.error(`${LOG_PREFIX} Failed to download:`, error);
-			alert('Failed to download file');
+			alert(localize('download.failed'));
 		}
 	}
 
@@ -290,7 +290,7 @@
 	`, 'icon');
 
 		button.classList.add('file-preview-download-button', 'shrink-0', '-mr-2');
-		createClaudeTooltip(button, 'Download file');
+		createClaudeTooltip(button, localize('download.download_file'));
 
 		button.onclick = () => {
 			const filename = header.querySelector('h2')?.textContent.trim() || 'download.txt';

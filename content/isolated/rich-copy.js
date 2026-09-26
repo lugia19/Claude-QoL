@@ -95,7 +95,7 @@
 			window.addEventListener('message', listener);
 			setTimeout(() => {
 				window.removeEventListener('message', listener);
-				resolve({ type: 'rich-copy-error', error: 'Timeout' });
+				resolve({ type: 'rich-copy-error', error: localize('richcopy.timeout') });
 			}, 2000);
 		});
 
@@ -104,14 +104,14 @@
 			richBtn.innerHTML = CHECK_SVG;
 			setTimeout(() => { richBtn.innerHTML = original; }, 1500);
 		} else {
-			showClaudeAlert('Error', 'Failed to copy rich text: ' + (result.error || 'Unknown error'));
+			showClaudeAlert(localize('common.error'), localize('richcopy.copy_failed', { error: result.error || localize('richcopy.unknown_error') }));
 		}
 	}
 
 	function createRichCopyButton(nativeCopyBtn) {
 		const btn = nativeCopyBtn.cloneNode(false);
 		btn.className = nativeCopyBtn.className + ' ' + RICH_COPY_CLASS;
-		btn.setAttribute('aria-label', 'Copy as rich text');
+		btn.setAttribute('aria-label', localize('richcopy.copy_as_rich_text'));
 		btn.removeAttribute('data-testid');
 
 		const iconSpans = nativeCopyBtn.querySelectorAll(':scope > span');
@@ -134,7 +134,7 @@
 			copyAsRichText(nativeCopyBtn, btn);
 		});
 
-		createClaudeTooltip(btn, 'Copy as rich text');
+		createClaudeTooltip(btn, localize('richcopy.copy_as_rich_text'));
 
 		return btn;
 	}
@@ -155,10 +155,10 @@
 			.flatMap((span) => [...span.childNodes])
 			.find((node) => node.nodeType === Node.TEXT_NODE && node.nodeValue.trim());
 		if (labelNode) {
-			labelNode.nodeValue = 'Copy rich text';
+			labelNode.nodeValue = localize('richcopy.copy_rich_text_label');
 		}
 
-		btn.setAttribute('aria-label', 'Copy as rich text');
+		btn.setAttribute('aria-label', localize('richcopy.copy_as_rich_text'));
 		btn.removeAttribute('data-testid');
 		btn.removeAttribute('data-state');
 
@@ -168,7 +168,7 @@
 			copyAsRichText(copyBtn, btn);
 		});
 
-		createClaudeTooltip(btn, 'Copy as rich text');
+		createClaudeTooltip(btn, localize('richcopy.copy_as_rich_text'));
 
 		return btn;
 	}
