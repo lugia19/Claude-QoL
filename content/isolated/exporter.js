@@ -1787,7 +1787,10 @@
 		const exportContent = await formatExport(conversationData, messages, format, conversationId, loadingModal, exportOptions);
 		const blob = exportContent instanceof Blob
 			? exportContent
-			: new Blob([exportContent], { type: 'text/plain' });
+			// The real type, not text/plain: Firefox for Android renames the download to match the
+			// type (an .html saved as text/plain came out as .txt). Octet-stream (for .jsonl, which
+			// mime doesn't know) leaves the name alone.
+			: new Blob([exportContent], { type: mime.getType(filename) || 'application/octet-stream' });
 		return { filename, blob, wasCached, content: exportContent };
 	}
 
