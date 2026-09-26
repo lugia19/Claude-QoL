@@ -1,7 +1,8 @@
 // toolbox-ui.js
 // Toolbox-only UI glue: the installed marker, the settings-mismatch warning and the alert override.
 
-// Add marker for usage tracker to know if it's installed:
+// Tells Claude Usage Tracker that QoL is installed (see "How the two extensions coordinate" in
+// common/README.md):
 document.documentElement.setAttribute('data-claude-qol-installed', 'true');
 
 // Warn on any mismatch between the source conversation's feature settings and

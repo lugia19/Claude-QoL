@@ -73,7 +73,7 @@
 
 			const orgId = orgIndex !== -1 ? urlParts[orgIndex + 1] : null;
 			const conversationId = convIndex !== -1 ? urlParts[convIndex + 1] : null;
-			const currentConversationId = window.location.pathname.match(/\/chat\/([^/?]+)/)?.[1];
+			const currentConversationId = getConversationId();
 
 			// Only handle if valid and matches current conversation
 			if (!orgId || !conversationId || (currentConversationId && conversationId !== currentConversationId)) {

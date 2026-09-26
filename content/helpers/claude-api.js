@@ -1904,25 +1904,11 @@ async function withJsonRequestBody(config, bodyObj) {
 	return { ...config, body: await new Response(compressed).arrayBuffer() };
 }
 
+// getActiveOrgId() (common/claude/page.js), for callers that can't do anything without an org.
 function getOrgId() {
-	const cookies = document.cookie.split(';');
-	for (const cookie of cookies) {
-		const [name, value] = cookie.trim().split('=');
-		if (name === 'lastActiveOrg') {
-			return value;
-		}
-	}
-	throw new Error('Could not find organization ID');
-}
-
-function getConversationId() {
-	const match = window.location.pathname.match(/\/chat\/([a-f0-9-]+)/);
-	return match ? match[1] : null;
-}
-
-function getProjectId() {
-	const match = window.location.pathname.match(/\/project\/([a-f0-9-]+)/);
-	return match ? match[1] : null;
+	const orgId = getActiveOrgId();
+	if (!orgId) throw new Error('Could not find organization ID');
+	return orgId;
 }
 
 // ======== Skills API (used for encryption key storage) ========

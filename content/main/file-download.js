@@ -8,18 +8,10 @@
 
 	//console.log(`${LOG_PREFIX} Script initialized`);
 
-	// Parse project URL to get orgId and projectId
-	function parseProjectUrl(url) {
-		const match = url.match(/\/project\/([a-f0-9-]+)/);
-		if (!match) {
-			//console.log(`${LOG_PREFIX} Not a project URL: ${url}`);
-			return null;
-		}
-
-		const projectId = match[1];
-		const orgId = getOrgId();
-		//console.log(`${LOG_PREFIX} Parsed project URL - orgId: ${orgId}, projectId: ${projectId}`);
-		return { orgId, projectId };
+	// The org and project of the project page we're on, or null elsewhere.
+	function parseProjectUrl() {
+		const projectId = getProjectId();
+		return projectId ? { orgId: getOrgId(), projectId } : null;
 	}
 
 	// Create download button
@@ -49,7 +41,7 @@
 
 	// Handle file download
 	async function handleDownload(fileId, isAttachment) {
-		const urlData = parseProjectUrl(window.location.href);
+		const urlData = parseProjectUrl();
 		if (!urlData) return;
 
 		const project = new ClaudeProject(urlData.orgId, urlData.projectId);
@@ -200,7 +192,7 @@
 
 		//console.log(`${LOG_PREFIX} processProject() called`);
 
-		const urlData = parseProjectUrl(window.location.href);
+		const urlData = parseProjectUrl();
 		if (!urlData) {
 			//console.log(`${LOG_PREFIX} Not a valid project page, exiting`);
 			return;

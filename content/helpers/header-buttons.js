@@ -62,7 +62,7 @@ const pageLayouts = {
 	chatActions: {
 		group: 'chat',
 		match() {
-			return window.location.href.includes('/chat/')
+			return isChatPage()
 				&& !!document.querySelector('[data-testid="chat-actions"]');
 		},
 		getAnchor() {
@@ -82,7 +82,7 @@ const pageLayouts = {
 		group: 'chat',
 		match() {
 			const wiggle = document.querySelector('[data-testid="wiggle-controls-actions"]');
-			return window.location.href.includes('/chat/')
+			return isChatPage()
 				&& !document.querySelector('[data-testid="chat-actions"]')
 				&& !!wiggle && !wiggle.closest('[inert]');
 		},
@@ -103,7 +103,7 @@ const pageLayouts = {
 	homeWeb: {
 		group: 'home',
 		match() {
-			const isHome = window.location.pathname === '/new' || window.location.pathname === '/';
+			const isHome = isHomePage();
 			if (!isHome) return false;
 			if (document.querySelector('#dframe-header-actions-slot')) return true;
 			const mainContent = document.getElementById('main-content');
@@ -129,7 +129,7 @@ const pageLayouts = {
 	homeDesktop: {
 		group: 'home',
 		match() {
-			const isHome = window.location.pathname === '/new' || window.location.pathname === '/';
+			const isHome = isHomePage();
 			return isHome && !!document.querySelector('.dframe-pane-header');
 		},
 		getAnchor() {
@@ -142,7 +142,7 @@ const pageLayouts = {
 	project: {
 		group: 'project',
 		match() {
-			return !!window.location.pathname.match(/\/project\/[a-f0-9-]+/);
+			return isProjectPage();
 		},
 		getAnchor() {
 			const nativeActions = document.querySelector('.flex.items-center.gap-1.ml-auto');
@@ -273,7 +273,8 @@ const ButtonBar = {
 	// It sees an ellipsised title only if the ellipsis is on that child itself, so claude.ai's normal
 	// truncation of a long title doesn't trigger it - but content spilling out of a row child does,
 	// whoever put it there. Claude Usage Tracker relies on this: it keeps its stats line's full width
-	// claimed in the title group and lets it spill, and expects us to make room.
+	// claimed in the title group and lets it spill, and expects us to make room (see "How the two
+	// extensions coordinate" in common/README.md).
 	//
 	// Opt-in per layout (`fitToHeader` on the anchor): only a header row shared with a title has
 	// something worth making room for, and other anchors sit inside small native button clusters
