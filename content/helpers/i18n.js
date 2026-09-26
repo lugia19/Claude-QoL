@@ -40,6 +40,9 @@ function _resolveLocale() {
 	try {
 		const override = localStorage.getItem(I18N_OVERRIDE_KEY);
 		if (override) return normalizeLocale(override);
+		// Expiry deliberately ignored: an expired entry is still the best guess (better than
+		// navigator.language), and fetchAndCacheLocale() refreshes it on this same load, so a
+		// language changed on another device is picked up on the next load.
 		const cached = localStorage.getItem('claude_qol_locale_cache');
 		if (cached) return normalizeLocale(JSON.parse(cached).locale);
 	} catch (e) { /* storage blocked or bad JSON - fall through */ }
