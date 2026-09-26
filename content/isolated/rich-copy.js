@@ -143,9 +143,10 @@
 
 	// claude.ai mounts menus in #portal-root; watching only that stays cheap while a reply streams.
 	// Re-attached if the page ever replaces the element.
-	const portalObserver = new MutationObserver(() => {
+	function injectMenuItems() {
 		for (const menu of document.querySelectorAll('#portal-root [role="menu"]')) injectMenuItem(menu);
-	});
+	}
+	const portalObserver = new MutationObserver(injectMenuItems);
 	let observedPortalRoot = null;
 
 	function watchMenus() {
@@ -154,6 +155,7 @@
 		portalObserver.disconnect();
 		portalObserver.observe(portalRoot, { childList: true, subtree: true });
 		observedPortalRoot = portalRoot;
+		injectMenuItems(); // a menu that was already open when observing started
 	}
 
 	function initialize() {
