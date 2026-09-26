@@ -43,120 +43,104 @@ getPhantomMessages = async function (conversationId) {
 };
 
 // ==== FETCH INTERCEPTOR ====
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-	const [input, config] = args;
+(function () {
+	const net = ClaudeExtNet;
+	const originalFetch = window.fetch;
+	window.fetch = async (...args) => {
+		const [input, config] = args;
+		const url = net.getFetchUrl(input);
+		const method = net.getFetchMethod(input, config);
 
-	let url;
-	if (input instanceof URL) {
-		url = input.href;
-	} else if (typeof input === 'string') {
-		url = input;
-	} else if (input instanceof Request) {
-		url = input.url;
-	}
+		if (url.includes('skip_uuid_injection=true')) {
+			return originalFetch(...args);
+		}
 
-	if (url && url.includes('skip_uuid_injection=true')) {
-		return originalFetch(...args);
-	}
+		// Check if this is a conversation data request
+		if (url.includes('rendering_mode=messages') && method === 'GET') {
+			const { conversationId } = net.getApiIds(url);
 
-	// Check if this is a conversation data request
-	if (url &&
-		url.includes('/chat_conversations/') &&
-		url.includes('rendering_mode=messages') &&
-		(!config || config.method === 'GET' || !config.method)) {
+			if (conversationId) {
+				const response = await originalFetch(...args);
+				const conversationData = await response.json();
 
-		const urlParts = url.split('/');
-		const conversationIdIndex = urlParts.findIndex(part => part === 'chat_conversations') + 1;
-		const conversationId = urlParts[conversationIdIndex]?.split('?')[0];
+				let phantomMessages = await getPhantomMessages(conversationId);
 
-		if (conversationId) {
-			const response = await originalFetch(...args);
-			const conversationData = await response.json();
+				if (!phantomMessages || phantomMessages.length === 0) {
+					const firstHuman = conversationData.chat_messages?.find(m => m.sender === 'human');
+					if (firstHuman) {
+						const attachments = firstHuman.attachments || [];
 
-			let phantomMessages = await getPhantomMessages(conversationId);
-
-			if (!phantomMessages || phantomMessages.length === 0) {
-				const firstHuman = conversationData.chat_messages?.find(m => m.sender === 'human');
-				if (firstHuman) {
-					const attachments = firstHuman.attachments || [];
-
-					const chatlogAtt = attachments.find(
-						a => a.file_name === 'chatlog.txt' &&
-							a.extracted_content?.startsWith('[CLEXP:MSG_HEADER:')
-					);
-
-					if (chatlogAtt) {
-						console.warn('No phantom messages found for conversation, attempting reconstruction from attachments');
-						const summaryTexts = attachments
-							.filter(a => a.file_name?.match(/^summary_chunk_\d+\.txt$/))
-							.sort((a, b) => {
-								const numA = parseInt(a.file_name.match(/\d+/)[0]);
-								const numB = parseInt(b.file_name.match(/\d+/)[0]);
-								return numA - numB;
-							})
-							.map(a => a.extracted_content);
-
-						const reconstructed = ClaudeConversation.fromChatlog(
-							chatlogAtt.extracted_content,
-							summaryTexts
+						const chatlogAtt = attachments.find(
+							a => a.file_name === 'chatlog.txt' &&
+								a.extracted_content?.startsWith('[CLEXP:MSG_HEADER:')
 						);
 
-						if (reconstructed) {
-							const messages = await reconstructed.getMessages();
-							const messagesJson = messages.map(m => m.toHistoryJSON());
-							await storePhantomMessages(conversationId, messagesJson);
-							phantomMessages = messages;
+						if (chatlogAtt) {
+							console.warn('No phantom messages found for conversation, attempting reconstruction from attachments');
+							const summaryTexts = attachments
+								.filter(a => a.file_name?.match(/^summary_chunk_\d+\.txt$/))
+								.sort((a, b) => {
+									const numA = parseInt(a.file_name.match(/\d+/)[0]);
+									const numB = parseInt(b.file_name.match(/\d+/)[0]);
+									return numA - numB;
+								})
+								.map(a => a.extracted_content);
+
+							const reconstructed = ClaudeConversation.fromChatlog(
+								chatlogAtt.extracted_content,
+								summaryTexts
+							);
+
+							if (reconstructed) {
+								const messages = await reconstructed.getMessages();
+								const messagesJson = messages.map(m => m.toHistoryJSON());
+								await storePhantomMessages(conversationId, messagesJson);
+								phantomMessages = messages;
+							}
 						}
 					}
 				}
-			}
 
-			if (phantomMessages && phantomMessages.length > 0) {
-				injectPhantomMessages(conversationData, phantomMessages);
-			}
-
-			injectUUIDMarkers(conversationData);
-
-			return new Response(JSON.stringify(conversationData), {
-				status: response.status,
-				statusText: response.statusText,
-				headers: response.headers
-			});
-		}
-	}
-
-	// Check if this is a completion request
-	if (url && url.includes('/completion') && config && config.method === 'POST') {
-		const urlParts = url.split('/');
-		const conversationIdIndex = urlParts.findIndex(part => part === 'chat_conversations') + 1;
-		const conversationId = urlParts[conversationIdIndex]?.split('?')[0];
-
-		if (conversationId) {
-			const phantomMessages = await getPhantomMessages(conversationId);
-
-			if (phantomMessages && phantomMessages.length > 0) {
-				const lastPhantomUuid = phantomMessages[phantomMessages.length - 1].uuid;
-
-				let body;
-				try {
-					body = await readJsonRequestBody(config);
-				} catch (e) {
-					return originalFetch(...args);
+				if (phantomMessages && phantomMessages.length > 0) {
+					injectPhantomMessages(conversationData, phantomMessages);
 				}
 
-				if (body.parent_message_uuid === lastPhantomUuid) {
-					console.log('Fixing parent_message_uuid from phantom to root for completion request');
-					body.parent_message_uuid = "00000000-0000-4000-8000-000000000000";
+				injectUUIDMarkers(conversationData);
 
-					return originalFetch(input, await withJsonRequestBody(config, body));
+				return net.jsonResponse(response, conversationData);
+			}
+		}
+
+		// Check if this is a completion request
+		if (net.isCompletionUrl(url) && method === 'POST') {
+			const { conversationId } = net.getApiIds(url);
+
+			if (conversationId) {
+				const phantomMessages = await getPhantomMessages(conversationId);
+
+				if (phantomMessages && phantomMessages.length > 0) {
+					const lastPhantomUuid = phantomMessages[phantomMessages.length - 1].uuid;
+
+					let body;
+					try {
+						body = await net.readJsonRequestBody(config);
+					} catch (e) {
+						return originalFetch(...args);
+					}
+
+					if (body.parent_message_uuid === lastPhantomUuid) {
+						console.log('Fixing parent_message_uuid from phantom to root for completion request');
+						body.parent_message_uuid = "00000000-0000-4000-8000-000000000000";
+
+						return originalFetch(input, await net.withJsonRequestBody(config, body));
+					}
 				}
 			}
 		}
-	}
 
-	return originalFetch(...args);
-};
+		return originalFetch(...args);
+	};
+})();
 
 function reorderKeys(obj, referenceObj) {
 	const orderedObj = {};

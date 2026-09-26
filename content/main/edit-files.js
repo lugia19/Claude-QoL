@@ -692,7 +692,7 @@
 	}
 
 	async function formatNewRequest(url, config) {
-		const originalBody = await readJsonRequestBody(config);
+		const originalBody = await ClaudeExtNet.readJsonRequestBody(config);
 		const completionJson = editMessage.toCompletionJSON();
 
 		const modifiedBody = {
@@ -704,7 +704,7 @@
 
 		return {
 			url,
-			config: await withJsonRequestBody(config, modifiedBody)
+			config: await ClaudeExtNet.withJsonRequestBody(config, modifiedBody)
 		};
 	}
 	//#endregion
@@ -713,18 +713,10 @@
 	const originalFetch = window.fetch;
 	window.fetch = async (...args) => {
 		const [input, config] = args;
-
-		let url = undefined;
-		if (input instanceof URL) {
-			url = input.href;
-		} else if (typeof input === 'string') {
-			url = input;
-		} else if (input instanceof Request) {
-			url = input.url;
-		}
+		const url = ClaudeExtNet.getFetchUrl(input);
 
 		// Intercept /completion requests when edit data is pending
-		if (url && url.includes('/completion') && pendingEditData && config?.method === 'POST') {
+		if (pendingEditData && ClaudeExtNet.isCompletionUrl(url) && ClaudeExtNet.getFetchMethod(input, config) === 'POST') {
 			console.log('Intercepting edit completion request');
 			pendingEditData = null;
 

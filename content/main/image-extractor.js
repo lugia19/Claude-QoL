@@ -79,12 +79,6 @@ function _galleryLimit() {
 	return limitEnabled && limit >= 1 ? Math.floor(limit) : Infinity;
 }
 
-// Conversation ID from an API URL (covers /completion, /retry_completion, and the
-// rendering_mode=messages conversation fetch).
-function _convIdFromUrl(url) {
-	return url.match(/chat_conversations\/([0-9a-f-]{8,})/)?.[1] || null;
-}
-
 function getImageDimensions(fileUuid, url) {
 	const cached = _imageDimsCache.get(fileUuid);
 	if (cached) return Promise.resolve(cached);
@@ -277,7 +271,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 	const decoder = new TextDecoder();
 	const encoder = new TextEncoder();
 
-	let buffer = '';
+	const splitter = ClaudeExtNet.createSseSplitter();
 	let indexOffset = 0;
 	const toolUseInputBuf = new Map();   // nativeIndex -> accumulated input_json_delta string
 	const toolUseParsed = new Map();     // nativeIndex -> parsed tool_use input object
@@ -522,8 +516,9 @@ function createImageInjectingStream(sourceBody, orgId) {
 					while (!_cancelled) {
 						const { done, value } = await reader.read();
 						if (done) {
-							buffer += decoder.decode();
-							if (buffer.trim()) await handleEvent(controller, buffer);
+							for (const event of [...splitter.push(decoder.decode()), ...splitter.flush()]) {
+								await handleEvent(controller, event.raw);
+							}
 							_diag(`stream done: ${_evtCount} events, ${_chunkNo} chunks, ${Math.round(performance.now() - _streamStart)}ms, maxQueuedAhead=${_maxAhead}`);
 							controller.close();
 							return;
@@ -532,13 +527,9 @@ function createImageInjectingStream(sourceBody, orgId) {
 						const _gap = performance.now() - _lastRead;
 						const _p0 = performance.now();
 						_chunkNo++;
-						buffer += decoder.decode(value, { stream: true });
-						let boundary;
 						let _n = 0;
-						while ((boundary = buffer.indexOf('\n\n')) !== -1) {
-							const rawEvent = buffer.slice(0, boundary);
-							buffer = buffer.slice(boundary + 2);
-							await handleEvent(controller, rawEvent);
+						for (const event of splitter.push(decoder.decode(value, { stream: true }))) {
+							await handleEvent(controller, event.raw);
 							_n++;
 						}
 						const _proc = performance.now() - _p0;
@@ -568,32 +559,17 @@ function createImageInjectingStream(sourceBody, orgId) {
 
 // ==== FETCH INTERCEPTION — inject test markers into tool_use/thinking near image results ====
 
-// When we rebuild a Response around bytes the browser has ALREADY decoded, we must not copy
-// the transport/encoding headers of the original. The live completion SSE arrives with
-// content-encoding: br (Brotli, decompressed by the network stack before our reader sees it);
-// blindly copying that header labels our plain-text stream as Brotli. Same for content-length
-// (describes the compressed original) and transfer-encoding.
-function sanitizedHeaders(response) {
-	const h = new Headers(response.headers);
-	h.delete('content-encoding');
-	h.delete('content-length');
-	h.delete('transfer-encoding');
-	return h;
-}
-
+// Rebuilt responses use ClaudeExtNet.sanitizedHeaders: the live completion SSE arrives with
+// content-encoding: br, already decoded by the network stack, so copying the original headers
+// would label our plain-text stream as Brotli.
 const _imageExtractorOriginalFetch = window.fetch;
 window.fetch = async (...args) => {
 	const [input, config] = args;
-
-	let url;
-	if (input instanceof URL) url = input.href;
-	else if (typeof input === 'string') url = input;
-	else if (input instanceof Request) url = input.url;
+	const url = ClaudeExtNet.getFetchUrl(input);
+	const method = ClaudeExtNet.getFetchMethod(input, config);
 
 	// Live streaming: inject galleries into the completion SSE stream as tool results arrive.
-	if (url &&
-		(url.includes('/completion') || url.includes('/retry_completion')) &&
-		config?.method === 'POST') {
+	if (ClaudeExtNet.isCompletionUrl(url, { retry: true }) && method === 'POST') {
 
 		if (!_galleryConfig().enabled) {
 			_diag('wrapper skipped — gallery injection disabled in settings');
@@ -603,7 +579,7 @@ window.fetch = async (...args) => {
 		// Only wrap conversations known to contain generated images (flagged by the
 		// load-time path). Everything else gets the native stream, untouched — JS
 		// re-piping janks streaming on some machines.
-		const convId = _convIdFromUrl(url);
+		const convId = ClaudeExtNet.getApiIds(url).conversationId;
 		if (!_conversationHasImages(convId)) {
 			_diag('wrapper skipped — conversation has no image history', convId);
 			return _imageExtractorOriginalFetch(...args);
@@ -615,12 +591,10 @@ window.fetch = async (...args) => {
 		// DIAGNOSTIC kill-switch: set localStorage['claude_qol_img_nowrap']='1' to bypass our
 		// stream wrapper entirely (pass the native response straight through). Lets us A/B test
 		// live whether the wrapper is the cause of the streaming jank — no rebuild needed.
-		try {
-			if (localStorage.getItem('claude_qol_img_nowrap') === '1') {
-				_diag('WRAPPER BYPASSED (claude_qol_img_nowrap=1) — native stream passed through');
-				return response;
-			}
-		} catch (e) { /* ignore */ }
+		if (ClaudeExtNet.isKillSwitchOn('claude_qol_img_nowrap')) {
+			_diag('WRAPPER BYPASSED (claude_qol_img_nowrap=1) — native stream passed through');
+			return response;
+		}
 
 		let orgId = null;
 		try { orgId = getOrgId(); } catch (e) { /* no org id → cannot build preview URLs */ }
@@ -631,7 +605,7 @@ window.fetch = async (...args) => {
 			return new Response(transformed, {
 				status: response.status,
 				statusText: response.statusText,
-				headers: sanitizedHeaders(response)
+				headers: ClaudeExtNet.sanitizedHeaders(response)
 			});
 		} catch (e) {
 			console.error('[QOL-ImageExtractor] Failed to wrap completion stream, passing through:', e);
@@ -639,17 +613,12 @@ window.fetch = async (...args) => {
 		}
 	}
 
-	if (url &&
-		url.includes('/chat_conversations/') &&
-		url.includes('rendering_mode=messages') &&
-		(!config || config.method === 'GET' || !config.method) &&
-		_galleryConfig().enabled) {
-
+	const convId = ClaudeExtNet.getApiIds(url).conversationId;
+	if (convId && url.includes('rendering_mode=messages') && method === 'GET' && _galleryConfig().enabled) {
 		const response = await _imageExtractorOriginalFetch(...args);
 		const data = await response.json();
 
 		if (data?.chat_messages) {
-			const convId = _convIdFromUrl(url);
 			// Org ID for building preview URLs when msg.files is empty (new API shape).
 			let orgId = null;
 			try { orgId = getOrgId(); } catch (e) { /* fail soft — fall back to file URLs */ }
@@ -733,11 +702,7 @@ window.fetch = async (...args) => {
 			}
 		}
 
-		return new Response(JSON.stringify(data), {
-			status: response.status,
-			statusText: response.statusText,
-			headers: sanitizedHeaders(response)
-		});
+		return ClaudeExtNet.jsonResponse(response, data);
 	}
 
 	return _imageExtractorOriginalFetch(...args);

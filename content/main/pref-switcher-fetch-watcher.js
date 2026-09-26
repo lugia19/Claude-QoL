@@ -6,19 +6,10 @@
 	const originalFetch = window.fetch;
 	window.fetch = async function (...args) {
 		const [input, options] = args;
-		let url = undefined;
-		if (input instanceof URL) {
-			url = input.href;
-		} else if (typeof input === 'string') {
-			url = input;
-		} else if (input instanceof Request) {
-			url = input.url;
-		}
 
 		// Check if this is a PUT to the account_profile endpoint
-		if (typeof url === 'string' &&
-			url.includes('/api/account_profile') &&
-			options?.method === 'PUT') {
+		if (ClaudeExtNet.getFetchUrl(input).includes('/api/account_profile') &&
+			ClaudeExtNet.getFetchMethod(input, options) === 'PUT') {
 
 			// Call the original fetch
 			const response = await originalFetch.apply(this, args);

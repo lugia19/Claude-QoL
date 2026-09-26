@@ -234,24 +234,18 @@
 	//console.log(`${LOG_PREFIX} Setting up fetch interception`);
 	const originalFetch = window.fetch;
 	window.fetch = function (...args) {
-		const url = args[0];
+		const url = ClaudeExtNet.getFetchUrl(args[0]).split('?')[0];
 
 		// Check if it's a project-related endpoint
-		if (typeof url === 'string') {
-			if (url.includes('/projects/') && (
-				url.match(/\/projects\/[a-f0-9-]+$/) ||
-				url.includes('/docs') ||
-				url.includes('/files')
-			)) {
-				//console.log(`${LOG_PREFIX} Fetch intercepted: ${url}`);
-				// Trigger processing after the fetch completes
-				const result = originalFetch.apply(this, args);
-				result.then(() => {
-					//console.log(`${LOG_PREFIX} Fetch completed, triggering processProject()`);
-					processProject();
-				});
-				return result;
-			}
+		if (url.includes('/projects/') && (
+			url.match(/\/projects\/[a-f0-9-]+$/) ||
+			url.includes('/docs') ||
+			url.includes('/files')
+		)) {
+			// Trigger processing after the fetch completes (a failed fetch is the page's to handle)
+			const result = originalFetch.apply(this, args);
+			result.then(() => processProject(), () => { });
+			return result;
 		}
 
 		return originalFetch.apply(this, args);

@@ -43,36 +43,20 @@
 	const originalFetch = window.fetch;
 	window.fetch = async (...args) => {
 		const [input, config] = args;
-
-		let url = undefined;
-		if (input instanceof URL) {
-			url = input.href;
-		} else if (typeof input === 'string') {
-			url = input;
-		} else if (input instanceof Request) {
-			url = input.url;
-		}
+		const url = ClaudeExtNet.getFetchUrl(input);
 
 		// Intercept completion requests
-		if (url && (url.includes('/completion') || url.includes('/retry_completion')) && config?.method === 'POST') {
+		if (ClaudeExtNet.isCompletionUrl(url, { retry: true }) && ClaudeExtNet.getFetchMethod(input, config) === 'POST') {
 			// DIAGNOSTIC kill-switch: set localStorage['claude_qol_tts_noclone']='1' to skip the
 			// TTS response.clone()+background read. Teeing the completion body and draining the
 			// clone in a tight loop can make Claude's renderer receive data in bursts (streaming
 			// jank). This lets us confirm that live with no rebuild.
-			try {
-				if (localStorage.getItem('claude_qol_tts_noclone') === '1') {
-					console.log('[QOL-DIAG] TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
-					return originalFetch(...args);
-				}
-			} catch (e) { /* ignore */ }
+			if (ClaudeExtNet.isKillSwitchOn('claude_qol_tts_noclone')) {
+				console.log('[QOL-DIAG] TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
+				return originalFetch(...args);
+			}
 
-			// Extract org ID and conversation ID from URL
-			const urlParts = url.split('/');
-			const orgIndex = urlParts.indexOf('organizations');
-			const convIndex = urlParts.indexOf('chat_conversations');
-
-			const orgId = orgIndex !== -1 ? urlParts[orgIndex + 1] : null;
-			const conversationId = convIndex !== -1 ? urlParts[convIndex + 1] : null;
+			const { orgId, conversationId } = ClaudeExtNet.getApiIds(url);
 			const currentConversationId = getConversationId();
 
 			// Only handle if valid and matches current conversation
@@ -92,53 +76,21 @@
 			// Consume the cloned stream in the background
 			(async () => {
 				try {
-					const reader = clonedResponse.body.getReader();
-					const decoder = new TextDecoder();
 					let responseUuid = null;
-					// message_start can straddle a chunk boundary, which would leave us parsing
-					// truncated JSON. Carry the incomplete trailing line into the next chunk.
-					let sseBuffer = '';
-					let scanningForUuid = true;
-
-					// Consume until done, extracting response UUID from message_start
-					while (true) {
-						const { done, value } = await reader.read();
-
-						if (done) break;
-
-						const chunk = decoder.decode(value, { stream: true });
-
-						// Extract response UUID from the message_start event
-						if (scanningForUuid) {
-							sseBuffer += chunk;
-							const lines = sseBuffer.split('\n');
-							sseBuffer = lines.pop();
-							for (const line of lines) {
-								const trimmed = line.trim();
-								if (!trimmed.startsWith('data: ') || !trimmed.includes('"message_start"')) continue;
-								try {
-									const parsed = JSON.parse(trimmed.substring(6));
-									responseUuid = parsed.message?.uuid;
-									console.log('TTS: Got response UUID from message_start:', responseUuid);
-								} catch (e) {}
-								if (responseUuid) break;
-							}
-							// message_start is the first event in the stream, so if it hasn't turned up
-							// early it isn't coming - stop buffering rather than hold the whole response.
-							if (responseUuid || sseBuffer.length > 65536) {
-								scanningForUuid = false;
-								sseBuffer = '';
-							}
+					// Read until message_stop, picking the response UUID out of message_start. Only
+					// those two events are parsed; returning false cancels the clone, so it stops
+					// buffering whatever follows.
+					await ClaudeExtNet.readSseEvents(clonedResponse, (event) => {
+						if (!responseUuid && event.raw.includes('"message_start"')) {
+							responseUuid = event.data?.message?.uuid ?? null;
+							console.log('TTS: Got response UUID from message_start:', responseUuid);
 						}
-
-						if (chunk.includes('event: message_stop') || chunk.includes('"type":"message_stop"')) {
+						if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) {
 							console.log('Stream completion detected');
-							reader.releaseLock();
-							break;
+							return false;
 						}
-					}
+					});
 
-					reader.releaseLock();
 					console.log('Completed reading completion response stream for TTS handling');
 					// The UUID from message_start is all the ISOLATED side needs - it only uses it
 					// to locate the message in the DOM. Refetching the whole conversation to look

@@ -342,43 +342,14 @@ class ClaudeConversation {
 			}
 
 			// Consume the stream, extracting the response UUID from the message_start event
-			const reader = response.body.getReader();
-			const decoder = new TextDecoder();
 			let responseUuid = null;
-
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-
-					const chunk = decoder.decode(value, { stream: true });
-					console.log('Received chunk:', chunk);
-
-					// Extract response UUID from the message_start event
-					if (!responseUuid && chunk.includes('"type":"message_start"')) {
-						const lines = chunk.split('\n');
-						for (const line of lines) {
-							const trimmed = line.trim();
-							if (trimmed.startsWith('data: ') && trimmed.includes('"message_start"')) {
-								try {
-									const parsed = JSON.parse(trimmed.substring(6));
-									responseUuid = parsed.message?.uuid;
-									console.log('Got response UUID from message_start:', responseUuid);
-								} catch (e) {
-									console.warn('Failed to parse message_start data:', e);
-								}
-								break;
-							}
-						}
-					}
-
-					if (chunk.includes('event: message_stop')) {
-						break;
-					}
+			await ClaudeExtNet.readSseEvents(response, (event) => {
+				if (!responseUuid && event.raw.includes('"message_start"')) {
+					responseUuid = event.data?.message?.uuid ?? null;
+					console.log('Got response UUID from message_start:', responseUuid);
 				}
-			} finally {
-				reader.releaseLock();
-			}
+				if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) return false;
+			});
 
 			// Find the assistant response by UUID (or fall back to timestamp)
 			let assistantMessage;
@@ -1880,28 +1851,6 @@ function generateUuid() {
 		const v = c === 'x' ? r : (r & 0x3 | 0x8);
 		return v.toString(16);
 	});
-}
-
-// claude.ai gzips some request bodies (Content-Encoding: gzip, body is bytes instead of a JSON string)
-function isGzipRequest(config) {
-	return new Headers(config?.headers || {}).get('content-encoding')?.toLowerCase() === 'gzip';
-}
-
-// Parse a fetch init's JSON body, whether it's a string or (gzipped) bytes
-async function readJsonRequestBody(config) {
-	const body = config?.body;
-	if (typeof body === 'string') return JSON.parse(body);
-	let stream = new Response(body).body;
-	if (isGzipRequest(config)) stream = stream.pipeThrough(new DecompressionStream('gzip'));
-	return JSON.parse(await new Response(stream).text());
-}
-
-// Return a copy of config with bodyObj serialized in the same encoding the original body used
-async function withJsonRequestBody(config, bodyObj) {
-	const json = JSON.stringify(bodyObj);
-	if (!isGzipRequest(config)) return { ...config, body: json };
-	const compressed = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
-	return { ...config, body: await new Response(compressed).arrayBuffer() };
 }
 
 // getActiveOrgId() (common/claude/page.js), for callers that can't do anything without an org.
