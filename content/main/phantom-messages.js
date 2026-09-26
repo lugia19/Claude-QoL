@@ -427,7 +427,7 @@ function schedulePass() {
 }
 
 function syncMessageObserver() {
-	// Scoped to the conversation scroll container (claude-styles.js) rather than
+	// Scoped to the conversation scroll container (message-ui.js) rather than
 	// document.body, so streaming text elsewhere on the page can't churn it.
 	const container = getMessageScroller();
 	if (!container || container === _observedContainer) {

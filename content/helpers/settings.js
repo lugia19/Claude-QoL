@@ -63,10 +63,6 @@ const SETTINGS_KEYS = {
 		// Cache of org flags, refetched from /api/organizations on every poll — nothing to preserve.
 		STORED_FLAGS: { key: 'banner_stored_flags', default: {}, type: 'object', local: true },
 	},
-	I18N: {
-		// '' = Auto (follow the claude.ai account language). Mirrored to localStorage, see i18n.js.
-		LANGUAGE: { key: 'ui_language', default: '', type: 'string' },
-	},
 };
 
 // ======== WORLD DETECTION ========

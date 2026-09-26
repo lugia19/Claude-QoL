@@ -1,12 +1,8 @@
-// Japanese - keys mirror en.js. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['ja'] = {
+// Japanese - keys mirror en.js. See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// common
-	"common.cancel": "キャンセル",
-	"common.confirm": "確認",
-	"common.ok": "OK",
 	"common.save": "保存",
 	"common.close": "閉じる",
-	"common.loading": "読み込み中…",
 	"common.error": "エラー",
 	"common.go_to_latest": "最新へ移動",
 	"common.go_to_longest": "最長へ移動",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "コード実行：元は{was}｜現在は{now}",
 	"ui.settings_mismatch_title": "設定の不一致",
 	"ui.settings_mismatch_body": "元の会話は異なる設定を使用しています：\n{mismatches}\n\n新しい会話には現在の設定が使用されます。注意：会話の作成時にオフになっている機能は、後からその会話で有効にすることはできません。必要に応じて、キャンセルして先に設定を調整してください。",
-	"ui.validation_error": "入力エラー",
-	"ui.none_available": "利用可能な項目がありません",
-	"ui.search_placeholder": "検索…",
 	"ui.more_actions": "その他の操作",
 	"ui.more_actions_title": "その他の操作",
 	"ui.reconstructed_from_chatlog": "チャットログから再構築",
@@ -185,13 +178,6 @@
 	"export.tooltip": "チャットをエクスポート／インポート",
 
 	// notif
-	"notif.kofi_alt": "ko-fi.comでコーヒーをおごる",
-	"notif.updated_to": "v{version}に更新されました！",
-	"notif.whats_new": "新機能：",
-	"notif.view_release_notes": "リリースノートをすべて表示",
-	"notif.enjoying": "Claude QoLを気に入っていただけましたか？",
-	"notif.consider_rating": "ぜひ評価をお願いします！",
-	"notif.rate_alt": "この拡張機能を評価",
 
 	// richcopy
 	"richcopy.timeout": "タイムアウト",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "テキストコンテンツが見つかりません",
-};
+});

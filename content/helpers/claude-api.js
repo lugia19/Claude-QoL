@@ -1,48 +1,9 @@
 // claude_api.js
 
-const SUPPORTED_LOCALES = ['en-US', 'de-DE', 'fr-FR', 'ko-KR', 'ja-JP', 'es-419', 'es-ES', 'it-IT', 'hi-IN', 'pt-BR', 'id-ID'];
-
 const MAX_FILES_PER_MESSAGE = 18;
 
-let _cachedLocale = null;
-async function fetchAndCacheLocale() {
-	// Check localStorage first
-	const cached = localStorage.getItem("claude_qol_locale_cache");
-	if (cached) {
-		try {
-			const { locale, expiry } = JSON.parse(cached);
-			if (Date.now() < expiry && SUPPORTED_LOCALES.includes(locale)) {
-				return locale;
-			}
-		} catch (e) { /* invalid cache, refetch */ }
-	}
-
-	// Fetch from API
-	try {
-		const response = await fetch('/api/account_profile');
-		if (response.ok) {
-			const data = await response.json();
-			const locale = SUPPORTED_LOCALES.includes(data.locale) ? data.locale : 'en-US';
-			localStorage.setItem("claude_qol_locale_cache", JSON.stringify({
-				locale,
-				expiry: Date.now() + 24 * 60 * 60 * 1000
-			}));
-			return locale;
-		}
-	} catch (e) {
-		console.error('Failed to fetch locale:', e);
-	}
-
-	// Fallback
-	return SUPPORTED_LOCALES.includes(navigator.language) ? navigator.language : 'en-US';
-}
-
-function getLocale() {
-	return _cachedLocale ?? (SUPPORTED_LOCALES.includes(navigator.language) ? navigator.language : 'en-US');
-}
-
-// Initialize on load (fire and forget)
-fetchAndCacheLocale().then(locale => { _cachedLocale = locale; });
+// Keep the shared account locale cache fresh (common/i18n/i18n-core.js). Fire and forget.
+refreshAccountLocale();
 
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
 let _bridgeMessageId = 0;
@@ -1241,7 +1202,7 @@ class ClaudeMessage {
 
 		// Completion-specific (defaults)
 		this.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-		this.locale = getLocale();
+		this.locale = accountLocale();
 
 		this.model = null;
 		this.tools = [];

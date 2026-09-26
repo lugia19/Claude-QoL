@@ -326,7 +326,7 @@
 
 			const voiceOptions = voices.length > 0
 				? voices.map(v => ({ value: v.voice_id, label: v.name }))
-				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('common.loading') }];
+				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('shared.loading') }];
 			const voiceSelect = createClaudeSearchableSelect(voiceOptions, settings.voice || '');
 			voiceSelect.id = 'voiceSelect';
 			voiceSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;
@@ -351,7 +351,7 @@
 
 			const modelOptions = models.length > 0
 				? models.map(m => ({ value: m.model_id, label: m.name }))
-				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('common.loading') }];
+				: [{ value: '', label: currentProviderInfo.requiresApiKey ? localize('tts.set_api_key_option') : localize('shared.loading') }];
 			const modelSelect = createClaudeSelect(modelOptions, settings.model || '');
 			modelSelect.id = 'modelSelect';
 			modelSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;

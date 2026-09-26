@@ -212,7 +212,7 @@
 			modal.modal.classList.add('max-w-2xl');
 
 			// Add cancel button
-			modal.addCancel(localize('common.cancel'), () => {
+			modal.addCancel(localize('shared.cancel'), () => {
 				cleanupEditState();
 				reject(new Error('Edit cancelled by user'));
 			});

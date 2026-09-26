@@ -1,12 +1,8 @@
-// English - source of truth for every key. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['en'] = {
+// English - source of truth for every toolbox key (shared.* keys live in common/i18n). See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	// common
-	"common.cancel": "Cancel",
-	"common.confirm": "Confirm",
-	"common.ok": "OK",
 	"common.save": "Save",
 	"common.close": "Close",
-	"common.loading": "Loading...",
 	"common.error": "Error",
 	"common.go_to_latest": "Go to Latest",
 	"common.go_to_longest": "Go to Longest",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "Code Execution: Originally {was} | Currently {now}",
 	"ui.settings_mismatch_title": "Settings Mismatch",
 	"ui.settings_mismatch_body": "The source conversation has different settings:\n{mismatches}\n\nThe new conversation will use your current settings. Note: features that are OFF when a conversation is created can never be enabled in it later. Cancel and adjust your settings first if needed.",
-	"ui.validation_error": "Validation Error",
-	"ui.none_available": "None available",
-	"ui.search_placeholder": "Search...",
 	"ui.more_actions": "More actions",
 	"ui.more_actions_title": "More Actions",
 	"ui.reconstructed_from_chatlog": "Reconstructed from chatlog",
@@ -185,13 +178,6 @@
 	"export.tooltip": "Export/Import chat",
 
 	// notif
-	"notif.kofi_alt": "Buy Me a Coffee at ko-fi.com",
-	"notif.updated_to": "Updated to v{version}!",
-	"notif.whats_new": "What's New:",
-	"notif.view_release_notes": "View full release notes",
-	"notif.enjoying": "Enjoying Claude QoL?",
-	"notif.consider_rating": "Consider leaving a rating!",
-	"notif.rate_alt": "Rate this extension",
 
 	// richcopy
 	"richcopy.timeout": "Timeout",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "No text content found",
-};
+});

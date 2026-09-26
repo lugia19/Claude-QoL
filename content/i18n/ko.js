@@ -1,12 +1,8 @@
-// Korean - keys mirror en.js. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['ko'] = {
+// Korean - keys mirror en.js. See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// common
-	"common.cancel": "취소",
-	"common.confirm": "확인",
-	"common.ok": "확인",
 	"common.save": "저장",
 	"common.close": "닫기",
-	"common.loading": "로딩 중...",
 	"common.error": "오류",
 	"common.go_to_latest": "최신으로 이동",
 	"common.go_to_longest": "가장 긴 브랜치로 이동",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "코드 실행: 원래 {was} | 현재 {now}",
 	"ui.settings_mismatch_title": "설정 불일치",
 	"ui.settings_mismatch_body": "원본 대화의 설정이 다릅니다:\n{mismatches}\n\n새 대화에는 현재 설정이 사용됩니다. 참고: 대화를 만들 때 꺼져 있던 기능은 나중에 해당 대화에서 켤 수 없습니다. 필요하다면 취소하고 먼저 설정을 조정하세요.",
-	"ui.validation_error": "유효성 검사 오류",
-	"ui.none_available": "사용 가능한 항목 없음",
-	"ui.search_placeholder": "검색...",
 	"ui.more_actions": "추가 작업",
 	"ui.more_actions_title": "추가 작업",
 	"ui.reconstructed_from_chatlog": "채팅 기록에서 재구성됨",
@@ -185,13 +178,6 @@
 	"export.tooltip": "채팅 내보내기/가져오기",
 
 	// notif
-	"notif.kofi_alt": "ko-fi.com에서 커피 한 잔 사주기",
-	"notif.updated_to": "v{version}(으)로 업데이트되었습니다!",
-	"notif.whats_new": "새로운 기능:",
-	"notif.view_release_notes": "전체 릴리스 노트 보기",
-	"notif.enjoying": "Claude QoL이 마음에 드시나요?",
-	"notif.consider_rating": "평가를 남겨 주세요!",
-	"notif.rate_alt": "이 확장 프로그램 평가하기",
 
 	// richcopy
 	"richcopy.timeout": "시간 초과",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "텍스트 콘텐츠를 찾을 수 없습니다",
-};
+});

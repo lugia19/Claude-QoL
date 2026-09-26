@@ -1,6 +1,6 @@
 // exporter.js
 // Chat export and import functionality for Claude.ai
-// Depends on: claude-styles.js, phantom-messages.js, claude-api.js
+// Depends on: common/ui/components.js, phantom-messages.js, claude-api.js
 
 (function () {
 	'use strict';
@@ -1345,7 +1345,7 @@
 
 		return new Promise((resolve) => {
 			const modal = new ClaudeModal(localize('export.import_warnings_title'), warningList);
-			modal.addCancel(localize('common.cancel'), () => resolve(false));
+			modal.addCancel(localize('shared.cancel'), () => resolve(false));
 			modal.addConfirm(localize('export.import_anyway'), () => resolve(true));
 			modal.show();
 		});
@@ -1795,7 +1795,7 @@
 		bulkExportCancelled = false;
 
 		const loadingModal = createLoadingModal(localize('export.fetching_list'));
-		loadingModal.addCancel(localize('common.cancel'), () => {
+		loadingModal.addCancel(localize('shared.cancel'), () => {
 			bulkExportCancelled = true;
 		});
 		loadingModal.show();

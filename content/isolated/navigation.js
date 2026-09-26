@@ -250,7 +250,7 @@
 			console.error('Failed to fetch conversation:', error);
 			loading.setTitle(localize('common.error'));
 			loading.setContent(localize('nav.load_conversation_failed'));
-			loading.addConfirm(localize('common.ok'));
+			loading.addConfirm(localize('shared.ok'));
 			return;
 		}
 

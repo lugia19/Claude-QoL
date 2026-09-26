@@ -460,7 +460,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			loadingModal.setTitle(localize('common.error'));
 			loadingModal.setContent(localize('fork.fork_failed', { error: error.message }));
 			loadingModal.clearButtons();
-			loadingModal.addConfirm(localize('common.ok'));
+			loadingModal.addConfirm(localize('shared.ok'));
 		} finally {
 			pendingFork = {
 				model: null,
@@ -550,7 +550,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 		content.appendChild(fileList);
 
 		const modal = new ClaudeModal(localize('fork.file_transfer_warning'), content);
-		modal.addConfirm(localize('common.ok'), () => {
+		modal.addConfirm(localize('shared.ok'), () => {
 			window.location.href = `/chat/${newUuid}`;
 		});
 		modal.show();
@@ -1334,7 +1334,7 @@ Provide the complete rewritten summary.`;
 			modal.modal.classList.remove('max-w-md');
 			modal.modal.classList.add('max-w-2xl');
 
-			modal.addCancel(localize('common.cancel'), () => {
+			modal.addCancel(localize('shared.cancel'), () => {
 				reject(new Error('USER_CANCELLED'));
 			});
 

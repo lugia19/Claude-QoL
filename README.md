@@ -69,3 +69,6 @@ You may notice a disabled skill on your account named `qol-encryptionkey-do-not-
 Its only purpose is to store an encryption key at the account level. Some features keep a local cache of conversation content in the browser (IndexedDB) - the export cache and forking's carried-over messages - and that cache is encrypted at rest using this key. Storing the key as an account-level skill means it travels with your account rather than being tied to a single browser, which lays the groundwork for future cross-device sync of that cached data.
 
 If you do delete it, nothing breaks — the extension simply generates a new key and rebuilds the local cache from scratch (the old encrypted cache becomes unrecoverable and is wiped).
+
+# Building from source
+Shared code lives in the [claude-ext-common](https://github.com/lugia19/claude-ext-common) submodule, so clone with `git clone --recurse-submodules` (or run `git submodule update --init` in an existing clone). Then run `build.bat`, which produces the Chrome, Firefox and Electron zips in `web-ext-artifacts/`.

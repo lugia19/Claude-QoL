@@ -1,12 +1,8 @@
-// Hindi - keys mirror en.js. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['hi'] = {
+// Hindi - keys mirror en.js. See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// common
-	"common.cancel": "रद्द करें",
-	"common.confirm": "पुष्टि करें",
-	"common.ok": "ठीक है",
 	"common.save": "सहेजें",
 	"common.close": "बंद करें",
-	"common.loading": "लोड हो रहा है...",
 	"common.error": "त्रुटि",
 	"common.go_to_latest": "नवीनतम पर जाएँ",
 	"common.go_to_longest": "सबसे लंबी पर जाएँ",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "कोड निष्पादन: पहले {was} | अभी {now}",
 	"ui.settings_mismatch_title": "सेटिंग्स मेल नहीं खातीं",
 	"ui.settings_mismatch_body": "स्रोत बातचीत की सेटिंग्स अलग हैं:\n{mismatches}\n\nनई बातचीत आपकी मौजूदा सेटिंग्स का उपयोग करेगी। ध्यान दें: बातचीत बनाते समय जो सुविधाएँ बंद होती हैं, उन्हें बाद में उसमें कभी चालू नहीं किया जा सकता। ज़रूरत हो तो रद्द करें और पहले अपनी सेटिंग्स बदलें।",
-	"ui.validation_error": "सत्यापन त्रुटि",
-	"ui.none_available": "कुछ भी उपलब्ध नहीं",
-	"ui.search_placeholder": "खोजें...",
 	"ui.more_actions": "अधिक कार्रवाइयाँ",
 	"ui.more_actions_title": "अधिक कार्रवाइयाँ",
 	"ui.reconstructed_from_chatlog": "चैट लॉग से पुनर्निर्मित",
@@ -185,13 +178,6 @@
 	"export.tooltip": "चैट एक्सपोर्ट/इम्पोर्ट करें",
 
 	// notif
-	"notif.kofi_alt": "ko-fi.com पर मुझे एक कॉफ़ी खरीदें",
-	"notif.updated_to": "v{version} पर अपडेट हुआ!",
-	"notif.whats_new": "नया क्या है:",
-	"notif.view_release_notes": "पूरे रिलीज़ नोट्स देखें",
-	"notif.enjoying": "Claude QoL पसंद आ रहा है?",
-	"notif.consider_rating": "रेटिंग देने पर विचार करें!",
-	"notif.rate_alt": "इस एक्सटेंशन को रेट करें",
 
 	// richcopy
 	"richcopy.timeout": "टाइमआउट",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "कोई टेक्स्ट सामग्री नहीं मिली",
-};
+});

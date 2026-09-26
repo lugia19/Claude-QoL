@@ -1,12 +1,8 @@
-// Indonesian - keys mirror en.js. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['id'] = {
+// Indonesian - keys mirror en.js. See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// common
-	"common.cancel": "Batal",
-	"common.confirm": "Konfirmasi",
-	"common.ok": "OK",
 	"common.save": "Simpan",
 	"common.close": "Tutup",
-	"common.loading": "Memuat...",
 	"common.error": "Kesalahan",
 	"common.go_to_latest": "Ke Terbaru",
 	"common.go_to_longest": "Ke Terpanjang",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "Eksekusi Kode: Semula {was} | Sekarang {now}",
 	"ui.settings_mismatch_title": "Pengaturan Tidak Cocok",
 	"ui.settings_mismatch_body": "Percakapan sumber memiliki pengaturan yang berbeda:\n{mismatches}\n\nPercakapan baru akan menggunakan pengaturan Anda saat ini. Catatan: fitur yang NONAKTIF saat percakapan dibuat tidak akan pernah bisa diaktifkan di percakapan tersebut. Batalkan dan sesuaikan pengaturan Anda terlebih dahulu jika perlu.",
-	"ui.validation_error": "Kesalahan Validasi",
-	"ui.none_available": "Tidak ada yang tersedia",
-	"ui.search_placeholder": "Cari...",
 	"ui.more_actions": "Tindakan lainnya",
 	"ui.more_actions_title": "Tindakan Lainnya",
 	"ui.reconstructed_from_chatlog": "Direkonstruksi dari log chat",
@@ -185,13 +178,6 @@
 	"export.tooltip": "Ekspor/Impor chat",
 
 	// notif
-	"notif.kofi_alt": "Traktir saya kopi di ko-fi.com",
-	"notif.updated_to": "Diperbarui ke v{version}!",
-	"notif.whats_new": "Yang Baru:",
-	"notif.view_release_notes": "Lihat catatan rilis lengkap",
-	"notif.enjoying": "Suka dengan Claude QoL?",
-	"notif.consider_rating": "Pertimbangkan untuk memberi rating!",
-	"notif.rate_alt": "Beri rating ekstensi ini",
 
 	// richcopy
 	"richcopy.timeout": "Waktu habis",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "Tidak ada konten teks",
-};
+});

@@ -1,12 +1,8 @@
-// Brazilian Portuguese - keys mirror en.js. See content/helpers/i18n.js.
-(globalThis.QOL_I18N ??= {})['pt-BR'] = {
+// Brazilian Portuguese - keys mirror en.js. See common/i18n/i18n-core.js.
+Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	// common
-	"common.cancel": "Cancelar",
-	"common.confirm": "Confirmar",
-	"common.ok": "OK",
 	"common.save": "Salvar",
 	"common.close": "Fechar",
-	"common.loading": "Carregando...",
 	"common.error": "Erro",
 	"common.go_to_latest": "Ir para a mais recente",
 	"common.go_to_longest": "Ir para a mais longa",
@@ -98,9 +94,6 @@
 	"ui.settings_mismatch_code_execution": "Execução de código: originalmente {was} | atualmente {now}",
 	"ui.settings_mismatch_title": "Configurações diferentes",
 	"ui.settings_mismatch_body": "A conversa de origem tem configurações diferentes:\n{mismatches}\n\nA nova conversa usará suas configurações atuais. Observação: recursos que estiverem DESATIVADOS quando uma conversa for criada nunca poderão ser ativados nela depois. Se necessário, cancele e ajuste suas configurações primeiro.",
-	"ui.validation_error": "Erro de validação",
-	"ui.none_available": "Nenhum disponível",
-	"ui.search_placeholder": "Pesquisar...",
 	"ui.more_actions": "Mais ações",
 	"ui.more_actions_title": "Mais ações",
 	"ui.reconstructed_from_chatlog": "Reconstruído a partir do histórico do chat",
@@ -185,13 +178,6 @@
 	"export.tooltip": "Exportar/importar chat",
 
 	// notif
-	"notif.kofi_alt": "Me pague um café no ko-fi.com",
-	"notif.updated_to": "Atualizado para a v{version}!",
-	"notif.whats_new": "Novidades:",
-	"notif.view_release_notes": "Ver as notas da versão completas",
-	"notif.enjoying": "Está gostando do Claude QoL?",
-	"notif.consider_rating": "Que tal deixar uma avaliação?",
-	"notif.rate_alt": "Avaliar esta extensão",
 
 	// richcopy
 	"richcopy.timeout": "Tempo esgotado",
@@ -374,4 +360,4 @@
 
 	// main
 	"main.rich_copy_no_text": "Nenhum conteúdo de texto encontrado",
-};
+});
