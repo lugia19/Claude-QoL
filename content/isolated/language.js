@@ -19,11 +19,7 @@
 		label.textContent = localize('lang.label');
 		content.appendChild(label);
 
-		const options = [
-			{ value: '', label: localize('lang.auto') },
-			...I18N_LOCALES.map(l => ({ value: l, label: LANGUAGE_NATIVE_NAMES[l] })),
-		];
-		const select = createClaudeSelect(options, current);
+		const select = createLanguageSelect();
 		content.appendChild(select);
 
 		const modal = new ClaudeModal(localize('lang.title'), content);
@@ -37,6 +33,10 @@
 	}
 
 	function initialize() {
+		// Keep the shared account locale cache fresh (common/i18n/i18n-core.js). From this ISOLATED-only
+		// file rather than a helper both worlds load, so a refresh costs one request, not two.
+		refreshAccountLocale();
+
 		ButtonBar.register({
 			buttonClass: 'language-settings-button',
 			createFn: () => createClaudeButton(GLOBE_SVG, 'icon', showLanguageModal),

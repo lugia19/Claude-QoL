@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"lang.tooltip": "언어",
 	"lang.title": "Toolbox 언어",
 	"lang.label": "언어",
-	"lang.auto": "자동(계정 언어)",
 
 	// nav
 	"nav.add_bookmark_title": "북마크 추가",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"export.replace_warning": "<strong>표시만 변경됨:</strong> 채팅 기록에 보이는 내용만 교체합니다. AI의 컨텍스트(AI가 실제로 읽을 수 있는 내용)는 그대로 유지됩니다.",
 	"export.modal_title": "내보내기 및 가져오기",
 	"export.tooltip": "채팅 내보내기/가져오기",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "시간 초과",

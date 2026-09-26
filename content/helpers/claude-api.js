@@ -2,9 +2,6 @@
 
 const MAX_FILES_PER_MESSAGE = 18;
 
-// Keep the shared account locale cache fresh (common/i18n/i18n-core.js). Fire and forget.
-refreshAccountLocale();
-
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
 let _bridgeMessageId = 0;
 

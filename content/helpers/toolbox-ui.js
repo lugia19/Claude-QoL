@@ -1,5 +1,5 @@
 // toolbox-ui.js
-// Toolbox-only UI glue that used to live in claude-styles.js. No IIFE - shared global context.
+// Toolbox-only UI glue: the installed marker, the settings-mismatch warning and the alert override.
 
 // Add marker for usage tracker to know if it's installed:
 document.documentElement.setAttribute('data-claude-qol-installed', 'true');

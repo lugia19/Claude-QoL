@@ -96,6 +96,7 @@
 				"content/i18n/es.js",
 				"content/helpers/i18n-migrate.js",
 				"common/i18n/i18n-core.js",
+				"common/i18n/account-locale-watcher.js",
 				"common/ui/components.js",
 				"content/helpers/toolbox-ui.js",
 				"content/helpers/header-buttons.js",

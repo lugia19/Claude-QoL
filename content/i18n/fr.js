@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"lang.tooltip": "Langue",
 	"lang.title": "Langue de Toolbox",
 	"lang.label": "Langue",
-	"lang.auto": "Auto (langue du compte)",
 
 	// nav
 	"nav.add_bookmark_title": "Ajouter un signet",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"export.replace_warning": "<strong>Changement visuel uniquement :</strong> cela remplace ce que vous voyez dans l'historique du chat. Le contexte de l'IA (ce qu'elle peut réellement lire) reste inchangé.",
 	"export.modal_title": "Export et import",
 	"export.tooltip": "Exporter/importer le chat",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "Délai dépassé",

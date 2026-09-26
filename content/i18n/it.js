@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"lang.tooltip": "Lingua",
 	"lang.title": "Lingua di Toolbox",
 	"lang.label": "Lingua",
-	"lang.auto": "Automatica (lingua dell'account)",
 
 	// nav
 	"nav.add_bookmark_title": "Aggiungi segnalibro",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"export.replace_warning": "<strong>Solo modifica visiva:</strong> sostituisce ciò che vedi nella cronologia della chat. Il contesto dell'IA (ciò che può effettivamente leggere) rimane invariato.",
 	"export.modal_title": "Esporta e importa",
 	"export.tooltip": "Esporta/importa chat",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "Timeout",

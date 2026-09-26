@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"lang.tooltip": "भाषा",
 	"lang.title": "Toolbox की भाषा",
 	"lang.label": "भाषा",
-	"lang.auto": "स्वचालित (खाते की भाषा)",
 
 	// nav
 	"nav.add_bookmark_title": "बुकमार्क जोड़ें",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"export.replace_warning": "<strong>केवल दिखावटी बदलाव:</strong> यह चैट इतिहास में आपको दिखने वाली चीज़ें बदलता है। AI का संदर्भ (जो वह वास्तव में पढ़ सकता है) नहीं बदलता।",
 	"export.modal_title": "एक्सपोर्ट और इम्पोर्ट",
 	"export.tooltip": "चैट एक्सपोर्ट/इम्पोर्ट करें",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "टाइमआउट",

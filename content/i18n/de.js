@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"lang.tooltip": "Sprache",
 	"lang.title": "Toolbox-Sprache",
 	"lang.label": "Sprache",
-	"lang.auto": "Automatisch (Kontosprache)",
 
 	// nav
 	"nav.add_bookmark_title": "Lesezeichen hinzufügen",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"export.replace_warning": "<strong>Nur visuelle Änderung:</strong> Dies ersetzt, was Sie im Chatverlauf sehen. Der Kontext der KI (was sie tatsächlich lesen kann) bleibt unverändert.",
 	"export.modal_title": "Export & Import",
 	"export.tooltip": "Chat exportieren/importieren",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "Zeitüberschreitung",

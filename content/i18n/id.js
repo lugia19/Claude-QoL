@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"lang.tooltip": "Bahasa",
 	"lang.title": "Bahasa Toolbox",
 	"lang.label": "Bahasa",
-	"lang.auto": "Otomatis (bahasa akun)",
 
 	// nav
 	"nav.add_bookmark_title": "Tambahkan Penanda",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"export.replace_warning": "<strong>Hanya perubahan tampilan:</strong> Ini mengganti apa yang Anda lihat di riwayat chat. Konteks AI (apa yang sebenarnya dapat dibacanya) tetap tidak berubah.",
 	"export.modal_title": "Ekspor & Impor",
 	"export.tooltip": "Ekspor/Impor chat",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "Waktu habis",

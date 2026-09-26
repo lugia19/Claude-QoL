@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"lang.tooltip": "言語",
 	"lang.title": "Toolboxの言語",
 	"lang.label": "言語",
-	"lang.auto": "自動（アカウントの言語）",
 
 	// nav
 	"nav.add_bookmark_title": "ブックマークを追加",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"export.replace_warning": "<strong>表示のみの変更：</strong>チャット履歴の表示内容を置き換えます。AIのコンテキスト（AIが実際に読み取れる内容）は変わりません。",
 	"export.modal_title": "エクスポートとインポート",
 	"export.tooltip": "チャットをエクスポート／インポート",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "タイムアウト",

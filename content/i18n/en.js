@@ -12,7 +12,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"lang.tooltip": "Language",
 	"lang.title": "Toolbox Language",
 	"lang.label": "Language",
-	"lang.auto": "Auto (account language)",
 
 	// nav
 	"nav.add_bookmark_title": "Add Bookmark",
@@ -176,8 +175,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"export.replace_warning": "<strong>Visual change only:</strong> This replaces what you see in the chat history. The AI's context (what it can actually read) remains unchanged.",
 	"export.modal_title": "Export & Import",
 	"export.tooltip": "Export/Import chat",
-
-	// notif
 
 	// richcopy
 	"richcopy.timeout": "Timeout",

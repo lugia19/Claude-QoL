@@ -5,7 +5,7 @@
     // The section a re-enabled model lands in within the dropdown.
     const TARGET_SECTION = 'overflow';
 
-    // User-visible text in the injected metadata is localized. This file loads BEFORE i18n.js,
+    // User-visible text in the injected metadata is localized. This file loads BEFORE i18n-core.js,
     // so localize() may only be called lazily (the list is built at fetch time) and must be
     // guarded. Ids, model names and *_key fields stay untouched - Claude's frontend keys on them.
     const t = (key, fallback) => (typeof localize === 'function' ? localize(key) : fallback);
