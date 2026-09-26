@@ -15,9 +15,11 @@
 // rewrite e.g. openai_tts_base_url redirects the next TTS call — taking the API key with it. So
 // anything that *directs where a secret is sent* is treated as a secret too.
 //
-// Settings are stored plaintext. The encryption helpers in databases.js are deliberately not reused:
-// _initEncryptionKey() wipes all encrypted data when the key skill is missing, so binding settings
-// to that key would mean deleting one skill nukes every setting.
+// Settings are stored plaintext, except keys flagged `secret: true` (see below), which are
+// AES-GCM encrypted in chrome.storage.local under a device-local key. The encryption helpers in
+// databases.js are deliberately not reused for this: _initEncryptionKey() wipes all encrypted data
+// when the key skill is missing, so binding settings to that key would mean deleting one skill
+// nukes every setting.
 
 // ======== SETTINGS KEY DEFINITIONS ========
 // Central manifest of all settings keys, grouped by feature.
@@ -30,11 +32,11 @@ const SETTINGS_KEYS = {
 	TTS: {
 		ENABLED: { key: 'tts_enabled', default: false, type: 'boolean', local: true }, // legacy; migrated to PROVIDER='claude'
 		PROVIDER: { key: 'tts_provider', default: 'claude', type: 'string' }, // 'claude' = native passthrough (no hijack)
-		API_KEY: { key: 'tts_apiKey', default: '', type: 'string', local: true }, // secret
+		API_KEY: { key: 'tts_apiKey', default: '', type: 'string', local: true, secret: true }, // secret
 		VOICE: { key: 'tts_voice', default: '', type: 'string' },
 		MODEL: { key: 'tts_model', default: 'eleven_flash_v2_5', type: 'string' },
 		AUTO_SPEAK: { key: 'tts_autoSpeak', default: false, type: 'boolean' },
-		BASE_URL: { key: 'openai_tts_base_url', default: '', type: 'string', local: true }, // directs where API_KEY is sent
+		BASE_URL: { key: 'openai_tts_base_url', default: '', type: 'string', local: true, secret: true }, // directs where API_KEY is sent
 	},
 	// Per-chat settings: each stores { conversationId: value, ... }
 	TTS_PERCHAT: {
@@ -69,6 +71,43 @@ const SETTINGS_KEYS = {
 
 // ======== WORLD DETECTION ========
 const _isIsolatedWorld = typeof chrome !== 'undefined' && !!chrome.storage?.local;
+
+// ======== Local-secret encryption ========
+// Keys flagged `secret: true` (API_KEY, BASE_URL) are encrypted at rest in chrome.storage.local
+// with a key that itself lives in chrome.storage.local. Deliberately NOT the databases.js
+// account-bound key: that one is wiped when the key skill is missing, which would nuke these
+// settings too (see comment above).
+const _LOCAL_ENC_KEY_STORAGE = 'qol_settingsEncKey';
+let _localEncKeyPromise = null;
+
+async function _getLocalEncKey() {
+	if (!_localEncKeyPromise) {
+		_localEncKeyPromise = (async () => {
+			const stored = await chrome.storage.local.get(_LOCAL_ENC_KEY_STORAGE);
+			let raw = stored[_LOCAL_ENC_KEY_STORAGE];
+			if (!raw) {
+				raw = Array.from(crypto.getRandomValues(new Uint8Array(32)));
+				await chrome.storage.local.set({ [_LOCAL_ENC_KEY_STORAGE]: raw });
+			}
+			return crypto.subtle.importKey('raw', new Uint8Array(raw), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+		})();
+	}
+	return _localEncKeyPromise;
+}
+
+async function _encryptLocalSecret(value) {
+	const key = await _getLocalEncKey();
+	const iv = crypto.getRandomValues(new Uint8Array(12));
+	const plaintext = new TextEncoder().encode(JSON.stringify(value));
+	const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+	return { iv: Array.from(iv), data: Array.from(new Uint8Array(ciphertext)) };
+}
+
+async function _decryptLocalSecret(payload) {
+	const key = await _getLocalEncKey();
+	const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(payload.iv) }, key, new Uint8Array(payload.data));
+	return JSON.parse(new TextDecoder().decode(plaintext));
+}
 
 // ======== SETTINGS REGISTRY ========
 // Build internal lookup: storage key string -> definition object
@@ -224,7 +263,14 @@ if (_isIsolatedWorld) {
 		const key = _resolveKey(keyOrDef);
 		if (_isLocalKey(keyOrDef)) {
 			const result = await chrome.storage.local.get(key);
-			if (result[key] !== undefined) return result[key];
+			if (result[key] !== undefined) {
+				const def = _resolveDef(keyOrDef);
+				// Legacy plaintext values (pre-encryption) lack the iv/data envelope; pass through as-is.
+				if (def?.secret && result[key] && typeof result[key] === 'object' && result[key].iv) {
+					return _decryptLocalSecret(result[key]);
+				}
+				return result[key];
+			}
 		} else {
 			const row = await _settingsDB.settings.get(key);
 			// Copy: the row belongs to the page's compartment, and callers mutate what they get back.
@@ -237,7 +283,9 @@ if (_isIsolatedWorld) {
 		await _ready;
 		const key = _resolveKey(keyOrDef);
 		if (_isLocalKey(keyOrDef)) {
-			await chrome.storage.local.set({ [key]: value });  // chrome.storage.onChanged notifies
+			const def = _resolveDef(keyOrDef);
+			const stored = def?.secret ? await _encryptLocalSecret(value) : value;
+			await chrome.storage.local.set({ [key]: stored });  // chrome.storage.onChanged notifies
 		} else {
 			await _settingsDB.settings.put({ key, value });
 			_notifyChange(key, value);
