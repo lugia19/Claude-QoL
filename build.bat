@@ -3,6 +3,9 @@
 REM Not part of the extension: the debug mirrors and the common submodule's tooling and docs.
 set IGNORE="debug/**" "common/scripts/**" "common/README.md"
 
+REM Stop unless common/ is exactly the pinned commit, and that matches common's main.
+node common/scripts/check-common.js || exit /b 1
+
 REM Chrome build
 echo Starting Chrome build...
 if exist manifest_chrome.json (
