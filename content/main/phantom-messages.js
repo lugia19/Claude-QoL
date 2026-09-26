@@ -229,7 +229,7 @@ function injectPhantomMessages(data, phantomMessages) {
 	// ClaudeConversation.getRenderedMessages so both views of the list agree.
 	stitchPhantomMessages(data, phantomJson);
 
-	phantomLog('Updated chat messages with phantom messages:', data.chat_messages);
+	phantomLog('Chat messages after injecting phantoms:', data.chat_messages.length);
 }
 
 function injectUUIDMarkers(data) {

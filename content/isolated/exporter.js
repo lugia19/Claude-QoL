@@ -1694,7 +1694,7 @@
 			}
 		}
 
-		log('Parsed import data:', { name, messages, zipFiles });
+		log('Parsed import data:', { messages: messages.length, files: zipFiles?.length ?? 0 });
 		try {
 			await finalizeImport(name, messages, model, zipFiles, loadingModal, settings);
 			// Navigation happens in finalizeImport, loading modal cleaned up automatically

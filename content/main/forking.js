@@ -331,7 +331,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 				// Normalize FIRST - break up oversized messages
 				messages = normalizeOversizedMessages(messages);
-				log('Messages after normalization:', messages);
+				log('Messages after normalization:', messages.length);
 
 				// NOW token-based splitting works at the right granularity
 				const splitIndex = calculateSplitIndex(messages, pendingFork.rawTextPercentage);
@@ -726,8 +726,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			const newContentArray = []
 			for (const item of msg.content) {
 				if (item.type == 'text') {
-					log("Original text content:", item.text);
-					const text = item.text;
+										const text = item.text;
 					if (text.includes("Simply say 'Acknowledged' and wait for user input.")) {
 						item.text = text.replace("Simply say 'Acknowledged' and wait for user input.", '').trim();
 						log("Removed boilerplate text from message content");
@@ -1072,7 +1071,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 				syntheticMessages.push(userMessage, assistantMessage);
 			}
 
-			log('Generated synthetic summary messages:', syntheticMessages.map(m => m.toHistoryJSON()));
+			log('Generated synthetic summary messages:', syntheticMessages.length);
 			return syntheticMessages;
 		} finally {
 			await summaryConv.delete();

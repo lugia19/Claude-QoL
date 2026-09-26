@@ -135,6 +135,7 @@
 	},
 	"background": {
 		"scripts": [
+			"common/log/logger.js",
 			"background.js"
 		]
 	},

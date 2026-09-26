@@ -377,7 +377,7 @@ class ClaudeConversation {
 			}
 
 			if (!assistantMessage) {
-				apiLog.error('Messages after retry:', messages);
+				apiLog.error('Messages after retry:', messages.map(m => `${m.sender}:${m.uuid}`));
 				apiLog.error('Response UUID:', responseUuid, 'requestSentTime:', requestSentTime);
 				throw new Error('Completion finished but no assistant message found after retry');
 			}
