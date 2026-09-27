@@ -157,7 +157,10 @@ const pageLayouts = {
 // All top right buttons must be in ISOLATED only!
 // Callers register buttons once; ButtonBar handles polling, injection, ordering, and mobile.
 const ButtonBar = {
+	// Leftmost first. The extension settings gear only shows on the home page, and the row is
+	// right-aligned: leftmost, it doesn't shift the other buttons between pages.
 	BUTTON_PRIORITY: [
+		'extension-settings-button',
 		'image-gallery-button',
 		'banner-watcher-button',
 		'search-button',
@@ -165,7 +168,6 @@ const ButtonBar = {
 		'preset-switcher-button',
 		'export-button',
 		'tts-settings-button',
-		'extension-settings-button',
 	],
 
 	_registrations: new Map(),

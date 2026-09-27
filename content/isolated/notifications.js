@@ -12,6 +12,8 @@
 	initNotificationCards({
 		name: 'Claude QoL',
 		releasesUrl: 'https://github.com/lugia19/Claude-QoL/releases',
+		// Below the usage tracker's cards (stackOrder 0), the more popular extension.
+		stackOrder: 1,
 		storeUrls: {
 			chrome: 'https://chromewebstore.google.com/detail/claude-qol/dkdnancajokhfclpjpplkhlkbhaeejob',
 			firefox: 'https://addons.mozilla.org/en-US/firefox/addon/claude-qol/',

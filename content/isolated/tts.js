@@ -995,7 +995,7 @@
 			buttonClass: 'tts-settings-button',
 			createFn: createSettingsButton,
 			tooltip: localize('tts.settings_title'),
-			forceDisplayOnMobile: true,
+			forceDisplayOnMobile: false, // on phones: in the More-actions menu (the preset switcher stays out)
 			pages: ['chat', 'home', 'coworkHome', 'coworkChat'],
 		});
 		pushHijackConfig();

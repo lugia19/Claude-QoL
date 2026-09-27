@@ -20,8 +20,11 @@
 			</svg>
 		`, 'icon');
 
-		button.classList.add('project-download-button');
-		button.classList.add('!w-[18px]', '!h-[18px]', '!border-0.5', '!border-border-300/25', '!shadow-sm', '!rounded', '!bg-bg-000');
+		// Styled like the native checkbox next to it (its wrapper's classes), sized inline: claude.ai's
+		// CSS only has the Tailwind classes its own UI uses, so arbitrary ones like !h-[18px] can vanish.
+		button.classList.add('project-download-button', 'rounded', 'bg-surface-3', 'shadow-sm');
+		button.style.width = '18px';
+		button.style.height = '18px';
 		button.setAttribute('data-file-id', fileId);
 		button.setAttribute('data-is-attachment', isAttachment);
 

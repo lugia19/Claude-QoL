@@ -318,7 +318,7 @@
 			buttonClass: 'preset-switcher-button',
 			createFn: createPresetButton,
 			tooltip: localize('prefs.preset_tooltip', { name: localize('prefs.none') }),
-			forceDisplayOnMobile: false,
+			forceDisplayOnMobile: true, // the one button kept out of the More-actions menu on phones
 			pages: ['chat', 'home'],
 			onInjected: () => updatePresetButtonAppearance(),
 		});

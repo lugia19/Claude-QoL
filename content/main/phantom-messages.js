@@ -261,9 +261,13 @@ function stylePhantomMessages() {
 		}
 
 		if (hasMarker || isMarkedPhantom) {
-			if (container.parentElement && container.parentElement.parentElement) {
-				container.parentElement.parentElement.style.filter = 'brightness(0.70)';
+			// The grandparent (a user message's bubble), or the first element above it that renders a
+			// box: a filter on a display:contents wrapper (assistant messages) has no effect.
+			let dimTarget = container.parentElement?.parentElement;
+			while (dimTarget && getComputedStyle(dimTarget).display === 'contents') {
+				dimTarget = dimTarget.parentElement;
 			}
+			if (dimTarget) dimTarget.style.filter = 'brightness(0.70)';
 
 			const controls = findMessageControls(container);
 			if (controls) {
