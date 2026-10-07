@@ -94,8 +94,6 @@
 		const validButtonIds = new Set();
 
 		// Process thumbnails and add/update buttons
-		let buttonsAdded = 0;
-		let buttonsReused = 0;
 
 		thumbnails.forEach((thumbnail, index) => {
 			if (index < syncsCount) {
@@ -135,7 +133,6 @@
 				const existingIsAttachment = existingButton.getAttribute('data-is-attachment') === 'true';
 
 				if (existingId === fileId && existingIsAttachment === isAttachment) {
-					buttonsReused++;
 					return;
 				} else {
 					existingButton.remove();
@@ -150,17 +147,14 @@
 			} else {
 				checkboxContainer.appendChild(button);
 			}
-			buttonsAdded++;
 		});
 
 		// Remove orphaned buttons (buttons that don't correspond to any current thumbnail)
 		const allButtons = document.querySelectorAll('.project-download-button');
-		let buttonsRemoved = 0;
 		allButtons.forEach(button => {
 			const fileId = button.getAttribute('data-file-id');
 			if (!validButtonIds.has(fileId)) {
 				button.remove();
-				buttonsRemoved++;
 			}
 		});
 
@@ -281,6 +275,5 @@
 	// Initial check
 	if (window.location.href.includes('/project/')) {
 		processProject();
-	} else {
 	}
 })();

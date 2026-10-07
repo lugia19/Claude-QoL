@@ -3,7 +3,7 @@
 	'use strict';
 	const log = createLogger('ChatSearch');
 
-	const { getRelativeTime, simplifyText, fuzzyMatch, compileQuery, findMatches } = window.ClaudeSearchShared;
+	const { getRelativeTime, compileQuery, findMatches } = window.ClaudeSearchShared;
 
 	// Fill `el` with `text`, wrapping every match in a highlight. Builds nodes rather than assigning
 	// innerHTML - message text is arbitrary and would otherwise be parsed as markup.
@@ -140,7 +140,6 @@
 			const header = document.createElement('div');
 			header.className = 'text-sm text-text-200 mb-2';
 			const roleIcon = role === 'human' ? '👤' : '🤖';
-			const roleName = role === 'human' ? localize('search.role_user') : 'Claude';
 			header.textContent = `${roleIcon} ${label}`;
 			block.appendChild(header);
 

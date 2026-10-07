@@ -1,0 +1,14 @@
+{
+  "name": "claude-qol",
+  "private": true,
+  "description": "Claude QoL browser extension. Dev dependencies are for linting only.",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "eslint": "^9.31.0",
+    "espree": "^10.4.0",
+    "globals": "^16.3.0"
+  }
+}

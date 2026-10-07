@@ -311,7 +311,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 			loadingModal.setContent(createLoadingContent(localize('fork.getting_messages')));
 
-			let { conversation, conversationData, messages } =
+			let { conversationData, messages } =
 				await getConversationMessages(orgId, conversationId, messageUuid);
 
 			const chatName = conversationData.name;
@@ -743,7 +743,6 @@ If this is a writing or creative discussion, include sections for characters, pl
 		const attachments = messages.flatMap(m =>
 			m.files.filter(f => f instanceof ClaudeAttachment)
 		);
-		const syncSources = messages.flatMap(m => m.sync_sources || []);
 
 		// Build message for summary generation
 		const summaryMessage = new ClaudeMessage(tempConversation);

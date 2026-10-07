@@ -137,7 +137,7 @@
 
 		// Calculate depth for each bookmark
 		const bookmarkDepths = new Map();
-		for (const [name, bookmarkUuid] of Object.entries(bookmarks)) {
+		for (const bookmarkUuid of Object.values(bookmarks)) {
 			let depth = 0;
 			let tempId = bookmarkUuid;
 			while (tempId && tempId !== ROOT_UUID) {

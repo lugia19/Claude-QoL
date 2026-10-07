@@ -32,7 +32,7 @@
 	window.ClaudeSearchShared.simplifyText = function (text) {
 		return text
 			.toLowerCase()
-			.replace(/[*_`~\[\]()]/g, '')  // Remove markdown chars
+			.replace(/[*_`~[\]()]/g, '')  // Remove markdown chars
 			.replace(/\s+/g, ' ')           // Normalize whitespace
 			.replace(/[""'']/g, '"')        // Normalize quotes
 			.trim();

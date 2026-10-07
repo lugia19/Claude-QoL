@@ -153,6 +153,7 @@ if (_isIsolatedWorld) {
 
 	// claude.ai-origin IndexedDB — survives extension uninstall. Dexie is loaded ahead of this file
 	// in every manifest.
+	// eslint-disable-next-line no-undef -- this file also loads in MAIN, which has no Dexie; this branch is ISOLATED only
 	const _settingsDB = new Dexie('ClaudeToolboxSettingsDB');
 	_settingsDB.version(1).stores({ settings: 'key' }); // rows: { key, value }
 

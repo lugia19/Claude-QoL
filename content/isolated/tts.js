@@ -184,7 +184,7 @@
 		text = text.replace(/```[\s\S]*?```/g, '');
 		// Remove lines that are indented with 4+ spaces (markdown code blocks)
 		text = text.split('\n')
-			.filter(line => !line.match(/^    /))
+			.filter(line => !line.match(/^ {4}/))
 			.join('\n');
 		// Clean up multiple newlines
 		text = text.replace(/\n{3,}/g, '\n\n').trim();

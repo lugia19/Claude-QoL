@@ -395,7 +395,7 @@ class ClaudeConversation {
 		let blob, name;
 
 		if (fileOrAttachmentOrBlob instanceof ClaudeFile) {
-			const downloadedBlob = await fileOrAttachmentOrBlob.download();
+			// Downloaded once, below, where the MIME type gets fixed up.
 			name = fileName ?? fileOrAttachmentOrBlob.file_name;
 		} else if (fileOrAttachmentOrBlob instanceof ClaudeAttachment) {
 			blob = new Blob([fileOrAttachmentOrBlob.extracted_content], { type: 'text/plain' });

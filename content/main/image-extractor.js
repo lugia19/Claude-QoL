@@ -461,7 +461,7 @@ function createImageInjectingStream(sourceBody, orgId) {
 			} else if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'input_json_delta' && toolUseInputBuf.has(parsed.index)) {
 				toolUseInputBuf.set(parsed.index, toolUseInputBuf.get(parsed.index) + (parsed.delta.partial_json || ''));
 			} else if (parsed.type === 'content_block_stop' && toolUseInputBuf.has(parsed.index)) {
-				try { toolUseParsed.set(parsed.index, JSON.parse(toolUseInputBuf.get(parsed.index) || '{}')); } catch (e) {}
+				try { toolUseParsed.set(parsed.index, JSON.parse(toolUseInputBuf.get(parsed.index) || '{}')); } catch (e) { /* input JSON incomplete: keep the last good parse */ }
 				toolUseInputBuf.delete(parsed.index);
 			}
 
@@ -548,13 +548,13 @@ function createImageInjectingStream(sourceBody, orgId) {
 						}
 					}
 				} catch (e) {
-					if (!_cancelled) { try { controller.error(e); } catch (_) {} }
+					if (!_cancelled) { try { controller.error(e); } catch (_) { /* stream already closed */ } }
 				}
 			})();
 		},
 		cancel(reason) {
 			_cancelled = true;
-			try { reader.cancel(reason); } catch (e) {}
+			try { reader.cancel(reason); } catch (e) { /* reader already released */ }
 		}
 	});
 }

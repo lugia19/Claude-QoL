@@ -247,8 +247,7 @@ function injectUUIDMarkers(data) {
 
 // Style phantom messages in the DOM
 function stylePhantomMessages() {
-	const { allMessages, userMessages } = getUIMessages();
-	const userMessageSet = new Set(userMessages);
+	const { allMessages } = getUIMessages();
 
 	allMessages.forEach(container => {
 		const textContent = container.textContent || '';

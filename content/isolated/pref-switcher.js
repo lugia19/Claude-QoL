@@ -98,10 +98,6 @@
 		loadingModal.show();
 
 		try {
-			const activeId = await getCurrentPresetId();
-			const currentPrefs = activeId === 'unsaved' ? await getCurrentPreferences() : '';
-			loadingModal.destroy();
-
 			const contentContainer = document.createElement('div');
 
 			const list = document.createElement('div');
@@ -172,7 +168,9 @@
 				}
 			}
 
+			// The first render does the fetching, so the loading modal stays up until it's done.
 			await renderList();
+			loadingModal.destroy();
 
 			// "+ New Preset" button
 			const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
