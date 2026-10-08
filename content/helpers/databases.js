@@ -407,62 +407,18 @@
 	window.ClaudeSearchShared.getPhantomMessages = getPhantomMessagesDB;
 	window.ClaudeSearchShared.clearPhantomMessages = clearPhantomMessagesDB;
 
-	// ======== PostMessage bridge for MAIN world access ========
-	window.addEventListener('message', async (event) => {
-		if (event.source !== window) return;
-
-		try {
-			switch (event.data.type) {
-				case 'CONV_CACHE_GET': {
-					const entry = await conversationCache.get(event.data.uuid);
-					window.postMessage({
-						type: 'CONV_CACHE_RESULT',
-						messageId: event.data.messageId,
-						entry: entry || null
-					}, '*');
-					break;
-				}
-				case 'CONV_CACHE_PUT': {
-					await conversationCache.put(event.data.uuid, event.data.updatedAt, event.data.data);
-					window.postMessage({
-						type: 'CONV_CACHE_STORED',
-						messageId: event.data.messageId
-					}, '*');
-					break;
-				}
-				case 'PHANTOM_GET': {
-					const messages = await getPhantomMessagesDB(event.data.conversationId);
-					window.postMessage({
-						type: 'PHANTOM_RESULT',
-						messageId: event.data.messageId,
-						messages: messages
-					}, '*');
-					break;
-				}
-				case 'PHANTOM_STORE': {
-					await storePhantomMessagesDB(event.data.conversationId, event.data.messages);
-					window.postMessage({
-						type: 'PHANTOM_STORED',
-						messageId: event.data.messageId,
-						conversationId: event.data.conversationId
-					}, '*');
-					break;
-				}
-				case 'PHANTOM_CLEAR': {
-					await clearPhantomMessagesDB(event.data.conversationId);
-					window.postMessage({
-						type: 'PHANTOM_CLEARED',
-						messageId: event.data.messageId
-					}, '*');
-					break;
-				}
-			}
-		} catch (error) {
-			window.postMessage({
-				type: 'BRIDGE_ERROR',
-				messageId: event.data.messageId,
-				error: error.message
-			}, '*');
+	// ======== MAIN world access (claude-api.js's _dbCall) ========
+	// This serves from document_idle, but MAIN loads at document_start: a call MAIN makes before
+	// this point (e.g. a conversation fetch early in page load) is lost and waits out _dbCall's
+	// timeout. The proper fix is a document_start ISOLATED script that calls serve() right away,
+	// with handlers that await a "DB ready" promise resolved here.
+	ClaudeExtBridge.serve('qol', {
+		handlers: {
+			CONV_CACHE_GET: ({ uuid }) => conversationCache.get(uuid),
+			CONV_CACHE_PUT: async ({ uuid, updatedAt, data }) => { await conversationCache.put(uuid, updatedAt, data); },
+			PHANTOM_GET: ({ conversationId }) => getPhantomMessagesDB(conversationId),
+			PHANTOM_STORE: async ({ conversationId, messages }) => { await storePhantomMessagesDB(conversationId, messages); },
+			PHANTOM_CLEAR: async ({ conversationId }) => { await clearPhantomMessagesDB(conversationId); },
 		}
 	});
 })();

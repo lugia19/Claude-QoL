@@ -48,7 +48,7 @@
 	}
 
 	function postSynthDone(requestId) {
-		window.postMessage({ type: 'TTS_SYNTH_DONE', requestId }, '*');
+		window.postMessage({ type: 'TTS_SYNTH_DONE', requestId }, window.location.origin);
 	}
 
 	function abortSynth(requestId) {
@@ -87,7 +87,7 @@
 			// Structured-clone copy (no transfer list): this message is delivered to BOTH the MAIN
 			// and ISOLATED listeners on this window, so a transferable would be detached for one of
 			// them. The data rate is tiny (~32 KB/s at 16kHz mono), so copying is cheap.
-			window.postMessage({ type: 'TTS_SYNTH_PCM', requestId, chunk: ab }, '*');
+			window.postMessage({ type: 'TTS_SYNTH_PCM', requestId, chunk: ab }, window.location.origin);
 		};
 
 		try {
@@ -142,38 +142,48 @@
 	//#endregion
 
 	//#region Message Listener
-	window.addEventListener('message', async (event) => {
-		if (event.source !== window || !event.data) return;
+	// The synth relay streams, so it stays hand-rolled rather than going through ClaudeExtBridge.
+	window.addEventListener('message', (event) => {
+		if (event.source !== window || event.origin !== window.location.origin) return;
 		const d = event.data;
 
-		if (d.type === 'TTS_SYNTH_REQUEST') {
+		if (d?.type === 'TTS_SYNTH_REQUEST') {
 			handleSynthRequest(d);
-		} else if (d.type === 'TTS_SYNTH_ABORT') {
+		} else if (d?.type === 'TTS_SYNTH_ABORT') {
 			abortSynth(d.requestId);
-		} else if (d.type === 'TTS_HIJACK_CONFIG_REQUEST') {
+		} else if (d?.type === 'TTS_HIJACK_CONFIG_REQUEST') {
 			pushHijackConfig();
-		} else if (d.type === 'tts-auto-speak') {
-			const settings = await loadSettings();
-			if (!settings.autoSpeak) return;
+		}
+	});
 
-			const { messageUuid } = d;
-			// Retry logic to find the native button (DOM might not be ready yet).
-			const maxRetries = 10;
-			const retryDelay = 300;
-			for (let attempt = 0; attempt < maxRetries; attempt++) {
-				const messageElement = document.querySelector(`[data-message-uuid="${messageUuid}"]`);
-				if (messageElement) {
-					const nativeBtn = messageElement.querySelector('button[data-testid="action-bar-read-aloud"]');
-					if (nativeBtn) {
-						nativeBtn.click();
-						return;
-					}
-				}
-				if (attempt < maxRetries - 1) {
-					await new Promise(r => setTimeout(r, retryDelay));
+	async function autoSpeak(messageUuid) {
+		const settings = await loadSettings();
+		if (!settings.autoSpeak) return;
+
+		// Retry logic to find the native button (DOM might not be ready yet).
+		const maxRetries = 10;
+		const retryDelay = 300;
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			const messageElement = document.querySelector(`[data-message-uuid="${CSS.escape(String(messageUuid))}"]`);
+			if (messageElement) {
+				const nativeBtn = messageElement.querySelector('button[data-testid="action-bar-read-aloud"]');
+				if (nativeBtn) {
+					nativeBtn.click();
+					return;
 				}
 			}
-			log('Could not find native read-aloud button for message:', messageUuid);
+			if (attempt < maxRetries - 1) {
+				await new Promise(r => setTimeout(r, retryDelay));
+			}
+		}
+		log('Could not find native read-aloud button for message:', messageUuid);
+	}
+
+	// Sent by tts-interceptor.js when a completion stream ends. Not awaited: the button search can
+	// outlast the bridge's timeout, and MAIN ignores the reply anyway.
+	ClaudeExtBridge.serve('qol', {
+		handlers: {
+			TTS_AUTO_SPEAK: ({ messageUuid }) => { autoSpeak(messageUuid); }
 		}
 	});
 	//#endregion
@@ -957,7 +967,7 @@
 	}
 
 	async function pushHijackConfig() {
-		window.postMessage({ type: 'TTS_HIJACK_CONFIG', hijack: await computeHijack() }, '*');
+		window.postMessage({ type: 'TTS_HIJACK_CONFIG', hijack: await computeHijack() }, window.location.origin);
 	}
 
 	// One-time migration from the old enable-toggle to the provider-as-gate model.

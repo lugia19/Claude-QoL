@@ -24,16 +24,16 @@
 
 	// --- config sync with ISOLATED (tts.js) ---
 	window.addEventListener('message', (e) => {
-		if (e.source !== window || !e.data) return;
+		if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
 		if (e.data.type === 'TTS_HIJACK_CONFIG') hijack = !!e.data.hijack;
 	});
 	// Ask for the current config (covers the case where ISOLATED loaded before we did).
-	window.postMessage({ type: 'TTS_HIJACK_CONFIG_REQUEST' }, '*');
+	window.postMessage({ type: 'TTS_HIJACK_CONFIG_REQUEST' }, window.location.origin);
 
 	// --- routing of synthesis results back to the owning socket ---
 	const liveSockets = new Map(); // requestId -> FakeWebSocket
 	window.addEventListener('message', (e) => {
-		if (e.source !== window || !e.data) return;
+		if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
 		const sock = liveSockets.get(e.data.requestId);
 		if (!sock) return; // late frame from an aborted/closed request -> drop
 		if (e.data.type === 'TTS_SYNTH_PCM') sock._emitBinary(e.data.chunk);
@@ -99,7 +99,7 @@
 					.replace(/====UUID:[a-f0-9-]+====/gi, '')
 					.replace(/====GALLERY_BREAK====/g, '');
 				const conversationId = (typeof getConversationId === 'function') ? getConversationId() : null;
-				window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, '*');
+				window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, window.location.origin);
 			}
 			// keep_alive: ignore
 		}
@@ -122,7 +122,7 @@
 			this.readyState = 3; // CLOSED
 			liveSockets.delete(this._requestId);
 			// Tell ISOLATED to abort any in-flight synthesis for this request (saves API calls).
-			window.postMessage({ type: 'TTS_SYNTH_ABORT', requestId: this._requestId }, '*');
+			window.postMessage({ type: 'TTS_SYNTH_ABORT', requestId: this._requestId }, window.location.origin);
 			this._fire('close', { wasClean: true, code: code || 1000, reason: reason || '' });
 		}
 	}

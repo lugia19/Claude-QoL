@@ -5,53 +5,44 @@ const apiLog = createLogger('API');
 const MAX_FILES_PER_MESSAGE = 18;
 
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
-let _bridgeMessageId = 0;
-
-function _bridgeRequest(type, data, responseType, timeout = 5000) {
-	const messageId = ++_bridgeMessageId;
-	return new Promise((resolve) => {
-		const listener = (event) => {
-			if (event.source !== window) return;
-			if (event.data.messageId !== messageId) return;
-			if (event.data.type !== responseType && event.data.type !== 'BRIDGE_ERROR') return;
-			window.removeEventListener('message', listener);
-			resolve(event.data);
-		};
-		window.addEventListener('message', listener);
-		setTimeout(() => { window.removeEventListener('message', listener); resolve(null); }, timeout);
-		window.postMessage({ type, messageId, ...data }, '*');
-	});
+// ISOLATED uses databases.js directly; MAIN asks it over ClaudeExtBridge (served in databases.js).
+// A failed or unanswered call resolves null: callers treat that as "nothing stored".
+// The 5s timeout bounds the wait when the call is lost, see the serve() comment in databases.js.
+async function _dbCall(type, data) {
+	try {
+		return await ClaudeExtBridge.call('qol', type, data, { timeout: 5000 });
+	} catch (e) {
+		apiLog.warn(`${type} failed:`, e.message);
+		return null;
+	}
 }
 
 async function _convCacheGet(uuid) {
 	const cache = window.ClaudeSearchShared?.conversationCache;
 	if (cache) return await cache.get(uuid);
 
-	const result = await _bridgeRequest('CONV_CACHE_GET', { uuid }, 'CONV_CACHE_RESULT');
-	return result?.entry || null;
+	return await _dbCall('CONV_CACHE_GET', { uuid }) || null;
 }
 
 async function _convCachePut(uuid, updatedAt, data) {
 	const cache = window.ClaudeSearchShared?.conversationCache;
 	if (cache) { await cache.put(uuid, updatedAt, data); return; }
 
-	window.postMessage({ type: 'CONV_CACHE_PUT', uuid, updatedAt, data, messageId: ++_bridgeMessageId }, '*');
+	_dbCall('CONV_CACHE_PUT', { uuid, updatedAt, data }); // not awaited: a cache write shouldn't hold up the caller
 }
 
 async function storePhantomMessages(conversationId, messages) {
 	const store = window.ClaudeSearchShared?.storePhantomMessages;
 	if (store) { await store(conversationId, messages); return; }
 
-	const result = await _bridgeRequest('PHANTOM_STORE', { conversationId, messages }, 'PHANTOM_STORED');
-	return result;
+	await _dbCall('PHANTOM_STORE', { conversationId, messages });
 }
 
 async function getPhantomMessages(conversationId) {
 	const get = window.ClaudeSearchShared?.getPhantomMessages;
 	if (get) return await get(conversationId);
 
-	const result = await _bridgeRequest('PHANTOM_GET', { conversationId }, 'PHANTOM_RESULT');
-	return result?.messages || null;
+	return await _dbCall('PHANTOM_GET', { conversationId }) || null;
 }
 
 const ROOT_MESSAGE_UUID = "00000000-0000-4000-8000-000000000000";
@@ -92,7 +83,7 @@ async function clearPhantomMessages(conversationId) {
 	const clear = window.ClaudeSearchShared?.clearPhantomMessages;
 	if (clear) { await clear(conversationId); return; }
 
-	await _bridgeRequest('PHANTOM_CLEAR', { conversationId }, 'PHANTOM_CLEARED');
+	await _dbCall('PHANTOM_CLEAR', { conversationId });
 }
 
 async function bustReactQueryCache() {

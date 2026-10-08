@@ -258,7 +258,8 @@ JSON array:`;
 				const requestId = Math.random().toString(36).substr(2, 9);
 
 				const listener = (event) => {
-					if (event.data.type === 'tts-analyze-dialogue-response' &&
+					if (event.source !== window || event.origin !== window.location.origin) return;
+					if (event.data?.type === 'tts-analyze-dialogue-response' &&
 						event.data.requestId === requestId) {
 						window.removeEventListener('message', listener);
 
@@ -293,7 +294,7 @@ JSON array:`;
 					type: 'tts-analyze-dialogue-request',
 					prompt: prompt,
 					requestId: requestId
-				}, '*');
+				}, window.location.origin);
 
 				setTimeout(() => {
 					window.removeEventListener('message', listener);
@@ -451,7 +452,8 @@ JSON array:`;
 				const requestId = Math.random().toString(36).substr(2, 9);
 
 				const listener = (event) => {
-					if (event.data.type === 'tts-analyze-dialogue-response' &&
+					if (event.source !== window || event.origin !== window.location.origin) return;
+					if (event.data?.type === 'tts-analyze-dialogue-response' &&
 						event.data.requestId === requestId) {
 						window.removeEventListener('message', listener);
 
@@ -487,7 +489,7 @@ JSON array:`;
 					type: 'tts-analyze-dialogue-request',
 					prompt: prompt,
 					requestId: requestId
-				}, '*');
+				}, window.location.origin);
 
 				setTimeout(() => {
 					window.removeEventListener('message', listener);

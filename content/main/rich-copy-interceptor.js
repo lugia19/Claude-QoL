@@ -9,9 +9,10 @@
 	let richCopyActive = false;
 
 	window.addEventListener('message', (event) => {
-		if (event.data.type === 'rich-copy-activate') {
+		if (event.source !== window || event.origin !== window.location.origin) return;
+		if (event.data?.type === 'rich-copy-activate') {
 			richCopyActive = true;
-			window.postMessage({ type: 'rich-copy-ready' }, '*');
+			window.postMessage({ type: 'rich-copy-ready' }, window.location.origin);
 			setTimeout(() => { richCopyActive = false; }, 2000);
 		}
 	});
@@ -48,15 +49,15 @@
 			}
 
 			if (!plainText) {
-				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, '*');
+				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, window.location.origin);
 				return prevWrite.call(navigator.clipboard, data);
 			}
 
 			await convertAndWrite(plainText);
-			window.postMessage({ type: 'rich-copy-done' }, '*');
+			window.postMessage({ type: 'rich-copy-done' }, window.location.origin);
 		} catch (err) {
 			log.error('Interceptor error:', err);
-			window.postMessage({ type: 'rich-copy-error', error: err.message }, '*');
+			window.postMessage({ type: 'rich-copy-error', error: err.message }, window.location.origin);
 			return prevWrite.call(navigator.clipboard, data);
 		}
 	};
@@ -70,15 +71,15 @@
 
 		try {
 			if (!text) {
-				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, '*');
+				window.postMessage({ type: 'rich-copy-error', error: localize('main.rich_copy_no_text') }, window.location.origin);
 				return prevWriteText.call(navigator.clipboard, text);
 			}
 
 			await convertAndWrite(text);
-			window.postMessage({ type: 'rich-copy-done' }, '*');
+			window.postMessage({ type: 'rich-copy-done' }, window.location.origin);
 		} catch (err) {
 			log.error('Interceptor error:', err);
-			window.postMessage({ type: 'rich-copy-error', error: err.message }, '*');
+			window.postMessage({ type: 'rich-copy-error', error: err.message }, window.location.origin);
 			return prevWriteText.call(navigator.clipboard, text);
 		}
 	};

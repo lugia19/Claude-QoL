@@ -40,11 +40,12 @@
 	}
 
 	async function copyAsRichText(nativeCopy, richBtn = null) {
-		window.postMessage({ type: 'rich-copy-activate' }, '*');
+		window.postMessage({ type: 'rich-copy-activate' }, window.location.origin);
 
 		await new Promise((resolve) => {
 			const listener = (event) => {
-				if (event.data.type === 'rich-copy-ready') {
+				if (event.source !== window || event.origin !== window.location.origin) return;
+				if (event.data?.type === 'rich-copy-ready') {
 					window.removeEventListener('message', listener);
 					resolve();
 				}
@@ -60,7 +61,8 @@
 
 		const result = await new Promise((resolve) => {
 			const listener = (event) => {
-				if (event.data.type === 'rich-copy-done' || event.data.type === 'rich-copy-error') {
+				if (event.source !== window || event.origin !== window.location.origin) return;
+				if (event.data?.type === 'rich-copy-done' || event.data?.type === 'rich-copy-error') {
 					window.removeEventListener('message', listener);
 					resolve(event.data);
 				}

@@ -12,7 +12,7 @@ const GALLERY_BREAK_MARKER = '====GALLERY_BREAK===='; // injected by image-extra
 
 // ==== STORAGE FUNCTIONS ====
 // storePhantomMessages, getPhantomMessages, clearPhantomMessages are defined in claude-api.js
-// They auto-detect isolated vs MAIN world and use the postMessage bridge when needed.
+// They auto-detect isolated vs MAIN world and go through ClaudeExtBridge when needed.
 
 // Wrap the raw accessor with localStorage migration and ClaudeMessage hydration
 const _rawGetPhantomMessages = getPhantomMessages;

@@ -100,10 +100,7 @@
 						?? (await findNewAssistantMessage(orgId, conversationId, requestSentTime))?.uuid;
 
 					if (messageUuid) {
-						window.postMessage({
-							type: 'tts-auto-speak',
-							messageUuid
-						}, '*');
+						ClaudeExtBridge.call('qol', 'TTS_AUTO_SPEAK', { messageUuid }).catch(() => {});
 					} else {
 						log('No new assistant message found after retries');
 					}
@@ -118,9 +115,11 @@
 		return originalFetch(...args);
 	};
 
-	// Handle dialogue analysis requests from ISOLATED world
+	// Handle dialogue analysis requests from ISOLATED world. ISOLATED asks here, the reverse of what
+	// ClaudeExtBridge supports, so this relay stays hand-rolled.
 	window.addEventListener('message', async (event) => {
-		if (event.data.type === 'tts-analyze-dialogue-request') {
+		if (event.source !== window || event.origin !== window.location.origin) return;
+		if (event.data?.type === 'tts-analyze-dialogue-request') {
 			const { prompt, requestId } = event.data;
 
 			try {
@@ -142,7 +141,7 @@
 					requestId: requestId,
 					success: true,
 					data: responseText
-				}, '*');
+				}, window.location.origin);
 
 			} catch (error) {
 				log.error('Dialogue analysis failed:', error);
@@ -151,7 +150,7 @@
 					requestId: requestId,
 					success: false,
 					error: error.message
-				}, '*');
+				}, window.location.origin);
 			}
 		}
 	});
