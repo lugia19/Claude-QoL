@@ -100,9 +100,15 @@ with the header `conversation_id` = **a new uuid we choose**.
   - A send whose parent isn't the current leaf is rejected on the stream with `ccrproxy_branch_send_unsupported`, "Editing and retrying aren't available here yet". No message is created.
     - Exception: `parent_message_id: ""` (a new root) was accepted after the upgrade.
   - **The sandbox (`/mnt/user-data`) is shared across branches:** a sibling branch listed the other branch's file. Nothing rolls back.
-- **Planned UX (D7):** when the earlier-version banner appears, add our own banner.
-  - **Non-upgraded chats:** "QoL: Continue anyway?". On click, `set_current_leaf` to the viewed branch's leaf: take the switched message's id (see [identity](#message-identity-in-the-dom)) and walk down the tree to its newest descendant.
-  - **Upgraded chats** (`workspace_upgraded`): in-place continuation is impossible, so the banner explains why and points to the native fork ("Continue in a new session").
+- **Which version the client shows after a flip:** the newest child at each step down (verified 2026-10-09: a fork at message 3 of `7c25d951…` showed the highest-index of 4 replies).
+- **Implemented (feat/navigation):**
+  - **Arrows:** `content/main/branch-arrows.js` sets `siblings_viewable` on every message of snapshots, history pages and live updates. Always on. Works in upgraded chats too (except, apparently, first-message forks).
+  - **D7 banner** (`navigation.js`): when claude.ai's earlier-version banner appears (hook: `[data-testid="hub-earlier-version-back"]`; upgraded chats have no "Continue in a new session" button, so not `…-continue`), ours goes above it inside the dock card.
+    - **Non-upgraded chats:** "Continue anyway" scrolls to the bottom, takes the last row's message (the viewed leaf; newest child down if it has children), sets it as the current leaf (legacy PUT) and reloads.
+    - **Upgraded chats** (`workspace_upgraded` on the legacy tree): an explanation only.
+  - **Jumps** (`jumpToMessage` in `message-ui.js`; bookmarks, chat search, latest/longest): a target on the current branch only scrolls (no PUT, no reload); otherwise the leaf moves (legacy PUT) and the page reloads, and the target is revealed after the load.
+  - **Leaf setting stays on the legacy PUT:** it sets the merged leaf, fails synchronously, and works from ISOLATED on every browser (RPCs check `Origin`). `set_current_leaf` is the contingency.
+  - **Reveals right after a load:** the list pins its tail until the user scrolls, undoing any scroll of ours; a synthetic wheel event on the scroller releases it. Freshly mounted rows also get re-measured over a few frames, so the settle re-checks and scrolls again if the target drifted.
 - **Why it's hidden:** the shared, non-rolling-back sandbox above. Non-upgraded chats still allow branching anywhere (edits and retries rely on it).
 
 ## Message identity in the DOM
@@ -237,8 +243,8 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | Forking, summaryless | Native fork | No phantoms needed at all. |
 | Forking, summary / compaction | New chat plus our own send | `hidden_context` is a candidate for carrying history invisibly. |
 | Advanced edit (files) | Rewrite the edit's `send_message`: add or remove `attachments` / `inline_attachments` | Removal is a round trip. |
-| Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + `set_current_leaf` (true leaf) | |
-| Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Plus the D7 banner. |
+| Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + legacy leaf PUT | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
+| Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |
 | Image gallery | Splice blocks into stream and history pages (live and on load) | |
 | TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | The tracker's `request-hook.js` already does this. |
 | TTS "Read aloud" hijack | Unchanged (WebSocket) | Retest. |
@@ -256,6 +262,8 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - **Not surveyed:** Code/Cowork pages, the artifacts page, mobile layout, Electron, sidebar features, and whether each modal still opens and works.
 
 ## Still open
+
+- **To be implemented: jumps to another branch in upgraded chats.** Their leaf can't move, so a bookmark or search result on another branch can't be reached by moving it (today the PUT is a silent no-op and the reveal finds nothing). Idea: drive the version arrows programmatically to show that branch.
 
 - Firefox (MAIN-world ordering) and Electron, for every interceptor.
 - Cross-chat attachment ids; the untested `send_message` fields listed above.

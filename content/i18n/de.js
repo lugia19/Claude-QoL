@@ -35,6 +35,10 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"nav.message_uuid_not_found": "UUID der Nachricht nicht gefunden",
 	"nav.success_title": "Erfolg",
 	"nav.bookmark_added": "Lesezeichen hinzugefügt!",
+	"nav.continue_anyway_text": "QoL: Du kannst diese Version auch hier fortsetzen.",
+	"nav.continue_anyway_button": "Trotzdem fortsetzen",
+	"nav.continuing": "Wechsle zu dieser Version...",
+	"nav.continue_upgraded_text": "QoL: Dieser Chat kann keine frühere Version fortsetzen, da seine Dateien von allen Versionen geteilt werden.",
 
 	// search
 	"search.branched_messages_ago": "Vor {n} Nachrichten verzweigt",

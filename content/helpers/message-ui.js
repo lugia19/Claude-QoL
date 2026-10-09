@@ -197,13 +197,17 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 	try {
 		if (!await _waitForMessageList()) return null;
 
+		// After a load the list pins its tail until the user scrolls: any scroll of ours snaps back to
+		// the bottom on the next frame. A (synthetic, so inert) wheel event counts as the user scrolling.
+		getMessageScroller()?.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true, cancelable: true }));
+
 		const conv = conversation ?? new ClaudeConversation(getOrgId(), getConversationId());
 		const tree = (await conv.getData()).chat_messages ?? [];
 		const findTarget = () => rowForUuid(uuid, tree);
 
 		// Already on screen — nothing to hunt for.
 		const alreadyThere = findTarget();
-		if (alreadyThere) return _settleOnMessage(alreadyThere, highlight);
+		if (alreadyThere) return await _settleOnMessage(alreadyThere, highlight);
 
 		const messages = await conv.getRenderedMessages();
 		const positions = new Map(messages.map((msg, i) => [msg.uuid, i]));
@@ -226,13 +230,31 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 
 		const target = findTarget();
 		if (!target) return null;
-		return _settleOnMessage(target, highlight);
+		return await _settleOnMessage(target, highlight);
 	} catch (error) {
 		messageUiLog.error('revealMessageByUuid failed:', error);
 		return null;
 	} finally {
 		_revealInFlight = false;
 	}
+}
+
+// "Go to" for any message in the tree (bookmarks, chat search, latest/longest). On the current branch
+// it just scrolls there. Elsewhere it moves the current leaf there (`leafId`, or the longest leaf below
+// the target) and reloads; chat-search.js's scrollToMessageByUuid reveals the target after the load.
+// Returns false when the page is reloading (leave any loading modal up), true otherwise.
+// Upgraded (workspace) chats can't move their leaf: jumps to another branch there are still to be
+// implemented (docs/bard-rework.md, "Still open").
+async function jumpToMessage(conversation, uuid, leafId = null) {
+	await conversation.getData(true); // fresh: the leaf may have moved since the conversation was loaded
+	const branch = await conversation.getMessages(false);
+	if (branch.some(msg => msg.uuid === uuid)) {
+		await revealMessageByUuid(uuid, { conversation });
+		return true;
+	}
+	sessionStorage.setItem('message_uuid_to_find', uuid);
+	await conversation.setCurrentLeaf(leafId ?? conversation.findLongestLeaf(uuid).leafId); // reloads
+	return false;
 }
 
 // Rows can lag a freshly mounted window by a frame or two.
@@ -309,16 +331,25 @@ async function _bracketTowardAnchor(scroller, findAnchor, positionOf, targetPosi
 }
 
 // Centre the message and flash it.
-function _settleOnMessage(target, highlight) {
+async function _settleOnMessage(target, highlight) {
 	// Instant, not smooth: smooth-scrolling across a virtualized list unmounts
 	// rows mid-flight and the scroll lands nowhere.
 	//
 	// Centre short messages, but align tall ones to the top — messages are
 	// routinely twice the viewport height, and centring those drops you into the
 	// middle of the text instead of at its start.
+	//
+	// Rows that just mounted still get measured, and the virtualizer corrects
+	// scrollTop for that over the next frames, which can undo our scroll: check
+	// after a couple of frames and settle again if the target drifted off screen.
 	const scroller = getMessageScroller();
-	const fitsOnScreen = !scroller || target.getBoundingClientRect().height <= scroller.clientHeight;
-	target.scrollIntoView({ block: fitsOnScreen ? 'center' : 'start' });
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const fitsOnScreen = !scroller || target.getBoundingClientRect().height <= scroller.clientHeight;
+		target.scrollIntoView({ block: fitsOnScreen ? 'center' : 'start' });
+		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+		const rect = target.getBoundingClientRect();
+		if (!target.isConnected || (rect.bottom > 0 && rect.top < window.innerHeight)) break;
+	}
 
 	if (highlight) {
 		target.style.transition = 'background-color 0.3s';

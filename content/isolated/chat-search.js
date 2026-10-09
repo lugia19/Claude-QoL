@@ -122,7 +122,7 @@
 	}
 
 	// ======== CONTEXT MODAL ========
-	function showContextModal(result, query, conversation) {
+	function showContextModal(result, query, goTo) {
 		const contentDiv = document.createElement('div');
 
 		// Scrollable messages container
@@ -207,18 +207,8 @@
 		const modal = new ClaudeModal(localize('search.message_context'), contentDiv);
 
 		modal.addCancel();
-		modal.addConfirm(localize('search.go_to_message'), async () => {
-			// Show loading modal
-			const loadingModal = createLoadingModal(localize('search.navigating_to_message'));
-			loadingModal.show();
-
-			// Any message, human or assistant: revealMessageByUuid finds rows by data-turn-key.
-			sessionStorage.setItem('message_uuid_to_find', result.matched_message_id);
-
-			const longestLeaf = conversation.findLongestLeaf(result.matched_message_id);
-			await conversation.setCurrentLeaf(longestLeaf.leafId);
-			window.location.reload();
-		});
+		// Any message, human or assistant: rows are found by data-turn-key.
+		modal.addConfirm(localize('search.go_to_message'), () => goTo(localize('search.navigating_to_message'), result.matched_message_id));
 
 		// Make context modal larger
 		modal.modal.classList.remove('max-w-md');
@@ -263,6 +253,21 @@
 
 		// Build the search UI
 		const contentDiv = document.createElement('div');
+		let modal = null;
+
+		// A jump on the current branch only scrolls, so close the search; otherwise the page reloads.
+		const goTo = async (loadingText, uuid, leafId = null) => {
+			const jumpLoading = createLoadingModal(loadingText);
+			jumpLoading.show();
+			try {
+				if (await jumpToMessage(conversation, uuid, leafId) === false) return;
+				modal?.dismiss();
+			} catch (error) {
+				log.error('Navigation failed:', error);
+				showClaudeAlert(localize('common.error'), localize('nav.navigation_failed'));
+			}
+			jumpLoading.destroy();
+		};
 
 		// Go to Latest / Go to Longest buttons row
 		const topButtonsRow = document.createElement('div');
@@ -281,17 +286,13 @@
 				}
 			}
 
-			if (latestMessage) {
-				await conversation.setCurrentLeaf(latestMessage.uuid);
-				window.location.reload();
-			}
+			if (latestMessage) await goTo(localize('nav.navigating_to_latest'), latestMessage.uuid);
 		});
 
 		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
 			const rootId = "00000000-0000-4000-8000-000000000000";
 			const longestLeaf = conversation.findLongestLeaf(rootId);
-			await conversation.setCurrentLeaf(longestLeaf.leafId);
-			window.location.reload();
+			await goTo(localize('nav.navigating_to_longest'), longestLeaf.leafId, longestLeaf.leafId);
 		});
 		longestBtn.classList.add('w-full');
 		latestBtn.classList.add('w-full');
@@ -369,7 +370,7 @@
 				resultItem.appendChild(matchText);
 
 				resultItem.onclick = () => {
-					showContextModal(result, query, conversation);
+					showContextModal(result, query, goTo);
 				};
 
 				resultsContainer.appendChild(resultItem);
@@ -385,7 +386,7 @@
 		});
 
 		// Create and show the search modal
-		const modal = new ClaudeModal(localize('search.search_conversation'), contentDiv);
+		modal = new ClaudeModal(localize('search.search_conversation'), contentDiv);
 		modal.addCancel(localize('common.close'));
 
 		// Override the max-width
@@ -418,6 +419,16 @@
 		if (!messageUuid) return;
 		sessionStorage.removeItem('message_uuid_to_find');
 		sessionStorage.removeItem('highlight_previous_message'); // legacy key, no longer written
+
+		// Full load can replace the first window with the whole branch a few seconds into the load,
+		// which would move the list under a reveal: wait until its height holds still (up to 10s).
+		let lastHeight = -1;
+		for (let stable = 0, i = 0; stable < 3 && i < 50; i++) {
+			const height = getMessageScroller()?.scrollHeight ?? 0;
+			stable = height > 0 && height === lastHeight ? stable + 1 : 0;
+			lastHeight = height;
+			await new Promise(r => setTimeout(r, 200));
+		}
 
 		const revealed = await revealMessageByUuid(messageUuid);
 		if (!revealed) log('Could not reveal message', messageUuid);

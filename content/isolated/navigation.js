@@ -151,7 +151,7 @@
 		return { tree, bookmarks, bookmarkDepths };
 	}
 
-	function renderBookmarkTree(tree, parentUuid, conversation, bookmarkDepths, conversationId, onDelete) {
+	function renderBookmarkTree(tree, parentUuid, goTo, bookmarkDepths, conversationId, onDelete) {
 		const children = tree.get(parentUuid) || [];
 		if (children.length === 0) return null;
 
@@ -191,21 +191,7 @@
 			content.appendChild(nameSpan);
 
 			// Click handler for navigation
-			content.onclick = async () => {
-				const loadingModal = createLoadingModal(localize('nav.navigating_to_bookmark'));
-				try {
-					loadingModal.show();
-
-					const longestLeaf = conversation.findLongestLeaf(bookmark.uuid);
-					await conversation.setCurrentLeaf(longestLeaf.leafId);
-					sessionStorage.setItem('message_uuid_to_find', bookmark.uuid);
-					window.location.reload();
-				} catch (error) {
-					log.error('Navigation failed:', error);
-					showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
-					loadingModal.destroy();
-				}
-			};
+			content.onclick = () => goTo(localize('nav.navigating_to_bookmark'), bookmark.uuid);
 
 			item.appendChild(content);
 
@@ -226,7 +212,7 @@
 			bookmarkWrapper.appendChild(item);
 
 			// Recursively render children
-			const childTree = renderBookmarkTree(tree, bookmark.uuid, conversation, bookmarkDepths, conversationId, onDelete);
+			const childTree = renderBookmarkTree(tree, bookmark.uuid, goTo, bookmarkDepths, conversationId, onDelete);
 			if (childTree) {
 				bookmarkWrapper.appendChild(childTree);
 			}
@@ -257,15 +243,27 @@
 
 		const conversationId = getConversationId();
 		const contentDiv = document.createElement('div');
+		let modal = null;
+
+		// A jump on the current branch only scrolls, so close the modals; otherwise the page reloads.
+		const goTo = async (loadingText, uuid, leafId = null) => {
+			const loadingModal = createLoadingModal(loadingText);
+			loadingModal.show();
+			try {
+				if (await jumpToMessage(conversation, uuid, leafId) === false) return;
+				modal?.dismiss();
+			} catch (error) {
+				log.error('Navigation failed:', error);
+				showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
+			}
+			loadingModal.destroy();
+		};
 
 		// Top buttons row
 		const topButtonsRow = document.createElement('div');
 		topButtonsRow.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
 
 		const latestBtn = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
-			const loadingModal = createLoadingModal(localize('nav.navigating_to_latest'));
-			loadingModal.show();
-
 			let latestMessage = null;
 			let latestTimestamp = 0;
 
@@ -278,20 +276,13 @@
 				}
 			}
 
-			if (latestMessage) {
-				await conversation.setCurrentLeaf(latestMessage.uuid);
-				window.location.reload();
-			}
+			if (latestMessage) await goTo(localize('nav.navigating_to_latest'), latestMessage.uuid);
 		});
 
 		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
-			const loadingModal = createLoadingModal(localize('nav.navigating_to_longest'));
-			loadingModal.show();
-
 			const rootId = "00000000-0000-4000-8000-000000000000";
 			const longestLeaf = conversation.findLongestLeaf(rootId);
-			await conversation.setCurrentLeaf(longestLeaf.leafId);
-			window.location.reload();
+			await goTo(localize('nav.navigating_to_longest'), longestLeaf.leafId, longestLeaf.leafId);
 		});
 		latestBtn.classList.add('w-full');
 		longestBtn.classList.add('w-full');
@@ -342,7 +333,7 @@
 
 			// Render tree starting from root
 			const ROOT_UUID = "00000000-0000-4000-8000-000000000000";
-			const treeContent = renderBookmarkTree(tree, ROOT_UUID, conversation, bookmarkDepths, conversationId, renderTree);
+			const treeContent = renderBookmarkTree(tree, ROOT_UUID, goTo, bookmarkDepths, conversationId, renderTree);
 
 			if (treeContent) {
 				treeContainer.appendChild(treeContent);
@@ -356,7 +347,7 @@
 		loading.destroy();
 
 		// Create and show modal
-		const modal = new ClaudeModal(localize('nav.navigation'), contentDiv);
+		modal = new ClaudeModal(localize('nav.navigation'), contentDiv);
 		modal.addCancel(localize('common.close'));
 		modal.modal.classList.remove('max-w-md');
 		modal.modal.classList.add('max-w-2xl');
@@ -620,8 +611,81 @@
 		document.head.appendChild(style);
 	}
 
+	//#region CONTINUE ANYWAY
+	// Viewing an earlier version (the branch arrows are client-only) makes claude.ai show "You're viewing
+	// an earlier version" with Send disabled. Next to it we offer to continue that version here: move the
+	// current leaf to the version's leaf and reload. Upgraded (workspace) chats can't move their leaf
+	// (their sandbox is shared across branches), so there we only explain. See docs/bard-rework.md (D7).
+	// "Back to latest version": in every earlier-version banner (upgraded chats have no "Continue in a
+	// new session" button there).
+	const EARLIER_VERSION = '[data-testid="hub-earlier-version-back"]';
+	const bannersSeen = new WeakSet();
+
+	// The leaf of the version on screen: the bottom row of the list once scrolled to the end. If it
+	// somehow has children, follow the newest one down, as claude.ai does when showing a version.
+	async function viewedLeaf(conversation) {
+		const scroller = getMessageScroller();
+		for (let i = 0; i < 3 && scroller; i++) {
+			scroller.scrollTop = scroller.scrollHeight;
+			await new Promise(r => setTimeout(r, 300));
+		}
+		const rows = [...document.querySelectorAll('[data-turn-key]')];
+		const last = rows.reduce((a, b) => (b.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? b : a), rows[0]);
+		const tree = (await conversation.getData()).chat_messages ?? [];
+		let uuid = last && uuidForTurnKey(last.dataset.turnKey, tree);
+		if (!uuid) return null;
+		const children = (id) => tree.filter(m => m.parent_message_uuid === id);
+		for (let kids = children(uuid); kids.length; kids = children(uuid)) {
+			uuid = kids.reduce((a, b) => (b.index > a.index ? b : a)).uuid;
+		}
+		return uuid;
+	}
+
+	async function addContinueBanner(nativeBanner) {
+		const conversation = await getConversation();
+		const upgraded = !!(await conversation.getData()).workspace_upgraded;
+		if (!nativeBanner.isConnected) return;
+
+		const banner = document.createElement('div');
+		banner.className = `${nativeBanner.className.replace(/\bitems-start\b/, 'items-center')} qol-continue-banner`;
+		banner.style.marginBottom = '6px';
+		const text = document.createElement('div');
+		text.className = 'flex-1 min-w-0';
+		text.textContent = localize(upgraded ? 'nav.continue_upgraded_text' : 'nav.continue_anyway_text');
+		banner.appendChild(text);
+
+		if (!upgraded) {
+			banner.appendChild(createClaudeButton(localize('nav.continue_anyway_button'), 'primary', async () => {
+				const loadingModal = createLoadingModal(localize('nav.continuing'));
+				loadingModal.show();
+				try {
+					const leaf = await viewedLeaf(conversation);
+					if (!leaf) throw new Error('could not tell which version is on screen');
+					await conversation.setCurrentLeaf(leaf); // reloads onto that version
+				} catch (error) {
+					log.error('Continue anyway failed:', error);
+					loadingModal.destroy();
+					showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
+				}
+			}));
+		}
+		// Inside claude.ai's dock card, above its banner: it goes away with it.
+		nativeBanner.before(banner);
+	}
+
+	function watchEarlierVersionBanner() {
+		new MutationObserver(() => {
+			const nativeBanner = document.querySelector(EARLIER_VERSION)?.closest('[data-cds="Banner"]');
+			if (!nativeBanner || bannersSeen.has(nativeBanner)) return;
+			bannersSeen.add(nativeBanner);
+			addContinueBanner(nativeBanner).catch(error => log.error('Continue banner failed:', error));
+		}).observe(document.body, { childList: true, subtree: true });
+	}
+	// #endregion
+
 	function initialize() {
 		injectTreeStyles();
+		watchEarlierVersionBanner();
 		// Add navigation button to top right
 		ButtonBar.register({
 			buttonClass: 'navigation-button',

@@ -35,6 +35,10 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"nav.message_uuid_not_found": "No se encontró el UUID del mensaje",
 	"nav.success_title": "Listo",
 	"nav.bookmark_added": "¡Marcador añadido!",
+	"nav.continue_anyway_text": "QoL: también puedes continuar esta versión aquí.",
+	"nav.continue_anyway_button": "Continuar de todos modos",
+	"nav.continuing": "Cambiando a esta versión...",
+	"nav.continue_upgraded_text": "QoL: este chat no puede continuar una versión anterior, porque sus archivos se comparten entre versiones.",
 
 	// search
 	"search.branched_messages_ago": "Ramificado hace {n} mensajes",

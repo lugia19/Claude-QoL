@@ -35,6 +35,10 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"nav.message_uuid_not_found": "メッセージのUUIDが見つかりませんでした",
 	"nav.success_title": "完了",
 	"nav.bookmark_added": "ブックマークを追加しました！",
+	"nav.continue_anyway_text": "QoL: このバージョンをここで続けることもできます。",
+	"nav.continue_anyway_button": "このまま続ける",
+	"nav.continuing": "このバージョンに切り替えています...",
+	"nav.continue_upgraded_text": "QoL: このチャットではファイルがすべてのバージョンで共有されているため、以前のバージョンを続けることはできません。",
 
 	// search
 	"search.branched_messages_ago": "{n}件前のメッセージで分岐",

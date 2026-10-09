@@ -35,6 +35,10 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"nav.message_uuid_not_found": "Tidak dapat menemukan UUID pesan",
 	"nav.success_title": "Berhasil",
 	"nav.bookmark_added": "Penanda ditambahkan!",
+	"nav.continue_anyway_text": "QoL: Anda juga bisa melanjutkan versi ini di sini.",
+	"nav.continue_anyway_button": "Tetap lanjutkan",
+	"nav.continuing": "Beralih ke versi ini...",
+	"nav.continue_upgraded_text": "QoL: obrolan ini tidak dapat melanjutkan versi sebelumnya, karena berkasnya dibagikan di semua versi.",
 
 	// search
 	"search.branched_messages_ago": "Bercabang {n} pesan yang lalu",
