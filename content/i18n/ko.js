@@ -331,8 +331,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// images
 	"images.generated_image": "생성된 이미지",
 	"images.generated_images": "생성된 이미지",
-	"images.generated_for": "생성된 이미지: {prompt}",
-	"images.generated_title": "생성됨: {prompt}",
 
 	// models
 	"models.opus_notice": "Opus는 다른 모델보다 사용 한도를 더 빨리 소모합니다",

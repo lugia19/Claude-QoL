@@ -248,7 +248,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | Advanced edit (files) | Rewrite the edit's `send_message` (`onSend`) | **Implemented** (feat/advanced-edit). claude.ai's own edit sends the original files in full in `attachments`; the patch replaces `text`, `attachments` (minimal `{ id, file_name, file_kind }` is enough) and `inline_attachments` from the modal, so removal is just leaving a file out. Verified: removed a PDF, added a text file and an uploaded image; the model saw exactly those. |
 | Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + `set_current_leaf` | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |
-| Image gallery | Splice blocks into stream and history pages (live and on load) | |
+| Image gallery | Add native image-search-shaped gallery groups after tool runs with result images (snapshots, history pages, live updates) | **Implemented** (feat/image-gallery). See "Image galleries". |
 | TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | **Implemented** (feat/tts-autospeak): `tts-interceptor.js` observes; updates during a turn carry `STATUS_RUNNING` with `status_assistant_message_id` = the reply, and the settle is one update with `STATUS_IDLE` and that reply `is_complete` + `stop_reason`. Only a reply seen running, in the chat on screen, is spoken (snapshots and reconnect replays never are). Verified in Chrome (end to end), the desktop client and Firefox Android (trigger). |
 | TTS "Read aloud" hijack | Unchanged (WebSocket) | Retest. |
 | Export / chat search data | Legacy tree GET, unchanged (D1 revised) | Contingency if it fails: `ReadConversation` (full tree, JSON or proto) through an adapter. Text attachments are file URLs there (fetch the content), and tool input is summarised. |
@@ -275,6 +275,17 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - **DOM:** rows whose `data-turn-key` is a phantom id are dimmed and their toolbar hidden. No text markers any more.
 - **Timing:** the phantoms live in ISOLATED (encrypted), so `databases.js` mirrors the ids of conversations that have them to `localStorage.claude_qol_phantom_ids`; only those snapshots wait (within the host's snapshot budget). MAIN's bridge calls are answered from `document_start` by `content/isolated/db-serve.js` (handlers await `databases.js`), so an early call isn't lost any more.
 - **Rebuild:** with nothing stored, a root whose `Message.attachments` include `chatlog.txt` (a QoL fork) has its phantoms rebuilt from it (and `summary_chunk_N.txt`), stored, and shown in that same snapshot. Verified on a fresh fork.
+
+## Image galleries (implemented)
+
+- **Native rendering:** an MCP tool's images arrive as `ContentBlock.result_images` (`url`, `thumbnail_url`, no size) and show only as 40x23 thumbnails in the "Used <tool>" row. claude.ai's own image search is drawn large: a standalone `GROUP_STYLE_TIMELINE` group holding one block with `row_kind: TOOL_ROW_KIND_DISPLAY_CARD` and `display_content.image_gallery` (`ImageGalleryDisplay.images`: `id, url, thumbnail_url, title, width, height, thumbnail_width, thumbnail_height`). Clicking an image opens claude.ai's viewer over every image of the gallery.
+- **What didn't work** (2026-10-10): putting `display_content.image_gallery` on the tool block itself (the row folds into the run's summary, display-card row kind or not), or an inline group holding only a gallery (ignored).
+- **What we do** (`content/main/image-extractor.js`): after each tool run with result images, add groups of the native shape, `dgrp_qolgallery_<run>_<n>`, each with up to the user's per-gallery limit of the run's images.
+- **Placement:** a gallery group takes the **same index** as the run's last group. claude.ai draws it after the native group (tested with an id sorting first and the group first in the array), and ours keep their own order. So no renumbering, which a streaming message couldn't do anyway.
+- **Merging:** adjacent galleries merge into one strip of at most 3 images (as on the legacy renderer). Split galleries are kept apart by an `GROUP_STYLE_INLINE` group whose block text is a zero-width space: real text to the renderer, invisible, harmless in copied and read-aloud text. (Whitespace-only text is dropped.)
+- **Sizes:** the cached measured size, else the tool's width/height or aspect-ratio input (`input_display.table` rows), else a square placeholder while the preview is measured for next time. The snapshot never waits on image loads.
+- **Live:** galleries are drawn when the tool run closes, not image by image (also as before). Live updates carry only what changed, so the module keeps each conversation's groups and run images; a snapshot starts them over.
+- **Settings:** unchanged (`content/isolated/image-gallery.js`, mirrored to `localStorage.claude_qol_image_gallery`). The legacy stream wrapper, its "conversations with images" gate and the `====GALLERY_BREAK====` markers (and their hiding and stripping) are gone.
 
 ## Still open
 

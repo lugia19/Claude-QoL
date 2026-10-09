@@ -125,9 +125,7 @@
 			if (msg.type === 'text_chunk') {
 				this._chunks.push(msg.text ?? '');
 			} else if (msg.type === 'close_stream') {
-				let text = this._chunks.join('');
-				// Strip image-extractor.js's gallery-break markers before synthesis.
-				text = text.replace(/====GALLERY_BREAK====/g, '');
+				const text = this._chunks.join('');
 				const conversationId = (typeof getConversationId === 'function') ? getConversationId() : null;
 				window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, window.location.origin);
 			}

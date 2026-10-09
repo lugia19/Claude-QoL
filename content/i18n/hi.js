@@ -331,8 +331,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// images
 	"images.generated_image": "जनरेट की गई इमेज",
 	"images.generated_images": "जनरेट की गई इमेज",
-	"images.generated_for": "इसके लिए जनरेट की गई इमेज: {prompt}",
-	"images.generated_title": "जनरेट किया गया: {prompt}",
 
 	// models
 	"models.opus_notice": "Opus अन्य मॉडलों की तुलना में उपयोग सीमा तेज़ी से खर्च करता है",

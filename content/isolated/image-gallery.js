@@ -1,12 +1,12 @@
-// image-gallery.js — Settings button + popup for the generated-image gallery injection
-// done by content/main/image-extractor.js.
+// image-gallery.js — Settings button + popup for the generated-image galleries
+// content/main/image-extractor.js adds.
 (function () {
 	'use strict';
 
 	const G = SETTINGS_KEYS.IMAGE_EXTRACTOR;
 
-	// The MAIN-world injector rewrites the conversation GET ~300ms into page load, long before
-	// this (document_idle) script exists, so it can't ask us for settings in time. We mirror the
+	// The MAIN-world patch runs on the first StreamTimeline snapshot, long before this
+	// (document_idle) script exists, so it can't ask us for settings in time. We mirror the
 	// relevant settings into localStorage (same origin, readable synchronously from MAIN) and
 	// keep the mirror current on init, on cross-tab changes, and on save.
 	const CONFIG_MIRROR_KEY = 'claude_qol_image_gallery';

@@ -331,8 +331,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	// images
 	"images.generated_image": "Immagine generata",
 	"images.generated_images": "Immagini generate",
-	"images.generated_for": "Immagine generata per: {prompt}",
-	"images.generated_title": "Generata: {prompt}",
 
 	// models
 	"models.opus_notice": "Opus consuma i limiti di utilizzo più velocemente degli altri modelli",

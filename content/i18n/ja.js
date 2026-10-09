@@ -331,8 +331,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// images
 	"images.generated_image": "生成された画像",
 	"images.generated_images": "生成された画像",
-	"images.generated_for": "生成された画像：{prompt}",
-	"images.generated_title": "生成：{prompt}",
 
 	// models
 	"models.opus_notice": "Opusは他のモデルよりも早く使用制限に達します",

@@ -17,7 +17,6 @@
 (function () {
 	'use strict';
 
-	const GALLERY_BREAK_MARKER = '====GALLERY_BREAK===='; // injected by image-extractor.js between galleries
 
 	const log = createLogger('PhantomMessages');
 
@@ -48,7 +47,7 @@
 		return (result.content ?? []).map(textOf).filter(Boolean).join('\n');
 	}
 
-	// A tool_result's images as result_images: image_gallery items (image-extractor.js, image search) and
+	// A tool_result's images as result_images: image_gallery items (the legacy image-extractor.js, image search) and
 	// bare image items (MCP tools), the latter by url or, failing that, by file uuid in this org.
 	function resultImages(result, orgId) {
 		if (!Array.isArray(result?.content)) return [];
@@ -263,79 +262,4 @@
 		[data-turn-key^="fffffffe-"] [role="toolbar"][data-cds="MessageActions"] { display: none !important; }
 	`;
 	document.documentElement.appendChild(phantomStyle);
-
-	// Gallery-break markers sit between injected image galleries (image-extractor.js; to be ported).
-	// They also appear mid-stream, so they're hidden on every pass.
-	function hideGalleryBreakMarkers() {
-		const { allMessages } = getUIMessages();
-		allMessages.forEach(container => {
-			if (!container.textContent.includes(GALLERY_BREAK_MARKER)) return;
-			container.querySelectorAll('p').forEach(p => {
-				if (p.textContent.includes(GALLERY_BREAK_MARKER)) p.style.display = 'none';
-			});
-		});
-	}
-
-	// Strip gallery-break markers from copied text.
-	const originalClipboardWrite = navigator.clipboard.write;
-	navigator.clipboard.write = async (data) => {
-		try {
-			const item = data[0];
-			if (!item) return originalClipboardWrite.call(navigator.clipboard, data);
-			const types = {};
-			for (const type of item.types) {
-				const blob = await item.getType(type);
-				if (type === 'text/plain' || type === 'text/html') {
-					let text = (await blob.text()).replace(/====GALLERY_BREAK====/g, '');
-					text = type === 'text/plain' ? text.replace(/\n{3,}/g, '\n\n').trim() : text.replace(/<p[^>]*>\s*<\/p>/gi, '');
-					types[type] = new Blob([text], { type });
-				} else {
-					types[type] = blob;
-				}
-			}
-			return originalClipboardWrite.call(navigator.clipboard, [new ClipboardItem(types)]);
-		} catch (error) {
-			log.error('Error cleaning clipboard text:', error);
-			return originalClipboardWrite.call(navigator.clipboard, data);
-		}
-	};
-
-	// The message list is virtualized, so rows mount continuously while scrolling. Observer callbacks
-	// run before paint, so a mounting row's markers are hidden in the same frame. The interval
-	// reattaches the observer after SPA navigation replaces the container.
-	let observedContainer = null;
-	let messageObserver = null;
-	let passScheduled = false;
-
-	const runPass = hideGalleryBreakMarkers;
-
-	function schedulePass() {
-		if (passScheduled) return;
-		passScheduled = true;
-		requestAnimationFrame(() => {
-			passScheduled = false;
-			runPass();
-		});
-	}
-
-	function syncMessageObserver() {
-		const container = getMessageScroller();
-		if (!container || container === observedContainer) {
-			if (observedContainer && !observedContainer.isConnected) {
-				messageObserver?.disconnect();
-				observedContainer = null;
-			}
-			return;
-		}
-		messageObserver?.disconnect();
-		messageObserver = new MutationObserver(schedulePass);
-		messageObserver.observe(container, { childList: true, subtree: true });
-		observedContainer = container;
-		runPass();
-	}
-
-	setInterval(() => {
-		syncMessageObserver();
-		runPass();
-	}, 300);
 })();

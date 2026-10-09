@@ -93,6 +93,7 @@
 				"content/main/bard-host.js",
 				"content/main/full-load.js",
 				"content/main/phantom-messages.js",
+				"content/main/image-extractor.js",
 				"content/main/branch-arrows.js",
 				"lib/jszip.min.js",
 				"lib/mime.min.js",
@@ -134,7 +135,6 @@
 				"content/main/tts-interceptor.js",
 				"lib/opus/opus-encoder.js",
 				"content/main/tts-ws-interceptor.js",
-				"content/main/image-extractor.js",
 				"lib/marked.min.js",
 				"content/main/rich-copy-interceptor.js"
 			],
