@@ -95,8 +95,15 @@ with the header `conversation_id` = **a new uuid we choose**.
   - `PerformAction` `set_current_leaf (23)` works. A message with children gets `invalid_leaf_target` (on the stream only).
   - **The open page follows live:** the banner goes, Send enables, and the view stays. The next send continues that branch, with the client setting `parent_message_id` itself.
   - The legacy `PUT …/current_leaf_message_uuid` also sets the merged leaf (a message with children gets 400 "Current leaf message has unexpected children"). Not to be used, per D1.
-- **Planned UX (D7):** when the earlier-version banner appears, add our own banner, "QoL: Continue anyway?", with "(Files will not be rolled back)" only when the chat has `workspace_upgraded`. On click, `set_current_leaf` to the viewed branch's leaf: take the switched message's id (see [identity](#message-identity-in-the-dom)) and walk down the tree to its newest descendant.
-- **Why it's hidden (likely):** workspace chats have a linear sandbox filesystem (`/mnt/user-data`) that wouldn't roll back with the branch. The server still allows branching anywhere (edits and retries rely on it).
+- **Upgraded (workspace) chats can't switch in place at all.** Server-gated, tested 2026-10-09 on chat `0a8b7ec1…`:
+  - `set_current_leaf` to a true leaf is accepted and acked with no error, but the leaf doesn't move. The legacy PUT returns 200 echoing the id, and the leaf doesn't move either.
+  - A send whose parent isn't the current leaf is rejected on the stream with `ccrproxy_branch_send_unsupported`, "Editing and retrying aren't available here yet". No message is created.
+    - Exception: `parent_message_id: ""` (a new root) was accepted after the upgrade.
+  - **The sandbox (`/mnt/user-data`) is shared across branches:** a sibling branch listed the other branch's file. Nothing rolls back.
+- **Planned UX (D7):** when the earlier-version banner appears, add our own banner.
+  - **Non-upgraded chats:** "QoL: Continue anyway?". On click, `set_current_leaf` to the viewed branch's leaf: take the switched message's id (see [identity](#message-identity-in-the-dom)) and walk down the tree to its newest descendant.
+  - **Upgraded chats** (`workspace_upgraded`): in-place continuation is impossible, so the banner explains why and points to the native fork ("Continue in a new session").
+- **Why it's hidden:** the shared, non-rolling-back sandbox above. Non-upgraded chats still allow branching anywhere (edits and retries rely on it).
 
 ## Message identity in the DOM
 
@@ -229,7 +236,6 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - Firefox (MAIN-world ordering) and Electron, for every interceptor.
 - Cross-chat attachment ids; the untested `send_message` fields listed above.
 - What a multi-message row chain (`isChain`) is.
-- Whether a workspace's files really don't roll back on a branch switch (create a file on branch A, switch to B, list `/mnt/user-data`).
 - The stream wrapper's jank behaviour on the affected machines.
 
 ## Test artefacts
@@ -238,4 +244,5 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
   - "Splice test chat" `d22a3a67…`
   - UI fork of 4c18a389: `8d5de03a…`
   - Hand forks: `12274be5…`, `7e601b34…`
+  - Upgraded-chat branch test: `0a8b7ec1…` (has a sandbox with `a.txt` / `b.txt`)
 - **After any experiment** that rewrites the stream, delete that conversation's entries from IndexedDB `claude-conversation-store` (`trees` and `meta`).
