@@ -182,13 +182,13 @@
 		// (message-ui.js), so it's found through the tree, fetched fresh so it includes the reply. The
 		// loop waits for that exact row; never guess "the last reply", which can still be the previous
 		// one while the new row mounts.
-		let tree = null;
+		let findRow = null;
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
 			let messageElement = document.querySelector(`[data-turn-key="${CSS.escape(String(messageUuid))}"]`);
 			if (!messageElement) {
-				tree ??= await new ClaudeConversation(getOrgId(), getConversationId()).getData(true)
-					.then(data => data.chat_messages ?? [], () => []);
-				messageElement = rowForUuid(String(messageUuid), tree);
+				findRow ??= rowFinder(String(messageUuid), await new ClaudeConversation(getOrgId(), getConversationId()).getData(true)
+					.then(data => data.chat_messages ?? [], () => []));
+				messageElement = findRow();
 			}
 			if (messageElement) {
 				const nativeBtn = messageElement.querySelector('button[data-testid="action-bar-read-aloud"]');

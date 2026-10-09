@@ -88,16 +88,23 @@ function uuidForTurnKey(key, tree) {
 	return turnKeyResolver(tree)(key);
 }
 
-// The mounted row element showing uuid, or null.
-function rowForUuid(uuid, tree) {
-	if (!uuid) return null;
-	const own = document.querySelector(`[data-turn-key="${CSS.escape(uuid)}"]`);
-	if (own) return own;
+// A function returning the mounted row element showing uuid, or null. The row's possible keys are
+// worked out once, so polling it is cheap.
+function rowFinder(uuid, tree) {
+	if (!uuid) return () => null;
+	const keys = [uuid];
 	const msg = tree.find(m => m.uuid === uuid);
-	if (!msg || msg.sender === 'human' || !msg.parent_message_uuid) return null;
-	const hubKey = msg.parent_message_uuid + HUB_REPLY_SUFFIX;
-	if (_originalReplies(tree).get(msg.parent_message_uuid) !== uuid) return null;
-	return document.querySelector(`[data-turn-key="${CSS.escape(hubKey)}"]`);
+	if (msg && msg.sender !== 'human' && msg.parent_message_uuid && _originalReplies(tree).get(msg.parent_message_uuid) === uuid) {
+		keys.push(msg.parent_message_uuid + HUB_REPLY_SUFFIX);
+	}
+	const selectors = keys.map(key => `[data-turn-key="${CSS.escape(key)}"]`);
+	return () => {
+		for (const selector of selectors) {
+			const row = document.querySelector(selector);
+			if (row) return row;
+		}
+		return null;
+	};
 }
 
 // The uuid of the message whose row contains el (for click handlers). Plain keys need nothing else;
@@ -203,7 +210,7 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 
 		const conv = conversation ?? new ClaudeConversation(getOrgId(), getConversationId());
 		const tree = (await conv.getData()).chat_messages ?? [];
-		const findTarget = () => rowForUuid(uuid, tree);
+		const findTarget = rowFinder(uuid, tree);
 
 		// Already on screen — nothing to hunt for.
 		const alreadyThere = findTarget();
@@ -239,16 +246,42 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 }
 
 // "Go to" for any message in the tree (bookmarks, chat search, latest/longest): moves the current leaf
-// there (`leafId`, or the longest leaf below the target) and reloads; chat-search.js's
-// scrollToMessageByUuid reveals the target after the load. Always a reload, even for a target that
-// looks on-branch: the branch arrows switch versions client-side, so the server's branch isn't
-// necessarily the one on screen.
+// to the longest leaf below the target and reloads, with a loading modal (loadingText) until then and
+// an alert if it fails; chat-search.js's scrollToMessageByUuid reveals the target after the load.
+// Always a reload, even for a target that looks on-branch: the branch arrows switch versions
+// client-side, so the server's branch isn't necessarily the one on screen.
 // Upgraded (workspace) chats can't move their leaf: jumps to another branch there are still to be
 // implemented (docs/bard-rework.md, "Still open").
-async function jumpToMessage(conversation, uuid, leafId = null) {
-	await conversation.getData();
-	sessionStorage.setItem('message_uuid_to_find', uuid);
-	await conversation.setCurrentLeaf(leafId ?? conversation.findLongestLeaf(uuid).leafId); // reloads
+async function jumpToMessage(conversation, uuid, loadingText) {
+	const loadingModal = createLoadingModal(loadingText);
+	loadingModal.show();
+	try {
+		await conversation.getData();
+		sessionStorage.setItem('message_uuid_to_find', uuid);
+		await conversation.setCurrentLeaf(conversation.findLongestLeaf(uuid).leafId); // reloads
+	} catch (error) {
+		messageUiLog.error('Navigation failed:', error);
+		loadingModal.destroy();
+		showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
+	}
+}
+
+// The "Go to latest" / "Go to longest" buttons at the top of the navigation and search modals.
+function createLatestLongestRow(conversation) {
+	const row = document.createElement('div');
+	row.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
+	const latest = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
+		const messages = await conversation.getMessages(true);
+		const newest = messages.reduce((a, b) => (new Date(b.created_at) > new Date(a.created_at) ? b : a), messages[0]);
+		if (newest) await jumpToMessage(conversation, newest.uuid, localize('nav.navigating_to_latest'));
+	});
+	const longest = createClaudeButton(localize('common.go_to_longest'), 'secondary', () =>
+		jumpToMessage(conversation, conversation.findLongestLeaf(ROOT_MESSAGE_UUID).leafId, localize('nav.navigating_to_longest')));
+	for (const button of [latest, longest]) {
+		button.classList.add('w-full');
+		row.appendChild(button);
+	}
+	return row;
 }
 
 // Rows can lag a freshly mounted window by a frame or two.

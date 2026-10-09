@@ -117,7 +117,7 @@ with the header `conversation_id` = **a new uuid we choose**.
 ## Message identity in the DOM
 
 **Implemented (PR C), in `content/helpers/message-ui.js`:**
-- `turnRowOf(el)`, `uuidForTurnKey(key, tree)`, `turnKeyResolver(tree)`, `rowForUuid(uuid, tree)`;
+- `turnRowOf(el)`, `uuidForTurnKey(key, tree)`, `turnKeyResolver(tree)`, `rowFinder(uuid, tree)` (returns a function finding the mounted row);
 - `messageUuidOfElement(el)` for click handlers;
 - `resolveUserMessageUuid(userEl)`;
 - `revealMessageByUuid` on turn keys; it reveals user and assistant messages directly.
@@ -193,15 +193,15 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
 
 | Registration | Runs on |
 | --- | --- |
-| `onSnapshot(fn)` | every `StreamTimeline` update with `replace_all_state`: the first one, reconnect snapshots, and snapshots injected through `ctx.inject` |
+| `onSnapshot(fn)` | every `StreamTimeline` update with `replace_all_state`: the first one, and reconnect snapshots |
 | `onLiveUpdate(fn)` | other `StreamTimeline` updates carrying messages / display groups / content blocks |
 | `onHistoryPage(fn)` | `ReadConversationHistoryResponse.update` |
 | `onSend(fn)` | `PerformAction`'s `send_message`, before it leaves |
 | `observe(fn)` | read-only, every non-heartbeat `StreamTimeline` event as the server sent it |
 
 - **A patch** is `fn(target, ctx)`. It may be async, edits `target` in place (decoded with `keepUnknown`), and returns `true` if it changed something. The host re-encodes only then; otherwise the original bytes pass through.
-- **`ctx`:** `{ source, orgId, conversationId, inject }`.
-- **`ctx.inject(event)`** (streams) runs injected snapshots through the `onSnapshot` patches first, which is the composition guarantee full load needs. It returns `false` once that connection has ended (the server reconnects on a cadence), so inject from the current connection's `ctx`.
+- **`ctx`:** `{ source, orgId, conversationId }`, plus `displayLanguage` on streams.
+- **`ctx.within(promise)`** (snapshot patches only) is how a patch waits for something: it resolves to `{ value }`, or to `null` once the snapshot's wait budget (6 s, shared by all its patches) is spent. The snapshot and every frame behind it are held meanwhile, so a fork with full load and phantoms waits 6 s at worst, not 12.
 - **Registration order is execution order.** An optional `{ label }` names a patch in logs.
 - **Fail-open:**
   - a throwing patch is logged and skipped;
@@ -210,9 +210,9 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
 - **Escape hatches:**
   - `QolBardHost.rawFetch` (MAIN-world calls that must see server data; ISOLATED fetches are never patched);
   - kill switch `localStorage.claude_qol_bard_host_off = '1'`.
-- **Manifest position:** first in the MAIN group after `extra-models.js`, preceded only by `net.js` and `bard-schema.js` (Firefox ordering). The logger and `page.js` are looked up lazily.
-- **Feature scripts that register patches load right after the host** (e.g. `full-load.js`). The host decides at fetch time whether to wrap a connection, so a feature registering after the page's first `StreamTimeline` would miss that snapshot (Firefox). Like the host, they look up later globals lazily.
-- **Account mode:** `QolBardHost.accountMode()` in MAIN, or `qolAccountMode()` (toolbox-ui.js) in either world, gives `'merged' | 'legacy' | 'unknown'` for the active org, from page `localStorage.claude_qol_account_mode`.
+- **Manifest position:** first in the MAIN group after `extra-models.js`, preceded only by `net.js`, `bard-schema.js` and the logger (`logger.js`, `logging.js`; Firefox ordering). `page.js` is looked up lazily.
+- **Feature scripts that register patches load right after the host** (e.g. `full-load.js`). The host decides at fetch time whether to wrap a connection, so a feature registering after the page's first `StreamTimeline` would miss that snapshot (Firefox). Like the host, they look up later globals (`page.js`, `claude-api.js`) lazily.
+- **Account mode:** `qolAccountMode()` (toolbox-ui.js), in either world, gives `'merged' | 'legacy' | 'unknown'` for the active org, from page `localStorage.claude_qol_account_mode`.
   - **`merged`:** any successful RPC response sets it.
   - **`legacy`:** only an hourly `GetNewConversationDefaults` probe returning 403 `permission_denied` sets it.
   - With `legacy`, `notifications.js` shows a once-per-session card.
@@ -273,7 +273,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - **What carries through an injected snapshot** (hand-rolled experiment, 2026-10-09): user text (rendered like real user text), assistant markdown, `Message.attachments` (a text file with only a name renders as a card; an image with an org file `url`/`thumbnail_url` renders), `TIMELINE` thinking groups (full text on expand), `TIMELINE` tool rows (name, input, result image). Mapping used: text → inline markdown; `tool_use` + `tool_result` → a timeline tool row; `files_v2` and text `attachments` → `Message.attachments`; **thinking dropped** (claude.ai doesn't show it any more).
 - **Page ids:** phantoms keep their source chat's uuids, which would collide with that chat's real messages (dimmed rows and rewritten sends there after navigating from a fork). So on the page they get ids of their own: `claude-api.js`'s `phantomMessageId` (`fffffffe-` + the rest of the uuid; stable, UUID-shaped, a prefix no real id has). `isPhantomId` recognises a phantom by id or turn key; `getRenderedMessages` uses the same ids.
 - **DOM:** rows whose `data-turn-key` is a phantom id are dimmed and their toolbar hidden. No text markers any more.
-- **Timing:** the phantoms live in ISOLATED (encrypted), so `databases.js` mirrors the ids of conversations that have them to `localStorage.claude_qol_phantom_ids`; only those snapshots wait (up to 6 s). MAIN's bridge calls are answered from `document_start` by `content/isolated/db-serve.js` (handlers await `databases.js`), so an early call isn't lost any more.
+- **Timing:** the phantoms live in ISOLATED (encrypted), so `databases.js` mirrors the ids of conversations that have them to `localStorage.claude_qol_phantom_ids`; only those snapshots wait (within the host's snapshot budget). MAIN's bridge calls are answered from `document_start` by `content/isolated/db-serve.js` (handlers await `databases.js`), so an early call isn't lost any more.
 - **Rebuild:** with nothing stored, a root whose `Message.attachments` include `chatlog.txt` (a QoL fork) has its phantoms rebuilt from it (and `summary_chunk_N.txt`), stored, and shown in that same snapshot. Verified on a fresh fork.
 
 ## Still open

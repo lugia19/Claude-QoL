@@ -42,13 +42,12 @@ async function storePhantomMessages(conversationId, messages) {
 // (MAIN only) undefined when the database couldn't be asked.
 async function getPhantomMessages(conversationId) {
 	// Very old forks kept them in the page's localStorage: move them to IndexedDB on first read.
-	for (const key of [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`]) {
+	for (const key of legacyPhantomKeys(conversationId)) {
 		const legacy = localStorage.getItem(key);
 		if (!legacy) continue;
 		const messages = JSON.parse(legacy);
 		await storePhantomMessages(conversationId, messages);
-		localStorage.removeItem(`phantom_messages_${conversationId}`);
-		localStorage.removeItem(`fork_history_${conversationId}`);
+		legacyPhantomKeys(conversationId).forEach(k => localStorage.removeItem(k));
 		return messages;
 	}
 
@@ -69,45 +68,38 @@ const phantomMessageId = (uuid) => PHANTOM_ID_PREFIX + uuid.slice(PHANTOM_ID_PRE
 // Also true for a phantom row's "<id>-hub-reply" turn key.
 const isPhantomId = (id) => typeof id === 'string' && id.startsWith(PHANTOM_ID_PREFIX);
 
-// The phantoms as the page shows them: page ids, chained in order from the root.
+// Where phantoms live besides IndexedDB: the ids of conversations that have some, mirrored to the
+// page's localStorage by databases.js (phantom-messages.js reads it synchronously), and the keys very
+// old forks stored the phantoms themselves under.
+const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
+const legacyPhantomKeys = (conversationId) => [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`];
+
+const PHANTOM_ACK_TEXT = 'Acknowledged - end of previous conversation.';
+
+// The phantoms (history JSON) as the page shows them, in order from the root: page ids, each parented
+// to the one before (the first to ROOT_MESSAGE_UUID), and, when the chain ends on a user message, an
+// assistant acknowledgement after it (as the legacy version did, and the fork's handshake expects).
 function pagePhantoms(phantomJson) {
-	return phantomJson.map((msg, i) => ({
-		...msg,
-		uuid: phantomMessageId(msg.uuid),
-		parent_message_uuid: i ? phantomMessageId(phantomJson[i - 1].uuid) : ROOT_MESSAGE_UUID,
-	}));
+	const chain = phantomJson.map(msg => ({ ...msg, uuid: phantomMessageId(msg.uuid) }));
+	const last = phantomJson.at(-1);
+	if (last?.sender === 'human') {
+		chain.push({
+			uuid: `${PHANTOM_ID_PREFIX}0000-4000-8000-${last.uuid.slice(-12)}`,
+			sender: 'assistant', text: PHANTOM_ACK_TEXT, content: [{ type: 'text', text: PHANTOM_ACK_TEXT }], created_at: last.created_at,
+		});
+	}
+	chain.forEach((msg, i) => { msg.parent_message_uuid = i ? chain[i - 1].uuid : ROOT_MESSAGE_UUID; });
+	return chain;
 }
 
-// Splice phantom (forked-in) messages onto the front of conversation data, the way the
-// page sees them. Rewiring the real root messages to hang off the last phantom is what
-// makes a parent-chain walk return the whole thing in order.
-//
-// `mutate: false` leaves the input untouched, which matters when the input is a cached
-// conversation payload — see ClaudeConversation.getRenderedMessages.
-function stitchPhantomMessages(data, phantomJson, { mutate = true } = {}) {
+// Conversation data with the phantoms spliced onto the front, the way the page sees them: the real
+// roots hang off the last phantom, so a parent-chain walk returns the whole thing in order. Leaves
+// data untouched (it may be a cached payload).
+function stitchPhantomMessages(data, phantomJson) {
 	if (!phantomJson?.length) return data;
-
-	const lastPhantom = phantomJson[phantomJson.length - 1];
-	const isRoot = msg => msg.parent_message_uuid === ROOT_MESSAGE_UUID;
-
-	const realMessages = (data.chat_messages || []).map(msg => {
-		if (!isRoot(msg)) return msg;
-		const rewired = mutate ? msg : { ...msg };
-		rewired.parent_message_uuid = lastPhantom.uuid;
-		return rewired;
-	});
-
-	const chat_messages = [...phantomJson, ...realMessages];
-
-	if (!mutate) {
-		// Array order is all the copy's callers need. `index` is only meaningful for the
-		// page-facing payload, and rewriting it here would touch shared message objects.
-		return { ...data, chat_messages };
-	}
-
-	data.chat_messages = chat_messages;
-	data.chat_messages.forEach((msg, idx) => { msg.index = idx; });
-	return data;
+	const lastId = phantomJson.at(-1).uuid;
+	const realMessages = (data.chat_messages || []).map(msg => msg.parent_message_uuid === ROOT_MESSAGE_UUID ? { ...msg, parent_message_uuid: lastId } : msg);
+	return { ...data, chat_messages: [...phantomJson, ...realMessages] };
 }
 
 async function clearPhantomMessages(conversationId) {
@@ -479,7 +471,7 @@ class ClaudeConversation {
 			return this.conversationData;
 		}
 
-		const apiUrl = `/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}?tree=true&rendering_mode=messages&render_all_tools=true&skip_uuid_injection=true&consistency=strong`;
+		const apiUrl = `/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}?tree=true&rendering_mode=messages&render_all_tools=true&consistency=strong`;
 
 		// Try cache (unless forcing refresh)
 		if (!forceRefresh) {
@@ -556,9 +548,8 @@ class ClaudeConversation {
 	}
 
 	// Get messages - when tree=false, reconstructs the current trunk from full tree data.
-	// Never includes phantom messages: getData passes skip_uuid_injection=true, so the
-	// phantom interceptor leaves our own requests alone. Use getRenderedMessages() when you
-	// need the list the UI is actually showing.
+	// Never includes phantom messages: use getRenderedMessages() when you need the list the UI is
+	// actually showing.
 	async getMessages(tree = false, forceRefresh = false) {
 		const data = await this.getData(forceRefresh);
 
@@ -583,12 +574,9 @@ class ClaudeConversation {
 		}
 		if (!phantoms?.length) return this._trunkFrom(data);
 
-		// With the ids the page shows them under, so rows and positions line up.
-		const phantomJson = pagePhantoms(phantoms.map(msg => msg.toHistoryJSON ? msg.toHistoryJSON() : msg));
-
-		// Non-mutating: `data` is cached on this instance and in IndexedDB, and must stay
-		// phantom-free so getMessages() keeps returning the real branch.
-		return this._trunkFrom(stitchPhantomMessages(data, phantomJson, { mutate: false }));
+		// With the ids the page shows them under, so rows and positions line up. `data` stays
+		// phantom-free (it's cached), so getMessages() keeps returning the real branch.
+		return this._trunkFrom(stitchPhantomMessages(data, pagePhantoms(phantoms)));
 	}
 
 	// Find longest leaf from a message ID
@@ -639,23 +627,13 @@ class ClaudeConversation {
 	// uses the page's (content.fetch); elsewhere plain fetch already sends claude.ai's.
 	async setCurrentLeaf(leafId) {
 		const pageFetch = globalThis.content?.fetch?.bind(globalThis.content) ?? fetch;
-		const response = await pageFetch(`${location.origin}/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/PerformAction`, {
-			method: 'POST',
-			credentials: 'include',
-			headers: {
-				'content-type': 'application/json',
-				'connect-protocol-version': '1',
-				'x-organization-uuid': this.orgId,
-				'anthropic-client-platform': 'web_claude_ai',
+		const response = await pageFetch(...ClaudeExtNet.bardRpcRequest('PerformAction', this.orgId, JSON.stringify({
+			header: {
+				conversationId: this.conversationId,
+				mutationId: { sessionId: `sess_qol${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, version: '1' },
 			},
-			body: JSON.stringify({
-				header: {
-					conversationId: this.conversationId,
-					mutationId: { sessionId: `sess_qol${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, version: '1' },
-				},
-				setCurrentLeaf: { currentLeafMessageId: leafId },
-			}),
-		});
+			setCurrentLeaf: { currentLeafMessageId: leafId },
+		})));
 
 		if (!response.ok) {
 			throw new Error(`Failed to set current leaf (${response.status})`);

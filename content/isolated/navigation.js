@@ -93,8 +93,6 @@
 	// #endregion
 	//#region TREE VIEW
 	async function buildBookmarkTree(conversationId, conversation) {
-		const ROOT_UUID = "00000000-0000-4000-8000-000000000000";
-
 		// Build message map
 		const messages = await conversation.getMessages(true);
 		const messageMap = new Map();
@@ -108,15 +106,15 @@
 
 		// Build tree structure
 		const tree = new Map();
-		tree.set(ROOT_UUID, []);
+		tree.set(ROOT_MESSAGE_UUID, []);
 
 		// For each bookmark, find its parent bookmark
 		for (const [name, bookmarkUuid] of Object.entries(bookmarks)) {
-			let parentBookmarkUuid = ROOT_UUID;
+			let parentBookmarkUuid = ROOT_MESSAGE_UUID;
 			let tempId = messageMap.get(bookmarkUuid)?.parent_message_uuid;
 
 			// Walk up until we find another bookmark or hit root
-			while (tempId && tempId !== ROOT_UUID) {
+			while (tempId && tempId !== ROOT_MESSAGE_UUID) {
 				if (bookmarkUuids.includes(tempId)) {
 					parentBookmarkUuid = tempId;
 					break;
@@ -140,7 +138,7 @@
 		for (const bookmarkUuid of Object.values(bookmarks)) {
 			let depth = 0;
 			let tempId = bookmarkUuid;
-			while (tempId && tempId !== ROOT_UUID) {
+			while (tempId && tempId !== ROOT_MESSAGE_UUID) {
 				depth++;
 				const msg = messageMap.get(tempId);
 				tempId = msg?.parent_message_uuid;
@@ -244,50 +242,9 @@
 		const conversationId = getConversationId();
 		const contentDiv = document.createElement('div');
 
-		// Moves the leaf and reloads; the loading modal stays up until then.
-		const goTo = async (loadingText, uuid, leafId = null) => {
-			const loadingModal = createLoadingModal(loadingText);
-			loadingModal.show();
-			try {
-				await jumpToMessage(conversation, uuid, leafId);
-			} catch (error) {
-				log.error('Navigation failed:', error);
-				loadingModal.destroy();
-				showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
-			}
-		};
+		const goTo = (loadingText, uuid) => jumpToMessage(conversation, uuid, loadingText);
 
-		// Top buttons row
-		const topButtonsRow = document.createElement('div');
-		topButtonsRow.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
-
-		const latestBtn = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
-			let latestMessage = null;
-			let latestTimestamp = 0;
-
-			const messages = await conversation.getMessages(true);
-			for (const msg of messages) {
-				const timestamp = new Date(msg.created_at).getTime();
-				if (timestamp > latestTimestamp) {
-					latestTimestamp = timestamp;
-					latestMessage = msg;
-				}
-			}
-
-			if (latestMessage) await goTo(localize('nav.navigating_to_latest'), latestMessage.uuid);
-		});
-
-		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
-			const rootId = "00000000-0000-4000-8000-000000000000";
-			const longestLeaf = conversation.findLongestLeaf(rootId);
-			await goTo(localize('nav.navigating_to_longest'), longestLeaf.leafId, longestLeaf.leafId);
-		});
-		latestBtn.classList.add('w-full');
-		longestBtn.classList.add('w-full');
-
-		topButtonsRow.appendChild(latestBtn);
-		topButtonsRow.appendChild(longestBtn);
-		contentDiv.appendChild(topButtonsRow);
+		contentDiv.appendChild(createLatestLongestRow(conversation));
 
 		// Tree view container
 		const treeContainer = document.createElement('div');
@@ -330,8 +287,7 @@
 			treeContainer.appendChild(rootNode);
 
 			// Render tree starting from root
-			const ROOT_UUID = "00000000-0000-4000-8000-000000000000";
-			const treeContent = renderBookmarkTree(tree, ROOT_UUID, goTo, bookmarkDepths, conversationId, renderTree);
+			const treeContent = renderBookmarkTree(tree, ROOT_MESSAGE_UUID, goTo, bookmarkDepths, conversationId, renderTree);
 
 			if (treeContent) {
 				treeContainer.appendChild(treeContent);
@@ -632,8 +588,8 @@
 		const tree = (await conversation.getData()).chat_messages ?? [];
 		let uuid = last && uuidForTurnKey(last.dataset.turnKey, tree);
 		if (!uuid) return null;
-		const children = (id) => tree.filter(m => m.parent_message_uuid === id);
-		for (let kids = children(uuid); kids.length; kids = children(uuid)) {
+		const children = Map.groupBy(tree, m => m.parent_message_uuid);
+		for (let kids = children.get(uuid); kids?.length; kids = children.get(uuid)) {
 			uuid = kids.reduce((a, b) => (b.index > a.index ? b : a)).uuid;
 		}
 		return uuid;
@@ -671,12 +627,20 @@
 		nativeBanner.before(banner);
 	}
 
+	// At most one look per frame: the observer fires constantly while a reply streams.
 	function watchEarlierVersionBanner() {
-		new MutationObserver(() => {
+		let scheduled = false;
+		const check = () => {
+			scheduled = false;
 			const nativeBanner = document.querySelector(EARLIER_VERSION)?.closest('[data-cds="Banner"]');
 			if (!nativeBanner || bannersSeen.has(nativeBanner)) return;
 			bannersSeen.add(nativeBanner);
 			addContinueBanner(nativeBanner).catch(error => log.error('Continue banner failed:', error));
+		};
+		new MutationObserver(() => {
+			if (scheduled) return;
+			scheduled = true;
+			requestAnimationFrame(check);
 		}).observe(document.body, { childList: true, subtree: true });
 	}
 	// #endregion

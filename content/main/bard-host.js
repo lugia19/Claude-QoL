@@ -6,8 +6,7 @@
 // once, and only if a patch changed something. See docs/bard-rework.md, "Interceptor host".
 //
 //   QolBardHost.onSnapshot(fn)     every StreamTimeline update with replace_all_state: the first one,
-//                                  reconnects (which can bring a fresh snapshot), and ones injected
-//                                  through ctx.inject
+//                                  and reconnects (which can bring a fresh snapshot)
 //   QolBardHost.onLiveUpdate(fn)   other StreamTimeline updates carrying messages, display groups or
 //                                  content blocks
 //   QolBardHost.onHistoryPage(fn)  ReadConversationHistoryResponse.update (scrolling up)
@@ -15,21 +14,22 @@
 //   QolBardHost.observe(fn)        read-only: every StreamTimeline event the server sends (no heartbeats)
 //
 // A patch is fn(target, ctx), may be async, edits target in place and returns true when it changed
-// it. ctx = { source: 'stream' | 'history' | 'action', orgId, conversationId, inject } (streams also
-// carry displayLanguage, the page's display_language). On streams,
-// ctx.inject(event) adds a StreamEvent of our own (snapshots run through the onSnapshot patches
-// first) and resolves false once the stream has ended. Registration takes an optional
-// { label } for logs. Everything fails open: a throwing patch is logged and skipped, an undecodable
+// it. ctx = { source: 'stream' | 'history' | 'action', orgId, conversationId } (streams also carry
+// displayLanguage, the page's display_language). Snapshot patches also get ctx.within(promise), for
+// anything they must wait for: it resolves to { value } or, once the snapshot's shared wait budget
+// (SNAPSHOT_WAIT_MS, across all its patches) is spent, to null; the snapshot and every frame behind it
+// are held meanwhile. Registration takes an optional { label } for logs. Everything fails open: a throwing patch is logged and skipped, an undecodable
 // frame or body goes through as it came.
 //
 // QoL's own calls (MAIN world) that must see the server's data go through QolBardHost.rawFetch, the
 // fetch this file wrapped. ReadConversation is never patched.
 //
 // Loads right after net.js and bard-schema.js, at the front of the MAIN group: Firefox doesn't
-// guarantee MAIN-world scripts run before the page's, so the wrapper must be in place early. Anything
-// else it needs (the logger, page.js) is looked up when used.
+// guarantee MAIN-world scripts run before the page's, so the wrapper must be in place early. Only the
+// logger loads before it; page.js is looked up when used.
 //
-// Also records whether the active account is on the merged experience: see accountMode().
+// Also records whether the active account is on the merged experience, for qolAccountMode()
+// (toolbox-ui.js).
 (function () {
 	'use strict';
 
@@ -40,13 +40,11 @@
 	const SERVICE_PATH = '/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/';
 	const KILL_SWITCH = 'claude_qol_bard_host_off';
 	const MODE_KEY = 'claude_qol_account_mode'; // read by qolAccountMode() (toolbox-ui.js) too
+	const SNAPSHOT_WAIT_MS = 6000; // see ctx.within; the largest full-load trees measured took 0.7-2.4 s
 	const MODE_TTL_MS = 60 * 60 * 1000; // re-probe hourly: the rollout moves accounts over without warning
 
 	const net = () => globalThis.ClaudeExtNet;
-	// logger.js loads after this file: until it has, log calls go nowhere (and aren't cached).
-	const silent = Object.assign(() => { }, { warn() { }, error() { } });
-	let loggerInstance = null;
-	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('BardHost')) : silent);
+	const log = createLogger('BardHost');
 
 	const patches = { snapshot: [], liveUpdate: [], historyPage: [], send: [] };
 	const observers = [];
@@ -63,7 +61,7 @@
 			try {
 				if (await fn(target, ctx) === true) changed = true;
 			} catch (e) {
-				logger().error(`${label} threw (${ctx.source}, ${ctx.conversationId ?? 'no conversation'}):`, e);
+				log.error(`${label} threw (${ctx.source}, ${ctx.conversationId ?? 'no conversation'}):`, e);
 			}
 		}
 		return changed;
@@ -74,7 +72,7 @@
 			try {
 				fn(event, ctx);
 			} catch (e) {
-				logger().error(`${label} threw:`, e);
+				log.error(`${label} threw:`, e);
 			}
 		}
 	}
@@ -95,11 +93,21 @@
 		return null;
 	}
 
-	async function plainBody(init) {
-		const bytes = bodyBytes(init);
-		if (!bytes) return null;
-		const n = net();
-		return n.isGzipRequest(init) || n.isGzipBytes(bytes) ? n.gunzipBytes(bytes) : bytes;
+	// Gunzipped. Only byte bodies: reading a stream body would consume it.
+	const plainBody = (init) => bodyBytes(init) ? net().readProtoRequestBody(init) : null;
+
+	// ctx.within for one snapshot: every patch's waits share one deadline.
+	function waitBudget(ms) {
+		const deadline = performance.now() + ms;
+		return async (promise) => {
+			let timer;
+			const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(null), Math.max(0, deadline - performance.now())); });
+			try {
+				return await Promise.race([Promise.resolve(promise).then(value => ({ value })), timeout]);
+			} finally {
+				clearTimeout(timer);
+			}
+		};
 	}
 
 	const hasContent = (update) => !!(update.messages?.length || update.display_groups?.length || update.content_blocks?.length);
@@ -108,7 +116,7 @@
 
 	async function wrapTimeline(thisArg, input, init) {
 		const n = net();
-		const ctx = { source: 'stream', orgId: orgOf(input, init), conversationId: null, displayLanguage: null, inject: null };
+		const ctx = { source: 'stream', orgId: orgOf(input, init), conversationId: null, displayLanguage: null };
 		try {
 			const frame = n.splitConnectFrames(bodyBytes(init) ?? new Uint8Array(0))[0];
 			if (frame) {
@@ -118,24 +126,19 @@
 				ctx.displayLanguage = request.display_language || null;
 			}
 		} catch (e) {
-			logger().warn('could not read the StreamTimeline request:', e);
+			log.warn('could not read the StreamTimeline request:', e);
 		}
 
 		const response = await rawFetch.call(thisArg, input, init);
-		noteMode(ctx.orgId, response);
 		if (!response.ok || !response.body) return response;
 
-		let ended = false; // the server closed this connection (it reconnects on a cadence)
-		const { response: rewritten, inject } = n.rewriteConnectResponse(response, async (frame) => {
-			if (frame.endStream) {
-				ended = true;
-				return undefined;
-			}
+		const { response: rewritten } = n.rewriteConnectResponse(response, async (frame) => {
+			if (frame.endStream) return undefined;
 			let decoded;
 			try {
 				decoded = n.decodeBard('StreamTimelineResponse', frame.payload, { keepUnknown: true });
 			} catch (e) {
-				logger().warn('undecodable StreamTimeline frame, passed through:', e);
+				log.warn('undecodable StreamTimeline frame, passed through:', e);
 				return undefined;
 			}
 			const event = decoded.event;
@@ -145,16 +148,10 @@
 			if (!update) return undefined;
 			const list = update.replace_all_state ? patches.snapshot : hasContent(update) ? patches.liveUpdate : null;
 			if (!list?.length) return undefined;
-			return await runPatches(list, update, ctx) ? n.encodeBard('StreamTimelineResponse', decoded) : undefined;
-		}, { onError: (e) => logger().error('StreamTimeline rewrite error:', e) });
-
-		// Only for this connection: once it has ended, inject the next connection's way (its ctx).
-		ctx.inject = async (event) => {
-			if (ended) return false;
-			if (event?.update?.replace_all_state) await runPatches(patches.snapshot, event.update, ctx);
-			return inject(net().encodeBard('StreamTimelineResponse', { event }));
-		};
-		logger()(`wrapped StreamTimeline for ${ctx.conversationId ?? 'unknown conversation'}`);
+			const patchCtx = update.replace_all_state ? { ...ctx, within: waitBudget(SNAPSHOT_WAIT_MS) } : ctx;
+			return await runPatches(list, update, patchCtx) ? n.encodeBard('StreamTimelineResponse', decoded) : undefined;
+		}, { onError: (e) => log.error('StreamTimeline rewrite error:', e) });
+		log(`wrapped StreamTimeline for ${ctx.conversationId ?? 'unknown conversation'}`);
 		return rewritten;
 	}
 
@@ -167,11 +164,10 @@
 			const body = await plainBody(init);
 			if (body) ctx.conversationId = n.decodeBard('ReadConversationHistoryRequest', body).conversation_id ?? null;
 		} catch (e) {
-			logger().warn('could not read the ReadConversationHistory request:', e);
+			log.warn('could not read the ReadConversationHistory request:', e);
 		}
 
 		const response = await rawFetch.call(thisArg, input, init);
-		noteMode(ctx.orgId, response);
 		if (!response.ok) return response;
 		try {
 			const decoded = n.decodeBard('ReadConversationHistoryResponse', new Uint8Array(await response.clone().arrayBuffer()), { keepUnknown: true });
@@ -179,7 +175,7 @@
 				return n.protoResponse(response, n.encodeBard('ReadConversationHistoryResponse', decoded));
 			}
 		} catch (e) {
-			logger().warn('ReadConversationHistory left unpatched:', e);
+			log.warn('ReadConversationHistory left unpatched:', e);
 		}
 		return response;
 	}
@@ -193,7 +189,7 @@
 			const body = await plainBody(init);
 			if (body) request = n.decodeBard('PerformActionRequest', body, { keepUnknown: true });
 		} catch (e) {
-			logger().warn('could not read the PerformAction request, sent as is:', e);
+			log.warn('could not read the PerformAction request, sent as is:', e);
 		}
 		let finalInit = init;
 		if (request?.send_message) {
@@ -202,13 +198,11 @@
 				try {
 					finalInit = n.withProtoRequestBody(init, n.encodeBard('PerformActionRequest', request));
 				} catch (e) {
-					logger().error('could not re-encode the patched send, sent as is:', e);
+					log.error('could not re-encode the patched send, sent as is:', e);
 				}
 			}
 		}
-		const response = await rawFetch.call(thisArg, input, finalInit);
-		noteMode(orgOf(input, init), response);
-		return response;
+		return rawFetch.call(thisArg, input, finalInit);
 	}
 
 	// ======== the fetch wrapper ========
@@ -229,10 +223,9 @@
 		} catch (e) { /* not a URL we handle */ }
 		if (!method) return rawFetch.apply(this, arguments);
 		diagnostics.firstSeen[method] ??= performance.now();
-		if (wrappers[method] && needs[method]() && !net().isKillSwitchOn(KILL_SWITCH)) {
-			return wrappers[method](this, input, init);
-		}
-		const pending = rawFetch.apply(this, arguments);
+		const pending = wrappers[method] && needs[method]() && !net().isKillSwitchOn(KILL_SWITCH)
+			? wrappers[method](this, input, init)
+			: rawFetch.apply(this, arguments);
 		const orgId = orgOf(input, init);
 		pending.then(response => noteMode(orgId, response), () => { });
 		return pending;
@@ -259,9 +252,13 @@
 	}
 
 	// Any successful RPC means the account is on the merged experience. Failures prove nothing on
-	// their own (a 403 can be about one conversation): only the probe below decides "legacy".
+	// their own (a 403 can be about one conversation): only the probe below decides "legacy". Noted in
+	// memory too, so most RPCs don't touch localStorage.
+	const notedAt = new Map(); // orgId -> when this page last recorded 'merged'
 	function noteMode(orgId, response) {
-		if (response?.ok) setMode(orgId, 'merged');
+		if (!response?.ok || !orgId || Date.now() - (notedAt.get(orgId) ?? 0) < MODE_TTL_MS / 2) return;
+		notedAt.set(orgId, Date.now());
+		setMode(orgId, 'merged');
 	}
 
 	// Once per org and hour: legacy accounts get 403 permission_denied ("not included in your current
@@ -272,19 +269,15 @@
 		const known = readModes()[orgId];
 		if (known && Date.now() - known.at < MODE_TTL_MS) return;
 		try {
-			const response = await rawFetch(`${SERVICE_PATH}GetNewConversationDefaults`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', 'connect-protocol-version': '1', 'x-organization-uuid': orgId },
-				body: '{}',
-			});
+			const response = await rawFetch(...ClaudeExtNet.bardRpcRequest('GetNewConversationDefaults', orgId, '{}'));
 			if (response.ok) {
 				setMode(orgId, 'merged');
 			} else if (response.status === 403 && (await response.json().catch(() => null))?.code === 'permission_denied') {
 				setMode(orgId, 'legacy');
-				logger()('this account is not on the merged experience');
+				log('this account is not on the merged experience');
 			}
 		} catch (e) {
-			logger().warn('account mode probe failed:', e);
+			log.warn('account mode probe failed:', e);
 		}
 	}
 	setTimeout(probeMode, 2000); // after page.js has loaded and the page's own first requests
@@ -297,9 +290,5 @@
 		observe: (fn, opts) => register(observers, fn, opts),
 		rawFetch: (...args) => rawFetch.apply(window, args),
 		diagnostics,
-		// 'merged' | 'legacy' | 'unknown' for orgId (default: the active org).
-		accountMode(orgId = typeof getActiveOrgId === 'function' ? getActiveOrgId() : null) {
-			return readModes()[orgId]?.mode ?? 'unknown';
-		},
 	};
 })();

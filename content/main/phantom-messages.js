@@ -9,23 +9,17 @@
 //   an edit of the first real message creates);
 // - a send whose parent is a phantom (editing the first real message) gets parent "" (a new root),
 //   which the server accepts; with a phantom parent it fails with stale_parent.
-// Phantoms get page ids of their own (claude-api.js's phantomMessageId: a marker prefix), so their rows
-// are recognised by data-turn-key alone, dimmed, and have their toolbar hidden. No markers in the text.
+// Phantoms get page ids of their own (claude-api.js's phantomMessageId: a marker prefix), so a stylesheet
+// dims their rows and hides their toolbars by data-turn-key alone. No markers in the text.
 //
 // The phantoms come from ISOLATED over the bridge, so only conversations listed in
 // localStorage[claude_qol_phantom_ids] (databases.js keeps it current) wait for them.
 (function () {
 	'use strict';
 
-	const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
-	const WAIT_MS = 6000; // the snapshot (and every frame behind it) waits at most this long
-	const ACK_TEXT = 'Acknowledged - end of previous conversation.';
 	const GALLERY_BREAK_MARKER = '====GALLERY_BREAK===='; // injected by image-extractor.js between galleries
 
-	// logger.js loads after this file: until it has, log calls go nowhere (and aren't cached).
-	const silent = Object.assign(() => { }, { warn() { }, error() { } });
-	let loggerInstance = null;
-	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('PhantomMessages')) : silent);
+	const log = createLogger('PhantomMessages');
 
 	const prepared = new Map(); // conversationId -> promise of { update, lastId, ids } or null
 	// conversationId -> built phantoms a snapshot has carried to the page. Only those may be used to
@@ -37,7 +31,7 @@
 		try {
 			if (JSON.parse(localStorage.getItem(PHANTOM_IDS_KEY) || '[]').includes(conversationId)) return true;
 			// Very old forks, not migrated to IndexedDB yet (claude-api.js's getPhantomMessages does that).
-			return !!(localStorage.getItem(`phantom_messages_${conversationId}`) || localStorage.getItem(`fork_history_${conversationId}`));
+			return legacyPhantomKeys(conversationId).some(key => localStorage.getItem(key));
 		} catch (e) {
 			return false;
 		}
@@ -88,7 +82,7 @@
 			});
 		}
 		for (const attachment of json.attachments ?? []) {
-			out.push({ id: `${phantomMessageId(json.uuid)}-attachment-${out.length}`, file_name: attachment.file_name ?? 'attachment.txt' });
+			out.push({ id: `${json.uuid}-attachment-${out.length}`, file_name: attachment.file_name ?? 'attachment.txt' });
 		}
 		return out;
 	}
@@ -96,7 +90,8 @@
 	// One phantom (legacy history JSON) as a Message plus its display groups and content blocks.
 	// Text becomes inline markdown, each tool_use (with its tool_result) a timeline tool row. Thinking
 	// is left out: claude.ai doesn't show it any more.
-	function buildPhantom(json, id, conversationId, orgId, index, parentId, out) {
+	function buildPhantom(json, conversationId, orgId, index, parentId, out) {
+		const id = json.uuid;
 		const isUser = json.sender === 'human';
 		const attachments = attachmentsOf(json);
 		out.messages.push({
@@ -140,22 +135,14 @@
 		if (!groupIndex) addGroup('GROUP_STYLE_INLINE', {}, [{ text: ' ', text_format: { style: 'STYLE_MARKDOWN' } }]);
 	}
 
-	// The phantoms as a ConversationUpdate fragment, or null. A phantom chain ending on a user message
-	// gets an assistant acknowledgement, as the legacy version did (and the fork's handshake expects).
-	// Ids are the page ids (claude-api.js's phantomMessageId), so they never collide with the source
-	// chat's real messages and every phantom row is recognisable by its prefix.
+	// The phantoms as a ConversationUpdate fragment: claude-api.js's pagePhantoms chain (page ids, so
+	// they never collide with the source chat's real messages and every phantom row is recognisable by
+	// its prefix; plus the acknowledgement), with negative indexes.
 	function buildPhantoms(conversationId, orgId, phantoms) {
-		const chain = phantoms.map(json => ({ json, id: phantomMessageId(json.uuid) }));
-		const last = chain.at(-1);
-		if (last?.json.sender === 'human') {
-			chain.push({
-				json: { sender: 'assistant', content: [{ type: 'text', text: ACK_TEXT }], created_at: last.json.created_at },
-				id: `${PHANTOM_ID_PREFIX}0000-4000-8000-${last.json.uuid.slice(-12)}`,
-			});
-		}
+		const chain = pagePhantoms(phantoms);
 		const out = { messages: [], display_groups: [], content_blocks: [] };
-		chain.forEach(({ json, id }, i) => buildPhantom(json, id, conversationId, orgId, i - chain.length, i ? chain[i - 1].id : null, out));
-		return { update: out, lastId: chain.at(-1).id };
+		chain.forEach((json, i) => buildPhantom(json, conversationId, orgId, i - chain.length, i ? json.parent_message_uuid : null, out));
+		return { update: out, lastId: chain.at(-1).uuid };
 	}
 
 	// ======== Getting the phantoms ========
@@ -166,10 +153,12 @@
 		return await response.text();
 	}
 
-	// No stored phantoms: a QoL fork's first message carries chatlog.txt (and summary_chunk_N.txt),
-	// enough to rebuild them, e.g. on another device. The snapshot lists the root's attachments.
+	// A QoL fork's first message carries chatlog.txt (and summary_chunk_N.txt), enough to rebuild the
+	// phantoms when none are stored, e.g. on another device. The snapshot lists the root's attachments.
+	const chatlogRoot = (snapshot) => (snapshot.messages ?? []).find(m => m.role === 'ROLE_USER' && !m.parent_message_id && m.attachments?.some(a => a.file_name === 'chatlog.txt'));
+
 	async function reconstruct(snapshot) {
-		const root = (snapshot.messages ?? []).find(m => m.role === 'ROLE_USER' && !m.parent_message_id && m.attachments?.some(a => a.file_name === 'chatlog.txt'));
+		const root = chatlogRoot(snapshot);
 		if (!root) return null;
 		const chatlog = await fileText(root.attachments.find(a => a.file_name === 'chatlog.txt'));
 		if (!chatlog.startsWith('[CLEXP:MSG_HEADER:')) return null;
@@ -180,7 +169,7 @@
 		const rebuilt = ClaudeConversation.fromChatlog(chatlog, summaries);
 		if (!rebuilt) return null;
 		const messages = (await rebuilt.getMessages()).map(m => m.toHistoryJSON());
-		logger().warn(`no stored phantoms for ${root.conversation_id}, rebuilt ${messages.length} from chatlog.txt`);
+		log.warn(`no stored phantoms for ${root.conversation_id}, rebuilt ${messages.length} from chatlog.txt`);
 		return messages;
 	}
 
@@ -197,10 +186,10 @@
 				if (!phantoms?.length) return null;
 				if (!stored?.length) await storePhantomMessages(conversationId, phantoms);
 				const built = buildPhantoms(conversationId, orgId, phantoms);
-				logger()(`${built.update.messages.length} phantom messages for ${conversationId}`);
+				log(`${built.update.messages.length} phantom messages for ${conversationId}`);
 				return built;
 			})().catch((e) => {
-				logger().error(`phantom messages for ${conversationId} failed:`, e);
+				log.error(`phantom messages for ${conversationId} failed:`, e);
 				prepared.delete(conversationId); // try again on the next snapshot
 				return null;
 			});
@@ -210,8 +199,7 @@
 	}
 
 	// Phantoms worth waiting for: stored ones, or a fork's chatlog.txt on the root to rebuild them from.
-	const worthWaiting = (conversationId, snapshot) => prepared.has(conversationId) || mayHavePhantoms(conversationId)
-		|| (snapshot.messages ?? []).some(m => !m.parent_message_id && m.attachments?.some(a => a.file_name === 'chatlog.txt'));
+	const worthWaiting = (conversationId, snapshot) => prepared.has(conversationId) || mayHavePhantoms(conversationId) || !!chatlogRoot(snapshot);
 
 	// ======== Patches ========
 
@@ -225,20 +213,14 @@
 		return changed;
 	}
 
-	// Phantoms a snapshot already carried: live updates and history pages never wait (a stalled
-	// rebuild would hold every frame behind them).
-	const readyPhantoms = (conversationId) => ready.get(conversationId) ?? null;
-
 	QolBardHost.onSnapshot(async function phantomMessages(update, ctx) {
 		if (!ctx.conversationId || !worthWaiting(ctx.conversationId, update)) return false;
-		let timer;
-		const timeout = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), WAIT_MS); });
-		const built = await Promise.race([prepare(ctx.conversationId, ctx.orgId, update), timeout]);
-		clearTimeout(timer);
-		if (built === 'timeout') {
-			logger().warn(`phantoms for ${ctx.conversationId} took over ${WAIT_MS}ms; this snapshot goes through without them`);
+		const result = await ctx.within(prepare(ctx.conversationId, ctx.orgId, update));
+		if (!result) {
+			log.warn(`phantoms for ${ctx.conversationId} took too long; this snapshot goes through without them`);
 			return false;
 		}
+		const built = result.value;
 		if (!built) return false;
 		const known = new Set((update.messages ?? []).map(m => m.id));
 		if (!known.has(built.lastId)) {
@@ -252,8 +234,10 @@
 		return true;
 	}, { label: 'phantom-messages' });
 
+	// Only phantoms a snapshot already carried: live updates and history pages never wait (a stalled
+	// rebuild would hold every frame behind them).
 	const reparentLater = (update, ctx) => {
-		const built = ctx.conversationId && readyPhantoms(ctx.conversationId);
+		const built = ready.get(ctx.conversationId);
 		return built ? reparentRoots(update, built) : false;
 	};
 	QolBardHost.onLiveUpdate(reparentLater, { label: 'phantom-messages' });
@@ -264,24 +248,21 @@
 	QolBardHost.onSend(function phantomParent(send) {
 		if (!isPhantomId(send.parent_message_id)) return false;
 		send.parent_message_id = '';
-		logger()('send from a phantom: sent as a new root');
+		log('send from a phantom: sent as a new root');
 		return true;
 	}, { label: 'phantom-messages' });
 
-	// ======== DOM: dim phantom rows, hide their toolbars ========
+	// ======== DOM ========
 
-	function stylePhantomRows() {
-		for (const row of document.querySelectorAll('[data-turn-key]')) {
-			if (!isPhantomId(row.getAttribute('data-turn-key')) || row.hasAttribute('data-qol-phantom')) continue;
-			row.setAttribute('data-qol-phantom', '');
-			row.style.filter = 'brightness(0.7)';
-		}
-		// Toolbars mount on hover, so hide them every pass.
-		for (const row of document.querySelectorAll('[data-qol-phantom]')) {
-			const controls = findMessageControls(row);
-			if (controls) controls.style.display = 'none';
-		}
-	}
+	// Phantom rows (a phantom assistant's "<phantom parent>-hub-reply" key has the prefix too): dimmed,
+	// toolbar hidden. Added to <html>, since <head> doesn't exist yet at document_start. The prefix is
+	// claude-api.js's PHANTOM_ID_PREFIX, spelled out: that file loads after this one.
+	const phantomStyle = document.createElement('style');
+	phantomStyle.textContent = `
+		[data-turn-key^="fffffffe-"] { filter: brightness(0.7); }
+		[data-turn-key^="fffffffe-"] [role="toolbar"][data-cds="MessageActions"] { display: none !important; }
+	`;
+	document.documentElement.appendChild(phantomStyle);
 
 	// Gallery-break markers sit between injected image galleries (image-extractor.js; to be ported).
 	// They also appear mid-stream, so they're hidden on every pass.
@@ -314,22 +295,19 @@
 			}
 			return originalClipboardWrite.call(navigator.clipboard, [new ClipboardItem(types)]);
 		} catch (error) {
-			logger().error('Error cleaning clipboard text:', error);
+			log.error('Error cleaning clipboard text:', error);
 			return originalClipboardWrite.call(navigator.clipboard, data);
 		}
 	};
 
 	// The message list is virtualized, so rows mount continuously while scrolling. Observer callbacks
-	// run before paint, so a mounting phantom row is dimmed in the same frame. The interval reattaches
-	// the observer after SPA navigation replaces the container.
+	// run before paint, so a mounting row's markers are hidden in the same frame. The interval
+	// reattaches the observer after SPA navigation replaces the container.
 	let observedContainer = null;
 	let messageObserver = null;
 	let passScheduled = false;
 
-	function runPass() {
-		stylePhantomRows();
-		hideGalleryBreakMarkers();
-	}
+	const runPass = hideGalleryBreakMarkers;
 
 	function schedulePass() {
 		if (passScheduled) return;

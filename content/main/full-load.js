@@ -22,17 +22,8 @@
 
 	const TREE_TTL_MS = 5 * 60 * 1000;
 	const MAX_TREES = 3;
-	// The snapshot (and every frame behind it) waits for the tree at most this long: past it, the
-	// snapshot goes through as it came (the page pages as usual), and the tree still lands in the
-	// cache for the next snapshot. Most reconnects resume without one, so that may be the next load.
-	// The largest chats measured took 0.7-2.4 s.
-	const WAIT_MS = 6000;
-	const RPC = '/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/ReadConversation';
 
-	// logger.js loads after this file: until it has, log calls go nowhere (and aren't cached).
-	const silent = Object.assign(() => { }, { warn() { }, error() { } });
-	let loggerInstance = null;
-	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('FullLoad')) : silent);
+	const log = createLogger('FullLoad');
 
 	const trees = new Map(); // conversationId -> { at, promise of the full ConversationUpdate or null }
 
@@ -46,23 +37,15 @@
 		while (trees.size >= MAX_TREES) trees.delete(trees.keys().next().value);
 		const net = ClaudeExtNet;
 		const startedAt = performance.now();
-		const promise = QolBardHost.rawFetch(RPC, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/proto',
-				'connect-protocol-version': '1',
-				'x-organization-uuid': ctx.orgId,
-				'anthropic-client-platform': 'web_claude_ai',
-			},
-			body: net.encodeBard('ReadConversationRequest', { conversation_id: ctx.conversationId, display_language: ctx.displayLanguage || 'en-US' }),
-		}).then(async (response) => {
+		const body = net.encodeBard('ReadConversationRequest', { conversation_id: ctx.conversationId, display_language: ctx.displayLanguage || 'en-US' });
+		const promise = QolBardHost.rawFetch(...net.bardRpcRequest('ReadConversation', ctx.orgId, body)).then(async (response) => {
 			if (!response.ok) throw new Error(`ReadConversation ${response.status}`);
 			const bytes = new Uint8Array(await response.arrayBuffer());
 			const update = net.decodeBard('ReadConversationResponse', bytes, { keepUnknown: true }).update ?? null;
-			logger()(`full tree for ${ctx.conversationId}: ${update?.messages?.length ?? 0} messages, ${bytes.length} bytes, ${Math.round(performance.now() - startedAt)}ms`);
+			log(`full tree for ${ctx.conversationId}: ${update?.messages?.length ?? 0} messages, ${bytes.length} bytes, ${Math.round(performance.now() - startedAt)}ms`);
 			return update;
 		}).catch((e) => {
-			logger().warn(`no full load for ${ctx.conversationId}, the page keeps paging:`, e);
+			log.warn(`no full load for ${ctx.conversationId}, the page keeps paging:`, e);
 			return null;
 		});
 		trees.set(ctx.conversationId, { at: Date.now(), promise });
@@ -91,14 +74,15 @@
 	// Registered first, so the other onSnapshot patches see the full snapshot.
 	QolBardHost.onSnapshot(async function fullLoad(update, ctx) {
 		if (!ctx.conversationId || !update.older_history_cursor) return false; // nothing more to load
-		let timer;
-		const timeout = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), WAIT_MS); });
-		const tree = await Promise.race([fullTree(ctx), timeout]);
-		clearTimeout(timer);
-		if (tree === 'timeout') {
-			logger().warn(`full tree for ${ctx.conversationId} took over ${WAIT_MS}ms; this snapshot goes through windowed`);
+		// Past the host's wait budget the snapshot goes through as it came (the page pages as usual), and
+		// the tree still lands in the cache for the next snapshot. Most reconnects resume without one, so
+		// that may be the next load.
+		const result = await ctx.within(fullTree(ctx));
+		if (!result) {
+			log.warn(`full tree for ${ctx.conversationId} took too long; this snapshot goes through windowed`);
 			return false;
 		}
+		const tree = result.value;
 		if (!tree) return false; // the snapshot goes through as it came, and the page keeps paging
 		fillSnapshot(update, tree);
 		return true;

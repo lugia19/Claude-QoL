@@ -57,13 +57,14 @@ If this is a writing or creative discussion, include sections for characters, pl
 	}
 
 	async function createConfigModal(messageUuid) {
-		// Pre-fetch messages for token estimation (fire-and-forget)
+		// Pre-fetch messages for token estimation; the fork itself reuses them.
 		const conversationId = getConversationId();
 		const orgId = getOrgId();
 		let fetchedMessages = null;
 		let totalTokens = null;
 
-		getConversationMessages(orgId, conversationId, messageUuid)
+		const prefetched = getConversationMessages(orgId, conversationId, messageUuid);
+		prefetched
 			.then(result => {
 				// An upgraded (workspace) chat's sandbox files live only in its cloud environment.
 				if (result.conversationData.workspace_upgraded) upgradedWarning.style.display = '';
@@ -297,7 +298,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			pendingFork.useSelectedModelForSummary = useSelectedModelToggle.input.checked;
 
 			modal.destroy();
-			await forkConversationClicked(messageUuid);
+			await forkConversationClicked(messageUuid, prefetched);
 			return false;
 		});
 
@@ -306,7 +307,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 	//#endregion
 
-	async function forkConversationClicked(messageUuid) {
+	async function forkConversationClicked(messageUuid, prefetched) {
 		const loadingModal = createLoadingModal(localize('fork.preparing'));
 		loadingModal.show();
 		pendingFork.loadingModal = loadingModal;
@@ -320,7 +321,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			loadingModal.setContent(createLoadingContent(localize('fork.getting_messages')));
 
 			let { conversationData, messages } =
-				await getConversationMessages(orgId, conversationId, messageUuid);
+				await prefetched.catch(() => getConversationMessages(orgId, conversationId, messageUuid));
 
 			const chatName = conversationData.name;
 			const projectUuid = conversationData.project?.uuid || conversationData?.project_uuid || null;

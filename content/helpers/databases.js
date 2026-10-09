@@ -352,7 +352,6 @@
 
 	// Which conversations have phantoms, mirrored to the page's localStorage (ids only) so that
 	// phantom-messages.js (MAIN) can tell synchronously, and only holds those chats' snapshots.
-	const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
 	async function writePhantomIdsMirror() {
 		try {
 			localStorage.setItem(PHANTOM_IDS_KEY, JSON.stringify(await phantomDB.phantomMessages.toCollection().primaryKeys()));
@@ -426,10 +425,5 @@
 	// ======== MAIN world access (claude-api.js's _dbCall) ========
 	// db-serve.js (document_start) answers MAIN from the start of the page load; its handlers wait
 	// for this.
-	resolveQolDb({
-		conversationCache,
-		getPhantomMessages: getPhantomMessagesDB,
-		storePhantomMessages: storePhantomMessagesDB,
-		clearPhantomMessages: clearPhantomMessagesDB,
-	});
+	resolveQolDb(window.ClaudeSearchShared);
 })();

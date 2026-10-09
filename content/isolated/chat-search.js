@@ -254,50 +254,9 @@
 		// Build the search UI
 		const contentDiv = document.createElement('div');
 
-		// Moves the leaf and reloads; the loading modal stays up until then.
-		const goTo = async (loadingText, uuid, leafId = null) => {
-			const jumpLoading = createLoadingModal(loadingText);
-			jumpLoading.show();
-			try {
-				await jumpToMessage(conversation, uuid, leafId);
-			} catch (error) {
-				log.error('Navigation failed:', error);
-				jumpLoading.destroy();
-				showClaudeAlert(localize('common.error'), localize('nav.navigation_failed'));
-			}
-		};
+		const goTo = (loadingText, uuid) => jumpToMessage(conversation, uuid, loadingText);
 
-		// Go to Latest / Go to Longest buttons row
-		const topButtonsRow = document.createElement('div');
-		topButtonsRow.className = CLAUDE_CLASSES.FLEX_GAP_2 + ' mb-4';
-
-		const latestBtn = createClaudeButton(localize('common.go_to_latest'), 'secondary', async () => {
-			let latestMessage = null;
-			let latestTimestamp = 0;
-
-			const messages = await conversation.getMessages(true);
-			for (const msg of messages) {
-				const timestamp = new Date(msg.created_at).getTime();
-				if (timestamp > latestTimestamp) {
-					latestTimestamp = timestamp;
-					latestMessage = msg;
-				}
-			}
-
-			if (latestMessage) await goTo(localize('nav.navigating_to_latest'), latestMessage.uuid);
-		});
-
-		const longestBtn = createClaudeButton(localize('common.go_to_longest'), 'secondary', async () => {
-			const rootId = "00000000-0000-4000-8000-000000000000";
-			const longestLeaf = conversation.findLongestLeaf(rootId);
-			await goTo(localize('nav.navigating_to_longest'), longestLeaf.leafId, longestLeaf.leafId);
-		});
-		longestBtn.classList.add('w-full');
-		latestBtn.classList.add('w-full');
-
-		topButtonsRow.appendChild(latestBtn);
-		topButtonsRow.appendChild(longestBtn);
-		contentDiv.appendChild(topButtonsRow);
+		contentDiv.appendChild(createLatestLongestRow(conversation));
 
 		// Search input row
 		const searchRow = document.createElement('div');
@@ -417,16 +376,6 @@
 		if (!messageUuid) return;
 		sessionStorage.removeItem('message_uuid_to_find');
 		sessionStorage.removeItem('highlight_previous_message'); // legacy key, no longer written
-
-		// Full load can replace the first window with the whole branch a few seconds into the load,
-		// which would move the list under a reveal: wait until its height holds still (up to 10s).
-		let lastHeight = -1;
-		for (let stable = 0, i = 0; stable < 3 && i < 50; i++) {
-			const height = getMessageScroller()?.scrollHeight ?? 0;
-			stable = height > 0 && height === lastHeight ? stable + 1 : 0;
-			lastHeight = height;
-			await new Promise(r => setTimeout(r, 200));
-		}
 
 		const revealed = await revealMessageByUuid(messageUuid);
 		if (!revealed) log('Could not reveal message', messageUuid);
