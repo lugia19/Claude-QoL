@@ -166,8 +166,7 @@
 		// The reply's own row: a just-streamed original reply is keyed "<parent>-hub-reply"
 		// (message-ui.js), so it's found through the tree, fetched fresh so it includes the reply. The
 		// loop waits for that exact row; never guess "the last reply", which can still be the previous
-		// one while the new row mounts. TODO(rework): port auto-speak to QolBardHost.observe (the
-		// stream's settle carries the reply and its parent).
+		// one while the new row mounts.
 		let tree = null;
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
 			let messageElement = document.querySelector(`[data-turn-key="${CSS.escape(String(messageUuid))}"]`);
@@ -190,7 +189,7 @@
 		log('Could not find native read-aloud button for message:', messageUuid);
 	}
 
-	// Sent by tts-interceptor.js when a completion stream ends. Not awaited: the button search can
+	// Sent by tts-interceptor.js when a reply finishes streaming (the turn settles on StreamTimeline). Not awaited: the button search can
 	// outlast the bridge's timeout, and MAIN ignores the reply anyway.
 	ClaudeExtBridge.serve('qol', {
 		handlers: {

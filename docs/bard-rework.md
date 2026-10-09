@@ -249,7 +249,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + `set_current_leaf` | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |
 | Image gallery | Splice blocks into stream and history pages (live and on load) | |
-| TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | The tracker's `request-hook.js` already does this. |
+| TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | **Implemented** (feat/tts-autospeak): `tts-interceptor.js` observes; updates during a turn carry `STATUS_RUNNING` with `status_assistant_message_id` = the reply, and the settle is one update with `STATUS_IDLE` and that reply `is_complete` + `stop_reason`. Only a reply seen running, in the chat on screen, is spoken (snapshots and reconnect replays never are). Verified in Chrome (end to end), the desktop client and Firefox Android (trigger). |
 | TTS "Read aloud" hijack | Unchanged (WebSocket) | Retest. |
 | Export / chat search data | Legacy tree GET, unchanged (D1 revised) | Contingency if it fails: `ReadConversation` (full tree, JSON or proto) through an adapter. Text attachments are file URLs there (fetch the content), and tool input is summarised. |
 | Project file download | Project data is still legacy REST; buttons must move into the "Context" dialog (table behind "Show context") | |

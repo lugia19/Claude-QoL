@@ -3,117 +3,33 @@
 	'use strict';
 	const log = createLogger('TTSInterceptor');
 
-	// Fallback for when message_start didn't yield a UUID: fetch the conversation and
-	// pick the newest assistant message. Only reachable if the stream parse failed.
-	async function findNewAssistantMessage(orgId, conversationId, requestSentTime, maxRetries = 2) {
-		for (let attempt = 0; attempt <= maxRetries; attempt++) {
-			if (attempt > 0) {
-				log(`Assistant message not found, retrying (${attempt}/${maxRetries})...`);
-				await new Promise(r => setTimeout(r, 1000));
-			}
+	// Auto-speak: when a reply finishes streaming in the chat on screen, ask ISOLATED (tts.js) to read it.
+	// On the merged experience the turn runs on StreamTimeline: while it runs, updates carry
+	// conversation.status STATUS_RUNNING with status_assistant_message_id = the reply; it settles in one
+	// update with STATUS_IDLE and that reply complete (is_complete + stop_reason). Only a reply this page
+	// saw running counts, so a snapshot or a reconnect replaying a finished turn never speaks.
+	const runningReplies = new Set(); // reply ids seen while their turn was running
+	const spokenReplies = new Set();
 
-			try {
-				const response = await fetch(
-					`/api/organizations/${orgId}/chat_conversations/${conversationId}?tree=True&rendering_mode=messages&render_all_tools=true`
-				);
-
-				if (!response.ok) {
-					log.error('Failed to fetch conversation:', response.status);
-					continue;
-				}
-
-				const data = await response.json();
-				const messages = data.chat_messages || [];
-
-				const assistantMessage = messages.find(msg =>
-					msg.sender === 'assistant' &&
-					msg.created_at > requestSentTime
-				);
-
-				if (assistantMessage) {
-					return assistantMessage;
-				}
-			} catch (error) {
-				log.error('Error fetching conversation:', error);
-			}
+	QolBardHost.observe(function autoSpeakOnSettle(event, ctx) {
+		const update = event.update;
+		if (!update || update.replace_all_state) return;
+		const conversation = update.conversation;
+		if (conversation?.status === 'STATUS_RUNNING' && conversation.status_assistant_message_id) {
+			runningReplies.add(conversation.status_assistant_message_id);
+			return;
 		}
-
-		return null;
-	}
-
-	const originalFetch = window.fetch;
-	window.fetch = async (...args) => {
-		const [input, config] = args;
-		const url = ClaudeExtNet.getFetchUrl(input);
-
-		// Intercept completion requests
-		if (ClaudeExtNet.isCompletionUrl(url, { retry: true }) && ClaudeExtNet.getFetchMethod(input, config) === 'POST') {
-			// DIAGNOSTIC kill-switch: set localStorage['claude_qol_tts_noclone']='1' to skip the
-			// TTS response.clone()+background read. Teeing the completion body and draining the
-			// clone in a tight loop can make Claude's renderer receive data in bursts (streaming
-			// jank). This lets us confirm that live with no rebuild.
-			if (ClaudeExtNet.isKillSwitchOn('claude_qol_tts_noclone')) {
-				log('TTS clone BYPASSED (claude_qol_tts_noclone=1) — no tee on completion stream');
-				return originalFetch(...args);
-			}
-
-			const { orgId, conversationId } = ClaudeExtNet.getApiIds(url);
-			const currentConversationId = getConversationId();
-
-			// Only handle if valid and matches current conversation
-			if (!orgId || !conversationId || (currentConversationId && conversationId !== currentConversationId)) {
-				return originalFetch(...args);
-			}
-
-			log('Intercepted completion request for TTS handling:', url);
-			const requestSentTime = new Date().toISOString();
-
-			// Make the original request
-			const response = await originalFetch(...args);
-
-			// Clone the response so we can consume the stream without affecting Claude's UI
-			const clonedResponse = response.clone();
-
-			// Consume the cloned stream in the background
-			(async () => {
-				try {
-					let responseUuid = null;
-					// Read until message_stop, picking the response UUID out of message_start. Only
-					// those two events are parsed; returning false cancels the clone, so it stops
-					// buffering whatever follows.
-					await ClaudeExtNet.readSseEvents(clonedResponse, (event) => {
-						if (!responseUuid && event.raw.includes('"message_start"')) {
-							responseUuid = event.data?.message?.uuid ?? null;
-							log('TTS: Got response UUID from message_start:', responseUuid);
-						}
-						if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) {
-							log('Stream completion detected');
-							return false;
-						}
-					});
-
-					log('Completed reading completion response stream for TTS handling');
-					// The UUID from message_start is all the ISOLATED side needs - it only uses it
-					// to locate the message in the DOM. Refetching the whole conversation to look
-					// up a UUID we already have is pure waste, so only do it if parsing failed.
-					const messageUuid = responseUuid
-						?? (await findNewAssistantMessage(orgId, conversationId, requestSentTime))?.uuid;
-
-					if (messageUuid) {
-						ClaudeExtBridge.call('qol', 'TTS_AUTO_SPEAK', { messageUuid }).catch(() => {});
-					} else {
-						log('No new assistant message found after retries');
-					}
-				} catch (error) {
-					log.error('Error processing completion stream:', error);
-				}
-			})();
-
-			return response;
+		if (conversation?.status !== 'STATUS_IDLE') return;
+		for (const message of update.messages ?? []) {
+			if (message.role !== 'ROLE_ASSISTANT' || !message.is_complete || !message.stop_reason) continue;
+			if (!runningReplies.delete(message.id) || spokenReplies.has(message.id)) continue;
+			// Only the chat on screen: its row is what tts.js reads aloud.
+			if (ctx.conversationId !== getConversationId()) continue;
+			spokenReplies.add(message.id);
+			log('Turn settled, auto-speak for', message.id);
+			ClaudeExtBridge.call('qol', 'TTS_AUTO_SPEAK', { messageUuid: message.id }).catch(() => { });
 		}
-
-		return originalFetch(...args);
-	};
+	}, { label: 'tts-auto-speak' });
 
 	// Handle dialogue analysis requests from ISOLATED world. ISOLATED asks here, the reverse of what
 	// ClaudeExtBridge supports, so this relay stays hand-rolled.
