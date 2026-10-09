@@ -5,8 +5,9 @@
 
 
 	//#region PCM Helpers
-	// Native claude.ai TTS plays raw 16kHz mono s16le PCM. Providers stream PCM (ElevenLabs at
-	// 16kHz, OpenAI at 24kHz); we normalize everything to 16kHz mono and hand ArrayBuffers back.
+	// Providers stream PCM (ElevenLabs at 16kHz, OpenAI at 24kHz); we normalize everything to 16kHz mono
+	// s16le and hand ArrayBuffers back. tts-ws-interceptor.js turns that into whatever the native player
+	// asked for (Opus packets nowadays).
 
 	// Stateful linear resampler (s16 mono, srcRate -> dstRate) safe across streamed chunks.
 	class LinearResampler {

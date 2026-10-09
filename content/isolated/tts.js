@@ -153,8 +153,23 @@
 			abortSynth(d.requestId);
 		} else if (d?.type === 'TTS_HIJACK_CONFIG_REQUEST') {
 			pushHijackConfig();
+		} else if (d?.type === 'TTS_OPUS_WASM_REQUEST') {
+			sendOpusWasm();
 		}
 	});
+
+	// The Opus encoder's .wasm for tts-ws-interceptor.js (MAIN), which claude.ai's CSP keeps from
+	// fetching extension files itself. A public library, so answering any page script is harmless.
+	async function sendOpusWasm() {
+		try {
+			const response = await fetch(chrome.runtime.getURL('lib/opus/opus-encoder.wasm'));
+			const bytes = await response.arrayBuffer();
+			window.postMessage({ type: 'TTS_OPUS_WASM', bytes }, window.location.origin, [bytes]);
+		} catch (error) {
+			log.error('Could not load the Opus encoder:', error);
+			window.postMessage({ type: 'TTS_OPUS_WASM', error: String(error) }, window.location.origin);
+		}
+	}
 
 	async function autoSpeak(messageUuid) {
 		const settings = await loadSettings();
