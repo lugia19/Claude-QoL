@@ -22,6 +22,11 @@
 
 	const TREE_TTL_MS = 5 * 60 * 1000;
 	const MAX_TREES = 3;
+	// The snapshot (and every frame behind it) waits for the tree at most this long: past it, the
+	// snapshot goes through as it came (the page pages as usual), and the tree still lands in the
+	// cache for the next snapshot. Most reconnects resume without one, so that may be the next load.
+	// The largest chats measured took 0.7-2.4 s.
+	const WAIT_MS = 6000;
 	const RPC = '/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/ReadConversation';
 
 	// logger.js loads after this file: until it has, log calls go nowhere (and aren't cached).
@@ -86,7 +91,14 @@
 	// Registered first, so the other onSnapshot patches see the full snapshot.
 	QolBardHost.onSnapshot(async function fullLoad(update, ctx) {
 		if (!ctx.conversationId || !update.older_history_cursor) return false; // nothing more to load
-		const tree = await fullTree(ctx);
+		let timer;
+		const timeout = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), WAIT_MS); });
+		const tree = await Promise.race([fullTree(ctx), timeout]);
+		clearTimeout(timer);
+		if (tree === 'timeout') {
+			logger().warn(`full tree for ${ctx.conversationId} took over ${WAIT_MS}ms; this snapshot goes through windowed`);
+			return false;
+		}
 		if (!tree) return false; // the snapshot goes through as it came, and the page keeps paging
 		fillSnapshot(update, tree);
 		return true;
