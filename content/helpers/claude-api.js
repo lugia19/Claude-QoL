@@ -631,19 +631,34 @@ class ClaudeConversation {
 		return longestPath;
 	}
 
-	// Navigate to a specific leaf
+	// Navigate to a specific leaf (it must have no children), then reload onto it.
+	// Through the merged experience's set_current_leaf: the legacy PUT also moves the leaf, but the
+	// StreamTimeline snapshot can keep serving the old one for a while after it, so the reload landed
+	// on the wrong branch. Connect's JSON codec, so it works from either world without the protobuf
+	// schema. The RPCs check Origin: a Firefox content script's own fetch sends the extension's, so it
+	// uses the page's (content.fetch); elsewhere plain fetch already sends claude.ai's.
 	async setCurrentLeaf(leafId) {
-		const url = `/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}/current_leaf_message_uuid`;
-
-		const response = await fetch(url, {
-			method: 'PUT',
+		const pageFetch = globalThis.content?.fetch?.bind(globalThis.content) ?? fetch;
+		const response = await pageFetch(`${location.origin}/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/PerformAction`, {
+			method: 'POST',
 			credentials: 'include',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ current_leaf_message_uuid: leafId })
+			headers: {
+				'content-type': 'application/json',
+				'connect-protocol-version': '1',
+				'x-organization-uuid': this.orgId,
+				'anthropic-client-platform': 'web_claude_ai',
+			},
+			body: JSON.stringify({
+				header: {
+					conversationId: this.conversationId,
+					mutationId: { sessionId: `sess_qol${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, version: '1' },
+				},
+				setCurrentLeaf: { currentLeafMessageId: leafId },
+			}),
 		});
 
 		if (!response.ok) {
-			throw new Error('Failed to set current leaf');
+			throw new Error(`Failed to set current leaf (${response.status})`);
 		}
 
 		// Bust the react-query cache before reloading
