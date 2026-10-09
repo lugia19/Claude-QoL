@@ -347,8 +347,10 @@ async function _settleOnMessage(target, highlight) {
 		const fitsOnScreen = !scroller || target.getBoundingClientRect().height <= scroller.clientHeight;
 		target.scrollIntoView({ block: fitsOnScreen ? 'center' : 'start' });
 		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+		// Visible inside the message list, not just the window (the header and composer overlap it).
 		const rect = target.getBoundingClientRect();
-		if (!target.isConnected || (rect.bottom > 0 && rect.top < window.innerHeight)) break;
+		const view = scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+		if (!target.isConnected || (rect.bottom > view.top && rect.top < view.bottom)) break;
 	}
 
 	if (highlight) {
