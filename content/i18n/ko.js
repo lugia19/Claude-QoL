@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// account
 	"account.legacy_title": "계정이 아직 새로운 claude.ai로 전환되지 않았습니다",
 	"account.legacy_body": "이 버전의 Claude QoL은 claude.ai의 새로운 환경이 필요하지만, 아직 계정에 적용되지 않았습니다. 그때까지 채팅 기능은 작동하지 않습니다.",
+
+	// settings
+	"settings.full_load": "전체 대화 불러오기",
+	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
 });

@@ -15,7 +15,8 @@
 //   QolBardHost.observe(fn)        read-only: every StreamTimeline event the server sends (no heartbeats)
 //
 // A patch is fn(target, ctx), may be async, edits target in place and returns true when it changed
-// it. ctx = { source: 'stream' | 'history' | 'action', orgId, conversationId, inject }. On streams,
+// it. ctx = { source: 'stream' | 'history' | 'action', orgId, conversationId, inject } (streams also
+// carry displayLanguage, the page's display_language). On streams,
 // ctx.inject(event) adds a StreamEvent of our own (snapshots run through the onSnapshot patches
 // first) and resolves false once the stream has ended. Registration takes an optional
 // { label } for logs. Everything fails open: a throwing patch is logged and skipped, an undecodable
@@ -107,12 +108,14 @@
 
 	async function wrapTimeline(thisArg, input, init) {
 		const n = net();
-		const ctx = { source: 'stream', orgId: orgOf(input, init), conversationId: null, inject: null };
+		const ctx = { source: 'stream', orgId: orgOf(input, init), conversationId: null, displayLanguage: null, inject: null };
 		try {
 			const frame = n.splitConnectFrames(bodyBytes(init) ?? new Uint8Array(0))[0];
 			if (frame) {
 				const payload = frame.flags & 1 ? await n.gunzipBytes(frame.payload) : frame.payload;
-				ctx.conversationId = n.decodeBard('StreamTimelineRequest', payload).conversation_id ?? null;
+				const request = n.decodeBard('StreamTimelineRequest', payload);
+				ctx.conversationId = request.conversation_id ?? null;
+				ctx.displayLanguage = request.display_language || null;
 			}
 		} catch (e) {
 			logger().warn('could not read the StreamTimeline request:', e);

@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	// account
 	"account.legacy_title": "Votre compte n'est pas encore sur le nouveau claude.ai",
 	"account.legacy_body": "Cette version de Claude QoL a besoin de la nouvelle expérience de claude.ai, qui n'est pas encore arrivée sur votre compte. Ses fonctions de chat ne marcheront pas d'ici là.",
+
+	// settings
+	"settings.full_load": "Charger les conversations entières",
+	"settings.full_load_hint": "Charge tous les messages à l'ouverture d'un chat, pour que Ctrl+F, la recherche dans le chat et les signets atteignent les anciens messages. Désactivez-le si les longs chats semblent lents.",
 });

@@ -127,6 +127,19 @@ with the header `conversation_id` = **a new uuid we choose**.
 
 ## Loading every message (and Ctrl+F)
 
+**Implemented: `content/main/full-load.js`**, an `onSnapshot` patch on the host.
+- After each real snapshot that has `older_history_cursor`, it injects the synthetic snapshot described below.
+- **Full tree:** `ReadConversation` through `QolBardHost.rawFetch`, cached per conversation for 5 minutes. Each reconnect snapshot reuses the cache, with its own entries winning.
+- **Toggle:** "Load whole conversations" in the gear modal (`extension-settings.js`), default on, mirrored to `localStorage.claude_qol_full_load` (`'0'` = off). It applies on the next load, and Save reloads.
+- **Verified 2026-10-09:**
+  - Chrome:
+    - 16 → 258 rows by 2.4 s;
+    - Ctrl+F finds message 1 (1/1, previously 0/0);
+    - still 258 after 6 stream connections over 3 minutes, from one `ReadConversation`, with no history calls;
+    - toggle off gives native paging again;
+    - a short chat makes no call.
+  - The desktop client: 16 → 258.
+
 - **How the list grows:** from the snapshot's window, bounded by `older_history_cursor` (29) and `baseline_floor_message_id` (30), and **only** through `ReadConversationHistory` pages. Older messages in an ordinary update are ignored.
 - **Approach (D6):** pass the real snapshot through, fetch `ReadConversation` (proto, response field 2 = the update), then enqueue a **synthetic second snapshot**: the original snapshot's fields (keeping `replace_all_state`) minus 29/30, plus the full tree's messages/display groups/content blocks (3/4/5).
   - 1,403-message chat (2.4 MB, ~1 s fetch): all 258 current-path rows known ~1.5 s after load, no scroll jump, jump-to-top instant, zero history calls.
@@ -187,6 +200,7 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
   - `QolBardHost.rawFetch` (MAIN-world calls that must see server data; ISOLATED fetches are never patched);
   - kill switch `localStorage.claude_qol_bard_host_off = '1'`.
 - **Manifest position:** first in the MAIN group after `extra-models.js`, preceded only by `net.js` and `bard-schema.js` (Firefox ordering). The logger and `page.js` are looked up lazily.
+- **Feature scripts that register patches load right after the host** (e.g. `full-load.js`). The host decides at fetch time whether to wrap a connection, so a feature registering after the page's first `StreamTimeline` would miss that snapshot (Firefox). Like the host, they look up later globals lazily.
 - **Account mode:** `QolBardHost.accountMode()` in MAIN, or `qolAccountMode()` (toolbox-ui.js) in either world, gives `'merged' | 'legacy' | 'unknown'` for the active org, from page `localStorage.claude_qol_account_mode`.
   - **`merged`:** any successful RPC response sets it.
   - **`legacy`:** only an hourly `GetNewConversationDefaults` probe returning 403 `permission_denied` sets it.

@@ -45,6 +45,10 @@ const SETTINGS_KEYS = {
 	NAVIGATION: {
 		BOOKMARKS: { key: 'navigation_bookmarks', default: {}, type: 'object' },
 	},
+	// Mirrored to localStorage[claude_qol_full_load] by extension-settings.js for content/main/full-load.js.
+	FULL_LOAD: {
+		ENABLED: { key: 'full_load_enabled', default: true, type: 'boolean' },
+	},
 	IMAGE_EXTRACTOR: {
 		ENABLED: { key: 'image_gallery_enabled', default: true, type: 'boolean' },
 		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },

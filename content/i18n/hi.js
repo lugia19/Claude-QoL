@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// account
 	"account.legacy_title": "आपका खाता अभी नए claude.ai पर नहीं है",
 	"account.legacy_body": "Claude QoL के इस संस्करण को claude.ai का नया अनुभव चाहिए, जो अभी आपके खाते तक नहीं पहुँचा है। तब तक इसकी चैट सुविधाएँ काम नहीं करेंगी।",
+
+	// settings
+	"settings.full_load": "पूरी बातचीत लोड करें",
+	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
 });

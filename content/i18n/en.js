@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	// account
 	"account.legacy_title": "Your account isn't on the new claude.ai yet",
 	"account.legacy_body": "This version of Claude QoL needs claude.ai's new experience, which hasn't reached your account. Its chat features won't work until it does.",
+
+	// settings
+	"settings.full_load": "Load whole conversations",
+	"settings.full_load_hint": "Loads every message when a chat opens, so Ctrl+F, chat search and bookmarks can reach old messages. Turn it off if long chats feel slow.",
 });

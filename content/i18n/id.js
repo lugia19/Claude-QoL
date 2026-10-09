@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// account
 	"account.legacy_title": "Akun Anda belum menggunakan claude.ai yang baru",
 	"account.legacy_body": "Versi Claude QoL ini memerlukan tampilan baru claude.ai, yang belum tersedia untuk akun Anda. Fitur obrolannya tidak akan berfungsi sampai saat itu.",
+
+	// settings
+	"settings.full_load": "Muat seluruh percakapan",
+	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
 });

@@ -359,4 +359,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// account
 	"account.legacy_title": "お使いのアカウントはまだ新しい claude.ai に移行していません",
 	"account.legacy_body": "このバージョンの Claude QoL には claude.ai の新しいエクスペリエンスが必要ですが、まだお使いのアカウントでは利用できません。それまでチャット機能は動作しません。",
+
+	// settings
+	"settings.full_load": "会話全体を読み込む",
+	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
 });
