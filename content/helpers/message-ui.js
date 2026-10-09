@@ -207,7 +207,7 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 
 		// Already on screen — nothing to hunt for.
 		const alreadyThere = findTarget();
-		if (alreadyThere) return await _settleOnMessage(alreadyThere, highlight);
+		if (alreadyThere) return await _settleOnMessage(findTarget, highlight);
 
 		const messages = await conv.getRenderedMessages();
 		const positions = new Map(messages.map((msg, i) => [msg.uuid, i]));
@@ -228,9 +228,8 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 			await _bracketTowardAnchor(scroller, findTarget, positionOf, targetPosition, maxProbes);
 		}
 
-		const target = findTarget();
-		if (!target) return null;
-		return await _settleOnMessage(target, highlight);
+		if (!findTarget()) return null;
+		return await _settleOnMessage(findTarget, highlight);
 	} catch (error) {
 		messageUiLog.error('revealMessageByUuid failed:', error);
 		return null;
@@ -326,7 +325,8 @@ async function _bracketTowardAnchor(scroller, findAnchor, positionOf, targetPosi
 }
 
 // Centre the message and flash it.
-async function _settleOnMessage(target, highlight) {
+// Scrolls the row findTarget() returns into view and returns it, or null if it can't be kept there.
+async function _settleOnMessage(findTarget, highlight) {
 	// Instant, not smooth: smooth-scrolling across a virtualized list unmounts
 	// rows mid-flight and the scroll lands nowhere.
 	//
@@ -335,18 +335,30 @@ async function _settleOnMessage(target, highlight) {
 	// middle of the text instead of at its start.
 	//
 	// Rows that just mounted still get measured, and the virtualizer corrects
-	// scrollTop for that over the next frames, which can undo our scroll: check
-	// after a couple of frames and settle again if the target drifted off screen.
+	// scrollTop for that over the next frames, which can undo our scroll (or
+	// unmount the row): look the row up again after a couple of frames, and
+	// settle again if it drifted off screen or was replaced.
 	const scroller = getMessageScroller();
-	for (let attempt = 0; attempt < 3; attempt++) {
-		const fitsOnScreen = !scroller || target.getBoundingClientRect().height <= scroller.clientHeight;
-		target.scrollIntoView({ block: fitsOnScreen ? 'center' : 'start' });
-		await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-		// Visible inside the message list, not just the window (the header and composer overlap it).
-		const rect = target.getBoundingClientRect();
+	const nextFrames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+	// Visible inside the message list, not just the window (the header and composer overlap it).
+	const isVisible = (el) => {
+		const rect = el.getBoundingClientRect();
 		const view = scroller?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
-		if (!target.isConnected || (rect.bottom > view.top && rect.top < view.bottom)) break;
+		return rect.bottom > view.top && rect.top < view.bottom;
+	};
+	let target = null;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		target = findTarget();
+		if (target) {
+			const fitsOnScreen = !scroller || target.getBoundingClientRect().height <= scroller.clientHeight;
+			target.scrollIntoView({ block: fitsOnScreen ? 'center' : 'start' });
+		}
+		await nextFrames();
+		target = findTarget();
+		if (target && isVisible(target)) break;
+		target = null;
 	}
+	if (!target) return null;
 
 	if (highlight) {
 		target.style.transition = 'background-color 0.3s';
