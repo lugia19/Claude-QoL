@@ -123,7 +123,7 @@
 	}
 
 	// Give up after ~5s rather than retrying forever: a stuck pendingEditData would
-	// hijack the next unrelated completion request.
+	// hijack the next unrelated send.
 	const AUTO_SUBMIT_MAX_ATTEMPTS = 100;
 
 	function autoSubmitEditWithText(newText, attempt = 0) {
@@ -145,7 +145,7 @@
 		const { textarea, saveButton } = controls;
 		textarea.focus();
 		textarea.select();
-		// Always append a space to guarantee the UI detects a change — the fetch interceptor overwrites the text anyway
+		// Always append a space to guarantee the UI detects a change — the send patch overwrites the text anyway
 		document.execCommand('insertText', false, newText + ' ');
 
 		setTimeout(() => {
@@ -662,48 +662,42 @@
 		});
 	}
 
-	async function formatNewRequest(url, config) {
-		const originalBody = await ClaudeExtNet.readJsonRequestBody(config);
-		const completionJson = editMessage.toCompletionJSON();
-
-		const modifiedBody = {
-			...originalBody,
-			prompt: completionJson.prompt,
-			files: completionJson.files,
-			attachments: completionJson.attachments
-		};
-
-		return {
-			url,
-			config: await ClaudeExtNet.withJsonRequestBody(config, modifiedBody)
-		};
+	// The edit's send_message, rebuilt from the modal: its text, its uploaded or kept files by id, and its
+	// text attachments inline. Files removed in the modal are simply not sent.
+	function applyEdit(send) {
+		const { files_v2, attachments } = editMessage._getFilesJSON();
+		send.text = editMessage.text;
+		send.attachments = files_v2.map(file => ({
+			id: file.file_uuid,
+			file_name: file.file_name,
+			file_kind: file.file_kind === 'image' ? 'FILE_KIND_IMAGE' : 'FILE_KIND_DOCUMENT',
+		}));
+		send.inline_attachments = attachments.map(attachment => ({
+			file_name: attachment.file_name,
+			file_size: String(attachment.file_size ?? attachment.extracted_content?.length ?? 0),
+			file_type: attachment.file_type || 'text/plain',
+			extracted_content: attachment.extracted_content ?? '',
+		}));
 	}
 	//#endregion
 
-	//#region Fetch Patching
-	const originalFetch = window.fetch;
-	window.fetch = async (...args) => {
-		const [input, config] = args;
-		const url = ClaudeExtNet.getFetchUrl(input);
-
-		// Intercept /completion requests when edit data is pending
-		if (pendingEditData && ClaudeExtNet.isCompletionUrl(url) && ClaudeExtNet.getFetchMethod(input, config) === 'POST') {
-			log('Intercepting edit completion request');
-			pendingEditData = null;
-
-			try {
-				const modifiedRequest = await formatNewRequest(url, config);
-				cleanupEditState();
-				return originalFetch(modifiedRequest.url, modifiedRequest.config);
-			} catch (error) {
-				log.error('Error applying edit modifications:', error);
-				cleanupEditState();
-				return originalFetch(...args);
-			}
+	//#region Send rewriting
+	// claude.ai's own edit (submitted by autoSubmitEditWithText) goes out as a PerformAction
+	// send_message, which the interceptor host hands to this patch before it leaves.
+	QolBardHost.onSend(function advancedEdit(send) {
+		if (!pendingEditData || !editMessage) return false;
+		pendingEditData = null;
+		try {
+			applyEdit(send);
+			log('Applied the advanced edit to the send');
+			return true;
+		} catch (error) {
+			log.error('Error applying edit modifications, sent as is:', error);
+			return false;
+		} finally {
+			cleanupEditState();
 		}
-
-		return originalFetch(...args);
-	};
+	}, { label: 'advanced-edit' });
 	//#endregion
 
 	MessageButtonBar.register({
