@@ -19,6 +19,7 @@
 	if (localStorage.getItem('claude_qol_full_load') === '0') return;
 
 	const TREE_TTL_MS = 5 * 60 * 1000;
+	const MAX_TREES = 3;
 	const RPC = '/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/ReadConversation';
 
 	// logger.js loads after this file: until it has, log calls go nowhere (and aren't cached).
@@ -32,8 +33,11 @@
 	// The whole conversation, from ReadConversation. Shared by concurrent snapshots, reused for a few
 	// minutes: a reconnect's snapshot carries anything new itself (see buildSynthetic).
 	function fullTree(ctx) {
+		// Drop expired trees, and keep at most a few: each one holds a whole decoded conversation.
+		for (const [id, entry] of trees) if (Date.now() - entry.at >= TREE_TTL_MS) trees.delete(id);
 		const cached = trees.get(ctx.conversationId);
-		if (cached && Date.now() - cached.at < TREE_TTL_MS) return cached.promise;
+		if (cached) return cached.promise;
+		while (trees.size >= MAX_TREES) trees.delete(trees.keys().next().value);
 		const net = ClaudeExtNet;
 		const startedAt = performance.now();
 		const promise = QolBardHost.rawFetch(RPC, {
@@ -83,6 +87,14 @@
 	QolBardHost.onSnapshot(function fullLoad(update, ctx) {
 		if (injected.has(update) || !ctx.conversationId || !ctx.inject) return false;
 		if (!update.older_history_cursor) return false; // the whole conversation is already in it
+		// A turn in progress: injecting this snapshot later would roll the streaming reply back and
+		// lose the text that arrived meanwhile. Just warm the cache; the next snapshot (a reconnect
+		// after the turn) injects right away from it. (A send in the ~1 s before a first-load tree
+		// arrives isn't guarded: not worth tracking every update for.)
+		if (update.conversation?.status === 'STATUS_RUNNING') {
+			fullTree(ctx);
+			return false;
+		}
 		// Registered first, so this is the snapshot before any other patch changed it; the synthetic
 		// snapshot goes through those patches itself when injected.
 		const snapshot = structuredClone(update);
