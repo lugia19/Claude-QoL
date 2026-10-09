@@ -28,7 +28,9 @@
 	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('PhantomMessages')) : silent);
 
 	const prepared = new Map(); // conversationId -> promise of { update, lastId, ids } or null
-	const ready = new Map(); // conversationId -> what that promise resolved to, once it has
+	// conversationId -> built phantoms a snapshot has carried to the page. Only those may be used to
+	// re-parent later roots: a parent the page never received would cut the message off.
+	const ready = new Map();
 	const phantomRowKeys = new Set(); // data-turn-key values of phantom rows, any conversation
 	const lastPhantomIds = new Set(); // ids a send must not use as its parent
 
@@ -166,6 +168,8 @@
 				// exist yet right after an update): a rebuild from chatlog.txt is lossier than what's
 				// stored, and would be stored over it.
 				const stored = await getPhantomMessages(conversationId);
+				// undefined: the database didn't answer. Rebuilding now could store over a real record.
+				if (stored === undefined) throw new Error('the phantom database did not answer');
 				const phantoms = stored?.length ? stored : await reconstruct(snapshot);
 				if (!phantoms?.length) return null;
 				if (!stored?.length) await storePhantomMessages(conversationId, phantoms);
@@ -183,7 +187,6 @@
 				return null;
 			});
 			prepared.set(conversationId, pending);
-			pending.then(built => ready.set(conversationId, built));
 		}
 		return prepared.get(conversationId);
 	}
@@ -204,8 +207,8 @@
 		return changed;
 	}
 
-	// The prepared phantoms only if they're already built: live updates and history pages never wait
-	// (a stalled rebuild would hold every frame behind them).
+	// Phantoms a snapshot already carried: live updates and history pages never wait (a stalled
+	// rebuild would hold every frame behind them).
 	const readyPhantoms = (conversationId) => ready.get(conversationId) ?? null;
 
 	QolBardHost.onSnapshot(async function phantomMessages(update, ctx) {
@@ -227,6 +230,7 @@
 			(update.content_blocks ??= []).push(...copy.content_blocks);
 		}
 		reparentRoots(update, built);
+		ready.set(ctx.conversationId, built);
 		return true;
 	}, { label: 'phantom-messages' });
 

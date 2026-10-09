@@ -5,15 +5,15 @@ const apiLog = createLogger('API');
 const MAX_FILES_PER_MESSAGE = 18;
 
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
-// ISOLATED uses databases.js directly; MAIN asks it over ClaudeExtBridge (served in databases.js).
-// A failed or unanswered call resolves null: callers treat that as "nothing stored".
-// The 5s timeout bounds the wait when the call is lost, see the serve() comment in databases.js.
+// ISOLATED uses databases.js directly; MAIN asks it over ClaudeExtBridge (served by db-serve.js).
+// A failed or unanswered call resolves undefined, while a handler's own "nothing stored" is null:
+// most callers treat both as nothing, but whoever would overwrite stored data must tell them apart.
 async function _dbCall(type, data) {
 	try {
 		return await ClaudeExtBridge.call('qol', type, data, { timeout: 5000 });
 	} catch (e) {
 		apiLog.warn(`${type} failed:`, e.message);
-		return null;
+		return undefined;
 	}
 }
 
@@ -38,7 +38,8 @@ async function storePhantomMessages(conversationId, messages) {
 	await _dbCall('PHANTOM_STORE', { conversationId, messages });
 }
 
-// Phantom messages as history JSON (ClaudeMessage.toHistoryJSON), or null.
+// Phantom messages as history JSON (ClaudeMessage.toHistoryJSON); null when none are stored, and
+// (MAIN only) undefined when the database couldn't be asked.
 async function getPhantomMessages(conversationId) {
 	// Very old forks kept them in the page's localStorage: move them to IndexedDB on first read.
 	for (const key of [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`]) {
@@ -54,7 +55,7 @@ async function getPhantomMessages(conversationId) {
 	const get = window.ClaudeSearchShared?.getPhantomMessages;
 	if (get) return await get(conversationId);
 
-	return await _dbCall('PHANTOM_GET', { conversationId }) || null;
+	return await _dbCall('PHANTOM_GET', { conversationId });
 }
 
 const ROOT_MESSAGE_UUID = "00000000-0000-4000-8000-000000000000";
