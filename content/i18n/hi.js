@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"fork.creating": "फ़ोर्क की गई बातचीत बनाई जा रही है...",
 	"fork.complete_redirecting": "फ़ोर्क पूरा हुआ! रीडायरेक्ट हो रहा है...",
 	"fork.fork_failed": "बातचीत फ़ोर्क नहीं हो सकी: {error}",
+	"fork.upgraded_warning": "यह चैट एक क्लाउड वातावरण में चलती है: फ़ोर्क की गई चैट में वहाँ बनाई गई कोई भी फ़ाइल शामिल नहीं होगी!",
 	"fork.files_not_transferred": "नीचे दी गई फ़ाइलें फ़ोर्क की गई बातचीत में ट्रांसफ़र नहीं हो सकीं:",
 	"fork.file_transfer_warning": "फ़ाइल ट्रांसफ़र चेतावनी",
 	"fork.upload_failed_title": "फ़ाइल अपलोड विफल",

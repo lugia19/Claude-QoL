@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"fork.creating": "포크된 대화 생성 중...",
 	"fork.complete_redirecting": "포크 완료! 이동 중...",
 	"fork.fork_failed": "대화를 포크하지 못했습니다: {error}",
+	"fork.upgraded_warning": "이 채팅은 클라우드 환경에서 실행됩니다. 포크한 채팅에는 그곳에서 만든 파일이 포함되지 않습니다!",
 	"fork.files_not_transferred": "다음 파일을 포크된 대화로 옮기지 못했습니다:",
 	"fork.file_transfer_warning": "파일 전송 경고",
 	"fork.upload_failed_title": "파일 업로드 실패",

@@ -65,6 +65,8 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 		getConversationMessages(orgId, conversationId, messageUuid)
 			.then(result => {
+				// An upgraded (workspace) chat's sandbox files live only in its cloud environment.
+				if (result.conversationData.workspace_upgraded) upgradedWarning.style.display = '';
 				fetchedMessages = result.messages;
 				totalTokens = estimateTokens(fetchedMessages);
 				percentInput.disabled = false;
@@ -82,6 +84,13 @@ If this is a writing or creative discussion, include sections for characters, pl
 		// --- LEFT PANEL ---
 		const leftPanel = document.createElement('div');
 		leftPanel.className = 'flex-1 min-w-0';
+
+		// Shown once the conversation data says the chat is upgraded (see the fetch above).
+		const upgradedWarning = document.createElement('div');
+		upgradedWarning.className = 'mb-4 p-3 rounded border border-border-300 text-sm text-text-100';
+		upgradedWarning.textContent = `⚠️ ${localize('fork.upgraded_warning')}`;
+		upgradedWarning.style.display = 'none';
+		leftPanel.appendChild(upgradedWarning);
 
 		// Model select
 		const selectOptions = CLAUDE_MODELS;

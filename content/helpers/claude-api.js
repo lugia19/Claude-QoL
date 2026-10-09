@@ -2005,4 +2005,4 @@ const CLAUDE_MODELS = [
 ]
 
 const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5';
-const FAST_MODEL = 'claude-haiku-4-5-20251001';
+const FAST_MODEL = 'claude-haiku-5-5';

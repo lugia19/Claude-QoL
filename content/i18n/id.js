@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"fork.creating": "Membuat percakapan fork...",
 	"fork.complete_redirecting": "Fork selesai! Mengalihkan...",
 	"fork.fork_failed": "Gagal membuat fork percakapan: {error}",
+	"fork.upgraded_warning": "Obrolan ini berjalan di lingkungan cloud: obrolan hasil fork tidak akan menyertakan berkas apa pun yang dibuat di sana!",
 	"fork.files_not_transferred": "File berikut tidak dapat dipindahkan ke percakapan fork:",
 	"fork.file_transfer_warning": "Peringatan Pemindahan File",
 	"fork.upload_failed_title": "Gagal Mengunggah File",

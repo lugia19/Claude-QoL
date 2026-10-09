@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"fork.creating": "フォークした会話を作成中…",
 	"fork.complete_redirecting": "フォークが完了しました！移動中…",
 	"fork.fork_failed": "会話をフォークできませんでした：{error}",
+	"fork.upgraded_warning": "このチャットはクラウド環境で動作しています。フォークしたチャットには、そこで作成されたファイルは含まれません！",
 	"fork.files_not_transferred": "以下のファイルはフォークした会話に引き継げませんでした：",
 	"fork.file_transfer_warning": "ファイル転送の警告",
 	"fork.upload_failed_title": "ファイルのアップロードに失敗しました",

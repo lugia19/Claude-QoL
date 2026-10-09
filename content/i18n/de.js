@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"fork.creating": "Abgezweigte Unterhaltung wird erstellt...",
 	"fork.complete_redirecting": "Abzweigung abgeschlossen! Weiterleitung...",
 	"fork.fork_failed": "Unterhaltung konnte nicht abgezweigt werden: {error}",
+	"fork.upgraded_warning": "Dieser Chat läuft in einer Cloud-Umgebung: Der abgezweigte Chat enthält keine der dort erstellten Dateien!",
 	"fork.files_not_transferred": "Die folgenden Dateien konnten nicht in die abgezweigte Unterhaltung übertragen werden:",
 	"fork.file_transfer_warning": "Warnung zur Dateiübertragung",
 	"fork.upload_failed_title": "Datei-Upload fehlgeschlagen",

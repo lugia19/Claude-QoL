@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"fork.creating": "Création de la conversation bifurquée...",
 	"fork.complete_redirecting": "Bifurcation terminée ! Redirection...",
 	"fork.fork_failed": "Impossible de bifurquer la conversation : {error}",
+	"fork.upgraded_warning": "Ce chat s'exécute dans un environnement cloud : le chat dérivé n'inclura aucun des fichiers créés là-bas !",
 	"fork.files_not_transferred": "Les fichiers suivants n'ont pas pu être transférés vers la conversation bifurquée :",
 	"fork.file_transfer_warning": "Avertissement de transfert de fichiers",
 	"fork.upload_failed_title": "Échec de l'envoi du fichier",

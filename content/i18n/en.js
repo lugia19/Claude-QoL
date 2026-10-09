@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"fork.creating": "Creating forked conversation...",
 	"fork.complete_redirecting": "Fork complete! Redirecting...",
 	"fork.fork_failed": "Failed to fork conversation: {error}",
+	"fork.upgraded_warning": "This chat runs in a cloud environment: the forked chat will not include any files created there!",
 	"fork.files_not_transferred": "The following files could not be transferred to the forked conversation:",
 	"fork.file_transfer_warning": "File Transfer Warning",
 	"fork.upload_failed_title": "File Upload Failed",

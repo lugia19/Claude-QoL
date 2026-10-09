@@ -286,6 +286,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"fork.creating": "Creazione della conversazione fork...",
 	"fork.complete_redirecting": "Fork completato! Reindirizzamento...",
 	"fork.fork_failed": "Impossibile creare il fork della conversazione: {error}",
+	"fork.upgraded_warning": "Questa chat gira in un ambiente cloud: la chat biforcata non includerà nessuno dei file creati lì!",
 	"fork.files_not_transferred": "Non è stato possibile trasferire i seguenti file nella conversazione fork:",
 	"fork.file_transfer_warning": "Avviso di trasferimento file",
 	"fork.upload_failed_title": "Caricamento del file non riuscito",

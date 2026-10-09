@@ -17,6 +17,7 @@ how.
 | D5 | **Message identity = `data-turn-key`**, plus the tree rule for `-hub-reply` keys. **Zero React internals** in production. |
 | D6 | **Full-load patch** (all messages loaded at page load), as a toggle in the overall Settings panel, **default on**. |
 | D7 | Navigation's "continue on an old branch" UX: our own banner next to claude.ai's "earlier version" banner (see [Branches](#branches-and-navigation)). |
+| D8 | **Forking stays QoL's own fork** (new chat, chatlog/summary attachments, phantoms), verbatim or summarized: clicking our fork button means our fork. The native fork is not used. Upgraded chats get a warning in the fork dialog that files created in the cloud environment won't come along. |
 
 ## Wire basics
 
@@ -80,6 +81,7 @@ with the header `conversation_id` = **a new uuid we choose**.
 - **Copied:** messages with new ids (UUID v5-looking), original `created_at`, attachments (new file ids, content intact), the title and all conversation settings.
 - **Not copied:** the model (falls back to the default). There's no visible link back to the source.
 - It **only replaces summaryless forking**. Summary forks still need their own path.
+- **Not used (D8).** Further findings (2026-10-09): the request returns in ~0.4 s and the copy fills in over the next seconds (an early read saw 12 of 18 messages); it keeps the source title (`rename_conversation { title }` renames); `set_conversation_model { model { identifier } }` sets the model; **upgraded chats reject it** (400 `failed_precondition`, "This version can't be continued in a new session").
 
 ## Branches and navigation
 
@@ -240,8 +242,8 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | Feature | Merged approach | Notes |
 | --- | --- | --- |
 | Phantom messages | Splice into snapshot and history pages; rewrite phantom `parent_message_id` to `""` on root edits | **Implemented** (feat/phantoms), see [Phantom messages](#phantom-messages-implemented). | Retry and non-root edits need nothing. |
-| Forking, summaryless | Native fork | No phantoms needed at all. |
-| Forking, summary / compaction | New chat plus our own send | `hidden_context` is a candidate for carrying history invisibly. |
+| Forking, summaryless | QoL's own fork (D8) | Unchanged: works on merged accounts (verified 2026-10-09), phantoms display. Upgraded chats: warning in the dialog. |
+| Forking, summary / compaction | QoL's own fork (D8) | Unchanged: summaries through `/completion` in a throwaway chat, now on Haiku 5.5 (`FAST_MODEL`), verified end to end 2026-10-09. Porting `/completion` sends to `PerformAction` is a separate, later item (also TTS dialogue analysis and import). |
 | Advanced edit (files) | Rewrite the edit's `send_message`: add or remove `attachments` / `inline_attachments` | Removal is a round trip. |
 | Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + legacy leaf PUT | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |
@@ -285,6 +287,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 ## Test artefacts
 
 - **Chats on the test account** (all deletable):
+  - Native fork of the splice test chat: `20181d23…`; QoL summary fork of it: `8de34a8a…`
   - QoL fork of the splice test chat (phantoms, chatlog.txt): `88219972…`
   - "Splice test chat" `d22a3a67…`
   - UI fork of 4c18a389: `8d5de03a…`
