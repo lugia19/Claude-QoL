@@ -7,19 +7,20 @@
 	// On the merged experience the turn runs on StreamTimeline: while it runs, updates carry
 	// conversation.status STATUS_RUNNING with status_assistant_message_id = the reply; it settles in one
 	// update with STATUS_IDLE and that reply complete (is_complete + stop_reason). Only a reply this page
-	// saw running counts, so a snapshot or a reconnect replaying a finished turn never speaks.
+	// saw running counts, so a snapshot or a reconnect replaying a finished turn never speaks. A snapshot
+	// that is itself running (the page loaded, or the stream reconnected, mid-reply) does count.
 	const runningReplies = new Set(); // reply ids seen while their turn was running
 	const spokenReplies = new Set();
 
 	QolBardHost.observe(function autoSpeakOnSettle(event, ctx) {
 		const update = event.update;
-		if (!update || update.replace_all_state) return;
+		if (!update) return;
 		const conversation = update.conversation;
 		if (conversation?.status === 'STATUS_RUNNING' && conversation.status_assistant_message_id) {
 			runningReplies.add(conversation.status_assistant_message_id);
 			return;
 		}
-		if (conversation?.status !== 'STATUS_IDLE') return;
+		if (update.replace_all_state || conversation?.status !== 'STATUS_IDLE') return;
 		for (const message of update.messages ?? []) {
 			if (message.role !== 'ROLE_ASSISTANT' || !message.is_complete || !message.stop_reason) continue;
 			if (!runningReplies.delete(message.id) || spokenReplies.has(message.id)) continue;
