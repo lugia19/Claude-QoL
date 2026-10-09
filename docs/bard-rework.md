@@ -239,7 +239,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 
 | Feature | Merged approach | Notes |
 | --- | --- | --- |
-| Phantom messages | Splice into snapshot and history pages; rewrite phantom `parent_message_id` to `""` on root edits | Retry and non-root edits need nothing. |
+| Phantom messages | Splice into snapshot and history pages; rewrite phantom `parent_message_id` to `""` on root edits | **Implemented** (feat/phantoms), see [Phantom messages](#phantom-messages-implemented). | Retry and non-root edits need nothing. |
 | Forking, summaryless | Native fork | No phantoms needed at all. |
 | Forking, summary / compaction | New chat plus our own send | `hidden_context` is a candidate for carrying history invisibly. |
 | Advanced edit (files) | Rewrite the edit's `send_message`: add or remove `attachments` / `inline_attachments` | Removal is a round trip. |
@@ -261,6 +261,17 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - **Projects list:** no QoL UI (probably none intended).
 - **Not surveyed:** Code/Cowork pages, the artifacts page, mobile layout, Electron, sidebar features, and whether each modal still opens and works.
 
+## Phantom messages (implemented)
+
+`content/main/phantom-messages.js`, on the host, right after `full-load.js`:
+- **Snapshots:** the phantoms (legacy history JSON from `ClaudePhantomMessagesDB`) become `Message`s with indexes -n..-1, each with display groups and content blocks; the real roots get `parent_message_id` = the last phantom. A chain ending on a user message gets the "Acknowledged - end of previous conversation." reply (id `<last>-qol-ack`).
+- **Live updates and history pages:** only the re-parenting (a root arriving later; editing the first real message makes a new root).
+- **Sends:** `parent_message_id` = the last phantom becomes `""` (a new root). Verified: the edit is accepted, the new root comes back in a live update, is re-parented, and the reply streams under the phantoms.
+- **What carries through an injected snapshot** (hand-rolled experiment, 2026-10-09): user text (rendered like real user text), assistant markdown, `Message.attachments` (a text file with only a name renders as a card; an image with an org file `url`/`thumbnail_url` renders), `TIMELINE` thinking groups (full text on expand), `TIMELINE` tool rows (name, input, result image). Mapping used: text → inline markdown; `tool_use` + `tool_result` → a timeline tool row; `files_v2` and text `attachments` → `Message.attachments`; **thinking dropped** (claude.ai doesn't show it any more).
+- **DOM:** phantom rows are matched by `data-turn-key` (the phantom's uuid, or `<phantom>-hub-reply` for a reply), dimmed, toolbar hidden. No text markers any more.
+- **Timing:** the phantoms live in ISOLATED (encrypted), so `databases.js` mirrors the ids of conversations that have them to `localStorage.claude_qol_phantom_ids`; only those snapshots wait (up to 6 s). MAIN's bridge calls are answered from `document_start` by `content/isolated/db-serve.js` (handlers await `databases.js`), so an early call isn't lost any more.
+- **Rebuild:** with nothing stored, a root whose `Message.attachments` include `chatlog.txt` (a QoL fork) has its phantoms rebuilt from it (and `summary_chunk_N.txt`), stored, and shown in that same snapshot. Verified on a fresh fork.
+
 ## Still open
 
 - **To be implemented: jumps to another branch in upgraded chats.** Their leaf can't move, so a bookmark or search result on another branch can't be reached by moving it (today the PUT is a silent no-op and the reveal finds nothing). Idea: drive the version arrows programmatically to show that branch.
@@ -273,6 +284,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 ## Test artefacts
 
 - **Chats on the test account** (all deletable):
+  - QoL fork of the splice test chat (phantoms, chatlog.txt): `88219972…`
   - "Splice test chat" `d22a3a67…`
   - UI fork of 4c18a389: `8d5de03a…`
   - Hand forks: `12274be5…`, `7e601b34…`

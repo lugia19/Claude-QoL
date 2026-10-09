@@ -350,9 +350,21 @@
 		phantomMessages: 'conversationId'
 	});
 
+	// Which conversations have phantoms, mirrored to the page's localStorage (ids only) so that
+	// phantom-messages.js (MAIN) can tell synchronously, and only holds those chats' snapshots.
+	const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
+	async function writePhantomIdsMirror() {
+		try {
+			localStorage.setItem(PHANTOM_IDS_KEY, JSON.stringify(await phantomDB.phantomMessages.toCollection().primaryKeys()));
+		} catch (e) {
+			log.warn('Could not mirror the phantom conversation ids:', e.message);
+		}
+	}
+
 	async function storePhantomMessagesDB(conversationId, messages) {
 		const encrypted = await encryptData({ messages, timestamp: Date.now() });
 		await phantomDB.phantomMessages.put({ conversationId, encryptedData: encrypted });
+		await writePhantomIdsMirror();
 	}
 
 	async function getPhantomMessagesDB(conversationId) {
@@ -371,13 +383,17 @@
 		} catch (e) {
 			log.warn(`Decryption failed for phantom ${conversationId}, deleting entry`);
 			await phantomDB.phantomMessages.delete(conversationId);
+			await writePhantomIdsMirror();
 			return null;
 		}
 	}
 
 	async function clearPhantomMessagesDB(conversationId) {
 		await phantomDB.phantomMessages.delete(conversationId);
+		await writePhantomIdsMirror();
 	}
+
+	writePhantomIdsMirror();
 
 	async function _bulkEncryptAll() {
 		try {
@@ -408,17 +424,12 @@
 	window.ClaudeSearchShared.clearPhantomMessages = clearPhantomMessagesDB;
 
 	// ======== MAIN world access (claude-api.js's _dbCall) ========
-	// This serves from document_idle, but MAIN loads at document_start: a call MAIN makes before
-	// this point (e.g. a conversation fetch early in page load) is lost and waits out _dbCall's
-	// timeout. The proper fix is a document_start ISOLATED script that calls serve() right away,
-	// with handlers that await a "DB ready" promise resolved here.
-	ClaudeExtBridge.serve('qol', {
-		handlers: {
-			CONV_CACHE_GET: ({ uuid }) => conversationCache.get(uuid),
-			CONV_CACHE_PUT: async ({ uuid, updatedAt, data }) => { await conversationCache.put(uuid, updatedAt, data); },
-			PHANTOM_GET: ({ conversationId }) => getPhantomMessagesDB(conversationId),
-			PHANTOM_STORE: async ({ conversationId, messages }) => { await storePhantomMessagesDB(conversationId, messages); },
-			PHANTOM_CLEAR: async ({ conversationId }) => { await clearPhantomMessagesDB(conversationId); },
-		}
+	// db-serve.js (document_start) answers MAIN from the start of the page load; its handlers wait
+	// for this.
+	resolveQolDb({
+		conversationCache,
+		getPhantomMessages: getPhantomMessagesDB,
+		storePhantomMessages: storePhantomMessagesDB,
+		clearPhantomMessages: clearPhantomMessagesDB,
 	});
 })();

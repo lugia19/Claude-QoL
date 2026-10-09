@@ -38,7 +38,19 @@ async function storePhantomMessages(conversationId, messages) {
 	await _dbCall('PHANTOM_STORE', { conversationId, messages });
 }
 
+// Phantom messages as history JSON (ClaudeMessage.toHistoryJSON), or null.
 async function getPhantomMessages(conversationId) {
+	// Very old forks kept them in the page's localStorage: move them to IndexedDB on first read.
+	for (const key of [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`]) {
+		const legacy = localStorage.getItem(key);
+		if (!legacy) continue;
+		const messages = JSON.parse(legacy);
+		await storePhantomMessages(conversationId, messages);
+		localStorage.removeItem(`phantom_messages_${conversationId}`);
+		localStorage.removeItem(`fork_history_${conversationId}`);
+		return messages;
+	}
+
 	const get = window.ClaudeSearchShared?.getPhantomMessages;
 	if (get) return await get(conversationId);
 
