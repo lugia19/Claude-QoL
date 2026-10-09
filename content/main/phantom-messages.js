@@ -28,6 +28,7 @@
 	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('PhantomMessages')) : silent);
 
 	const prepared = new Map(); // conversationId -> promise of { update, lastId, ids } or null
+	const ready = new Map(); // conversationId -> what that promise resolved to, once it has
 	const phantomRowKeys = new Set(); // data-turn-key values of phantom rows, any conversation
 	const lastPhantomIds = new Set(); // ids a send must not use as its parent
 
@@ -160,8 +161,11 @@
 
 	function prepare(conversationId, snapshot) {
 		if (!prepared.has(conversationId)) {
-			prepared.set(conversationId, (async () => {
-				const stored = mayHavePhantoms(conversationId) ? await getPhantomMessages(conversationId) : null;
+			const pending = (async () => {
+				// Always ask the database first, even when the mirror doesn't list the chat (it may not
+				// exist yet right after an update): a rebuild from chatlog.txt is lossier than what's
+				// stored, and would be stored over it.
+				const stored = await getPhantomMessages(conversationId);
 				const phantoms = stored?.length ? stored : await reconstruct(snapshot);
 				if (!phantoms?.length) return null;
 				if (!stored?.length) await storePhantomMessages(conversationId, phantoms);
@@ -177,7 +181,9 @@
 				logger().error(`phantom messages for ${conversationId} failed:`, e);
 				prepared.delete(conversationId); // try again on the next snapshot
 				return null;
-			}));
+			});
+			prepared.set(conversationId, pending);
+			pending.then(built => ready.set(conversationId, built));
 		}
 		return prepared.get(conversationId);
 	}
@@ -198,10 +204,9 @@
 		return changed;
 	}
 
-	// The prepared phantoms if they're ready, without waiting (live updates and history pages).
-	async function readyPhantoms(conversationId) {
-		return prepared.has(conversationId) ? await prepared.get(conversationId) : null;
-	}
+	// The prepared phantoms only if they're already built: live updates and history pages never wait
+	// (a stalled rebuild would hold every frame behind them).
+	const readyPhantoms = (conversationId) => ready.get(conversationId) ?? null;
 
 	QolBardHost.onSnapshot(async function phantomMessages(update, ctx) {
 		if (!ctx.conversationId || !worthWaiting(ctx.conversationId, update)) return false;
@@ -225,8 +230,8 @@
 		return true;
 	}, { label: 'phantom-messages' });
 
-	const reparentLater = async (update, ctx) => {
-		const built = ctx.conversationId && await readyPhantoms(ctx.conversationId);
+	const reparentLater = (update, ctx) => {
+		const built = ctx.conversationId && readyPhantoms(ctx.conversationId);
 		return built ? reparentRoots(update, built) : false;
 	};
 	QolBardHost.onLiveUpdate(reparentLater, { label: 'phantom-messages' });
