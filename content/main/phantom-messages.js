@@ -9,8 +9,8 @@
 //   an edit of the first real message creates);
 // - a send whose parent is a phantom (editing the first real message) gets parent "" (a new root),
 //   which the server accepts; with a phantom parent it fails with stale_parent.
-// Phantom rows are found by their data-turn-key (the phantom's uuid, or "<phantom>-hub-reply" for a
-// reply), dimmed, and have their toolbar hidden. No markers in the text.
+// Phantoms get page ids of their own (claude-api.js's phantomMessageId: a marker prefix), so their rows
+// are recognised by data-turn-key alone, dimmed, and have their toolbar hidden. No markers in the text.
 //
 // The phantoms come from ISOLATED over the bridge, so only conversations listed in
 // localStorage[claude_qol_phantom_ids] (databases.js keeps it current) wait for them.
@@ -31,8 +31,6 @@
 	// conversationId -> built phantoms a snapshot has carried to the page. Only those may be used to
 	// re-parent later roots: a parent the page never received would cut the message off.
 	const ready = new Map();
-	const phantomRowKeys = new Set(); // data-turn-key values of phantom rows, any conversation
-	const lastPhantomIds = new Set(); // ids a send must not use as its parent
 
 	// Synchronous, so a chat without phantoms is never held.
 	function mayHavePhantoms(conversationId) {
@@ -90,7 +88,7 @@
 			});
 		}
 		for (const attachment of json.attachments ?? []) {
-			out.push({ id: `${json.uuid}-attachment-${out.length}`, file_name: attachment.file_name ?? 'attachment.txt' });
+			out.push({ id: `${phantomMessageId(json.uuid)}-attachment-${out.length}`, file_name: attachment.file_name ?? 'attachment.txt' });
 		}
 		return out;
 	}
@@ -98,8 +96,7 @@
 	// One phantom (legacy history JSON) as a Message plus its display groups and content blocks.
 	// Text becomes inline markdown, each tool_use (with its tool_result) a timeline tool row. Thinking
 	// is left out: claude.ai doesn't show it any more.
-	function buildPhantom(json, conversationId, orgId, index, parentId, out) {
-		const id = json.uuid;
+	function buildPhantom(json, id, conversationId, orgId, index, parentId, out) {
 		const isUser = json.sender === 'human';
 		const attachments = attachmentsOf(json);
 		out.messages.push({
@@ -145,14 +142,20 @@
 
 	// The phantoms as a ConversationUpdate fragment, or null. A phantom chain ending on a user message
 	// gets an assistant acknowledgement, as the legacy version did (and the fork's handshake expects).
+	// Ids are the page ids (claude-api.js's phantomMessageId), so they never collide with the source
+	// chat's real messages and every phantom row is recognisable by its prefix.
 	function buildPhantoms(conversationId, orgId, phantoms) {
-		const chain = [...phantoms];
-		if (chain.at(-1)?.sender === 'human') {
-			chain.push({ uuid: `${chain.at(-1).uuid}-qol-ack`, sender: 'assistant', content: [{ type: 'text', text: ACK_TEXT }], created_at: chain.at(-1).created_at });
+		const chain = phantoms.map(json => ({ json, id: phantomMessageId(json.uuid) }));
+		const last = chain.at(-1);
+		if (last?.json.sender === 'human') {
+			chain.push({
+				json: { sender: 'assistant', content: [{ type: 'text', text: ACK_TEXT }], created_at: last.json.created_at },
+				id: `${PHANTOM_ID_PREFIX}0000-4000-8000-${last.json.uuid.slice(-12)}`,
+			});
 		}
 		const out = { messages: [], display_groups: [], content_blocks: [] };
-		chain.forEach((json, i) => buildPhantom(json, conversationId, orgId, i - chain.length, i ? chain[i - 1].uuid : null, out));
-		return { update: out, lastId: chain.at(-1).uuid, ids: chain.map(json => json.uuid) };
+		chain.forEach(({ json, id }, i) => buildPhantom(json, id, conversationId, orgId, i - chain.length, i ? chain[i - 1].id : null, out));
+		return { update: out, lastId: chain.at(-1).id };
 	}
 
 	// ======== Getting the phantoms ========
@@ -194,12 +197,7 @@
 				if (!phantoms?.length) return null;
 				if (!stored?.length) await storePhantomMessages(conversationId, phantoms);
 				const built = buildPhantoms(conversationId, orgId, phantoms);
-				for (const phantomId of built.ids) {
-					phantomRowKeys.add(phantomId);
-					phantomRowKeys.add(`${phantomId}-hub-reply`);
-				}
-				lastPhantomIds.add(built.lastId);
-				logger()(`${built.ids.length} phantom messages for ${conversationId}`);
+				logger()(`${built.update.messages.length} phantom messages for ${conversationId}`);
 				return built;
 			})().catch((e) => {
 				logger().error(`phantom messages for ${conversationId} failed:`, e);
@@ -220,7 +218,7 @@
 	function reparentRoots(update, built) {
 		let changed = false;
 		for (const message of update.messages ?? []) {
-			if (message.parent_message_id || message.index < 0 || built.ids.includes(message.id)) continue;
+			if (message.parent_message_id || isPhantomId(message.id)) continue;
 			message.parent_message_id = built.lastId;
 			changed = true;
 		}
@@ -261,19 +259,20 @@
 	QolBardHost.onLiveUpdate(reparentLater, { label: 'phantom-messages' });
 	QolBardHost.onHistoryPage(reparentLater, { label: 'phantom-messages' });
 
+	// Any phantom parent (in practice the last one: editing the first real message) means a new root;
+	// the server rejects a phantom parent (stale_parent).
 	QolBardHost.onSend(function phantomParent(send) {
-		if (!lastPhantomIds.has(send.parent_message_id)) return false;
-		send.parent_message_id = ''; // a new root: the server rejects a phantom parent (stale_parent)
-		logger()('send from the last phantom: sent as a new root');
+		if (!isPhantomId(send.parent_message_id)) return false;
+		send.parent_message_id = '';
+		logger()('send from a phantom: sent as a new root');
 		return true;
 	}, { label: 'phantom-messages' });
 
 	// ======== DOM: dim phantom rows, hide their toolbars ========
 
 	function stylePhantomRows() {
-		if (!phantomRowKeys.size) return;
 		for (const row of document.querySelectorAll('[data-turn-key]')) {
-			if (!phantomRowKeys.has(row.getAttribute('data-turn-key')) || row.hasAttribute('data-qol-phantom')) continue;
+			if (!isPhantomId(row.getAttribute('data-turn-key')) || row.hasAttribute('data-qol-phantom')) continue;
 			row.setAttribute('data-qol-phantom', '');
 			row.style.filter = 'brightness(0.7)';
 		}
