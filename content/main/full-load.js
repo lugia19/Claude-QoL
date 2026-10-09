@@ -4,10 +4,12 @@
 // so its own Ctrl+F, QoL's chat-search jumps, bookmarks and nav arrows can't reach unloaded messages.
 //
 // The page only grows its list from a snapshot (older messages in ordinary updates are ignored), so
-// after each real snapshot this injects a second, synthetic one: the real snapshot without the cursor
-// and floor, plus every message, display group and content block from ReadConversation. Reconnects
-// bring fresh snapshots that would shrink the list again, so it repeats for each of them. Injected
-// snapshots run through the other onSnapshot patches (bard-host.js), so features compose.
+// this rewrites each snapshot in place: without the cursor and floor, plus every message, display
+// group and content block from ReadConversation. The snapshot waits for that tree (the host passes
+// frames on in order, so later updates queue behind it rather than get lost); after the first one
+// the tree is cached, so reconnect snapshots go through at once and never shrink the list.
+// Rewriting in place rather than injecting a second snapshot matters: an injected snapshot made the
+// page forget a version picked with the branch arrows on every reconnect.
 // See docs/bard-rework.md, "Loading every message".
 //
 // Setting: "Load whole conversations" (extension-settings.js), on by default, mirrored to
@@ -27,11 +29,10 @@
 	let loggerInstance = null;
 	const logger = () => loggerInstance ?? (typeof createLogger === 'function' ? (loggerInstance = createLogger('FullLoad')) : silent);
 
-	const injected = new WeakSet(); // our synthetic snapshots, which must not trigger another round
 	const trees = new Map(); // conversationId -> { at, promise of the full ConversationUpdate or null }
 
 	// The whole conversation, from ReadConversation. Shared by concurrent snapshots, reused for a few
-	// minutes: a reconnect's snapshot carries anything new itself (see buildSynthetic).
+	// minutes: a reconnect's snapshot carries anything new itself (see fillSnapshot).
 	function fullTree(ctx) {
 		// Drop expired trees, and keep at most a few: each one holds a whole decoded conversation.
 		for (const [id, entry] of trees) if (Date.now() - entry.at >= TREE_TTL_MS) trees.delete(id);
@@ -73,37 +74,21 @@
 		return merged;
 	}
 
-	// The real snapshot, minus what tells the page there's more to page in, with every message.
-	function buildSynthetic(snapshot, tree) {
-		const synthetic = structuredClone(snapshot);
-		delete synthetic.older_history_cursor;
-		delete synthetic.baseline_floor_message_id;
-		synthetic.messages = mergeById(tree.messages, snapshot.messages);
-		synthetic.display_groups = mergeById(tree.display_groups, snapshot.display_groups);
-		synthetic.content_blocks = mergeById(tree.content_blocks, snapshot.content_blocks);
-		return synthetic;
+	// The snapshot, minus what tells the page there's more to page in, with every message.
+	function fillSnapshot(snapshot, tree) {
+		delete snapshot.older_history_cursor;
+		delete snapshot.baseline_floor_message_id;
+		snapshot.messages = mergeById(tree.messages, snapshot.messages);
+		snapshot.display_groups = mergeById(tree.display_groups, snapshot.display_groups);
+		snapshot.content_blocks = mergeById(tree.content_blocks, snapshot.content_blocks);
 	}
 
-	QolBardHost.onSnapshot(function fullLoad(update, ctx) {
-		if (injected.has(update) || !ctx.conversationId || !ctx.inject) return false;
-		if (!update.older_history_cursor) return false; // the whole conversation is already in it
-		// A turn in progress: injecting this snapshot later would roll the streaming reply back and
-		// lose the text that arrived meanwhile. Just warm the cache; the next snapshot (a reconnect
-		// after the turn) injects right away from it. (A send in the ~1 s before a first-load tree
-		// arrives isn't guarded: not worth tracking every update for.)
-		if (update.conversation?.status === 'STATUS_RUNNING') {
-			fullTree(ctx);
-			return false;
-		}
-		// Registered first, so this is the snapshot before any other patch changed it; the synthetic
-		// snapshot goes through those patches itself when injected.
-		const snapshot = structuredClone(update);
-		fullTree(ctx).then(async (tree) => {
-			if (!tree) return;
-			const synthetic = buildSynthetic(snapshot, tree);
-			injected.add(synthetic);
-			if (!await ctx.inject({ update: synthetic })) logger()('connection closed before the full load landed; the next snapshot retries');
-		}).catch((e) => logger().error('full load failed:', e));
-		return false; // the real snapshot goes through as it came; the full one follows it
+	// Registered first, so the other onSnapshot patches see the full snapshot.
+	QolBardHost.onSnapshot(async function fullLoad(update, ctx) {
+		if (!ctx.conversationId || !update.older_history_cursor) return false; // nothing more to load
+		const tree = await fullTree(ctx);
+		if (!tree) return false; // the snapshot goes through as it came, and the page keeps paging
+		fillSnapshot(update, tree);
+		return true;
 	}, { label: 'full-load' });
 })();

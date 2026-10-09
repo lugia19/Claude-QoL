@@ -128,7 +128,9 @@ with the header `conversation_id` = **a new uuid we choose**.
 ## Loading every message (and Ctrl+F)
 
 **Implemented: `content/main/full-load.js`**, an `onSnapshot` patch on the host.
-- After each real snapshot that has `older_history_cursor`, it injects the synthetic snapshot described below.
+- **Rewrites each snapshot that has `older_history_cursor` in place** (revised 2026-10-09, the first version injected a second snapshot): minus 29/30, plus the full tree. The first snapshot waits for the fetch (the host keeps frames in order, so later updates queue behind it). Reconnect snapshots are filled from the cache at once.
+- **Why in place:** an injected snapshot made the page forget a version picked with the branch arrows on every reconnect (a flipped old fork went back to latest at the next `StreamTimeline` connection). Native reconnect snapshots and in-place ones keep the pick. In-place also removes the race with updates arriving during the fetch.
+- **Cost:** on a cold page cache the first rows appear with the whole list, at ~2.9 s instead of the window at ~1.9 s (1,403-message chat); with the page cache warm, 258 rows at ~1.3 s.
 - **Full tree:** `ReadConversation` through `QolBardHost.rawFetch`, cached per conversation for 5 minutes. Each reconnect snapshot reuses the cache, with its own entries winning.
 - **Toggle:** "Load whole conversations" in the gear modal (`extension-settings.js`), default on, mirrored to `localStorage.claude_qol_full_load` (`'0'` = off). It applies on the next load, and Save reloads.
 - **Verified 2026-10-09:**
@@ -141,7 +143,7 @@ with the header `conversation_id` = **a new uuid we choose**.
   - The desktop client: 16 → 258.
 
 - **How the list grows:** from the snapshot's window, bounded by `older_history_cursor` (29) and `baseline_floor_message_id` (30), and **only** through `ReadConversationHistory` pages. Older messages in an ordinary update are ignored.
-- **Approach (D6):** pass the real snapshot through, fetch `ReadConversation` (proto, response field 2 = the update), then enqueue a **synthetic second snapshot**: the original snapshot's fields (keeping `replace_all_state`) minus 29/30, plus the full tree's messages/display groups/content blocks (3/4/5).
+- **Original approach (superseded, see above):** pass the real snapshot through, fetch `ReadConversation` (proto, response field 2 = the update), then enqueue a **synthetic second snapshot**: the original snapshot's fields (keeping `replace_all_state`) minus 29/30, plus the full tree's messages/display groups/content blocks (3/4/5).
   - 1,403-message chat (2.4 MB, ~1 s fetch): all 258 current-path rows known ~1.5 s after load, no scroll jump, jump-to-top instant, zero history calls.
   - The blocking alternative (merge into the real snapshot) also works but delays the snapshot by the fetch (672 ms for 772 KB).
 - **Re-apply on every later `replace_all_state`.** A patched tab fell back from "of 258" to "of 16" within minutes once a fresh snapshot arrived.
