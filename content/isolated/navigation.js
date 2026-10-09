@@ -243,20 +243,18 @@
 
 		const conversationId = getConversationId();
 		const contentDiv = document.createElement('div');
-		let modal = null;
 
-		// A jump on the current branch only scrolls, so close the modals; otherwise the page reloads.
+		// Moves the leaf and reloads; the loading modal stays up until then.
 		const goTo = async (loadingText, uuid, leafId = null) => {
 			const loadingModal = createLoadingModal(loadingText);
 			loadingModal.show();
 			try {
-				if (await jumpToMessage(conversation, uuid, leafId) === false) return;
-				modal?.dismiss();
+				await jumpToMessage(conversation, uuid, leafId);
 			} catch (error) {
 				log.error('Navigation failed:', error);
+				loadingModal.destroy();
 				showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
 			}
-			loadingModal.destroy();
 		};
 
 		// Top buttons row
@@ -347,7 +345,7 @@
 		loading.destroy();
 
 		// Create and show modal
-		modal = new ClaudeModal(localize('nav.navigation'), contentDiv);
+		const modal = new ClaudeModal(localize('nav.navigation'), contentDiv);
 		modal.addCancel(localize('common.close'));
 		modal.modal.classList.remove('max-w-md');
 		modal.modal.classList.add('max-w-2xl');

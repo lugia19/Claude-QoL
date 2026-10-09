@@ -239,22 +239,17 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 	}
 }
 
-// "Go to" for any message in the tree (bookmarks, chat search, latest/longest). On the current branch
-// it just scrolls there. Elsewhere it moves the current leaf there (`leafId`, or the longest leaf below
-// the target) and reloads; chat-search.js's scrollToMessageByUuid reveals the target after the load.
-// Returns false when the page is reloading (leave any loading modal up), true otherwise.
+// "Go to" for any message in the tree (bookmarks, chat search, latest/longest): moves the current leaf
+// there (`leafId`, or the longest leaf below the target) and reloads; chat-search.js's
+// scrollToMessageByUuid reveals the target after the load. Always a reload, even for a target that
+// looks on-branch: the branch arrows switch versions client-side, so the server's branch isn't
+// necessarily the one on screen.
 // Upgraded (workspace) chats can't move their leaf: jumps to another branch there are still to be
 // implemented (docs/bard-rework.md, "Still open").
 async function jumpToMessage(conversation, uuid, leafId = null) {
-	await conversation.getData(true); // fresh: the leaf may have moved since the conversation was loaded
-	const branch = await conversation.getMessages(false);
-	if (branch.some(msg => msg.uuid === uuid)) {
-		await revealMessageByUuid(uuid, { conversation });
-		return true;
-	}
+	await conversation.getData();
 	sessionStorage.setItem('message_uuid_to_find', uuid);
 	await conversation.setCurrentLeaf(leafId ?? conversation.findLongestLeaf(uuid).leafId); // reloads
-	return false;
 }
 
 // Rows can lag a freshly mounted window by a frame or two.

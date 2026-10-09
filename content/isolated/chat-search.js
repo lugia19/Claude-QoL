@@ -253,20 +253,18 @@
 
 		// Build the search UI
 		const contentDiv = document.createElement('div');
-		let modal = null;
 
-		// A jump on the current branch only scrolls, so close the search; otherwise the page reloads.
+		// Moves the leaf and reloads; the loading modal stays up until then.
 		const goTo = async (loadingText, uuid, leafId = null) => {
 			const jumpLoading = createLoadingModal(loadingText);
 			jumpLoading.show();
 			try {
-				if (await jumpToMessage(conversation, uuid, leafId) === false) return;
-				modal?.dismiss();
+				await jumpToMessage(conversation, uuid, leafId);
 			} catch (error) {
 				log.error('Navigation failed:', error);
+				jumpLoading.destroy();
 				showClaudeAlert(localize('common.error'), localize('nav.navigation_failed'));
 			}
-			jumpLoading.destroy();
 		};
 
 		// Go to Latest / Go to Longest buttons row
@@ -386,7 +384,7 @@
 		});
 
 		// Create and show the search modal
-		modal = new ClaudeModal(localize('search.search_conversation'), contentDiv);
+		const modal = new ClaudeModal(localize('search.search_conversation'), contentDiv);
 		modal.addCancel(localize('common.close'));
 
 		// Override the max-width
