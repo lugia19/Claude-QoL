@@ -355,4 +355,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 
 	// main
 	"main.rich_copy_no_text": "텍스트 콘텐츠를 찾을 수 없습니다",
+
+	// account
+	"account.legacy_title": "계정이 아직 새로운 claude.ai로 전환되지 않았습니다",
+	"account.legacy_body": "이 버전의 Claude QoL은 claude.ai의 새로운 환경이 필요하지만, 아직 계정에 적용되지 않았습니다. 그때까지 채팅 기능은 작동하지 않습니다.",
 });

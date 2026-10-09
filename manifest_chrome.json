@@ -77,6 +77,9 @@
 			],
 			"js": [
 				"content/main/extra-models.js",
+				"common/net/net.js",
+				"common/net/bard-schema.js",
+				"content/main/bard-host.js",
 				"lib/jszip.min.js",
 				"lib/mime.min.js",
 				"common/log/logger.js",
@@ -104,7 +107,6 @@
 				"content/helpers/i18n-migrate.js",
 				"common/i18n/i18n-core.js",
 				"common/claude/page.js",
-				"common/net/net.js",
 				"common/ext/bridge-main.js",
 				"common/i18n/account-locale-watcher.js",
 				"common/ui/components.js",

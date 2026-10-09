@@ -355,4 +355,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 
 	// main
 	"main.rich_copy_no_text": "Tidak ada konten teks",
+
+	// account
+	"account.legacy_title": "Akun Anda belum menggunakan claude.ai yang baru",
+	"account.legacy_body": "Versi Claude QoL ini memerlukan tampilan baru claude.ai, yang belum tersedia untuk akun Anda. Fitur obrolannya tidak akan berfungsi sampai saat itu.",
 });

@@ -355,4 +355,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 
 	// main
 	"main.rich_copy_no_text": "テキストコンテンツが見つかりません",
+
+	// account
+	"account.legacy_title": "お使いのアカウントはまだ新しい claude.ai に移行していません",
+	"account.legacy_body": "このバージョンの Claude QoL には claude.ai の新しいエクスペリエンスが必要ですが、まだお使いのアカウントでは利用できません。それまでチャット機能は動作しません。",
 });

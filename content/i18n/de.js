@@ -355,4 +355,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 
 	// main
 	"main.rich_copy_no_text": "Kein Textinhalt gefunden",
+
+	// account
+	"account.legacy_title": "Dein Konto ist noch nicht auf dem neuen claude.ai",
+	"account.legacy_body": "Diese Version von Claude QoL braucht die neue Oberfläche von claude.ai, die dein Konto noch nicht erreicht hat. Bis dahin funktionieren die Chat-Funktionen nicht.",
 });

@@ -148,6 +148,47 @@ Precedence rules:
   - **Drift:** decode with a deliberately trimmed schema and check that the missing fields survive.
   - **Well-known types to watch:** Timestamp nanos, Duration, Struct/Value, FieldMask casing, NaN/Infinity floats.
 
+## Interceptor host (`content/main/bard-host.js`)
+
+The one place QoL intercepts the RPCs. **Features never wrap them themselves**; they register patches with `QolBardHost`:
+
+| Registration | Runs on |
+| --- | --- |
+| `onSnapshot(fn)` | every `StreamTimeline` update with `replace_all_state`: the first one, reconnect snapshots, and snapshots injected through `ctx.inject` |
+| `onLiveUpdate(fn)` | other `StreamTimeline` updates carrying messages / display groups / content blocks |
+| `onHistoryPage(fn)` | `ReadConversationHistoryResponse.update` |
+| `onSend(fn)` | `PerformAction`'s `send_message`, before it leaves |
+| `observe(fn)` | read-only, every non-heartbeat `StreamTimeline` event as the server sent it |
+
+- **A patch** is `fn(target, ctx)`. It may be async, edits `target` in place (decoded with `keepUnknown`), and returns `true` if it changed something. The host re-encodes only then; otherwise the original bytes pass through.
+- **`ctx`:** `{ source, orgId, conversationId, inject }`.
+- **`ctx.inject(event)`** (streams) runs injected snapshots through the `onSnapshot` patches first, which is the composition guarantee full load needs. It returns `false` once that connection has ended (the server reconnects on a cadence), so inject from the current connection's `ctx`.
+- **Registration order is execution order.** An optional `{ label }` names a patch in logs.
+- **Fail-open:**
+  - a throwing patch is logged and skipped;
+  - an undecodable frame or body passes through as it came;
+  - a method with nothing registered isn't wrapped at all.
+- **Escape hatches:**
+  - `QolBardHost.rawFetch` (MAIN-world calls that must see server data; ISOLATED fetches are never patched);
+  - kill switch `localStorage.claude_qol_bard_host_off = '1'`.
+- **Manifest position:** first in the MAIN group after `extra-models.js`, preceded only by `net.js` and `bard-schema.js` (Firefox ordering). The logger and `page.js` are looked up lazily.
+- **Account mode:** `QolBardHost.accountMode()` in MAIN, or `qolAccountMode()` (toolbox-ui.js) in either world, gives `'merged' | 'legacy' | 'unknown'` for the active org, from page `localStorage.claude_qol_account_mode`.
+  - **`merged`:** any successful RPC response sets it.
+  - **`legacy`:** only an hourly `GetNewConversationDefaults` probe returning 403 `permission_denied` sets it.
+  - With `legacy`, `notifications.js` shows a once-per-session card.
+- **Verified live (2026-10-09):**
+  - patches survive reconnect snapshots;
+  - an injected clean snapshot went through `onSnapshot`;
+  - `onSend` `hidden_context` reached the model;
+  - `onHistoryPage` fired on every page;
+  - a throwing patch was harmless;
+  - the kill switch disables wrapping;
+  - the legacy card shows.
+- **Firefox (Android Nightly, verified 2026-10-09):**
+  - `QolBardHost.diagnostics` (`{ loadedAt, firstSeen: { [method]: ms } }`, performance clock) showed the host in place ~300 ms before the page's first `StreamTimeline` on every one of 5 loads (e.g. 851 → 1154 ms);
+  - an `onSnapshot` patch rendered.
+  - Check `diagnostics` again if Firefox ever seems to miss the first snapshot.
+
 ## Legacy accounts (for D3)
 
 - **How to recognise one:** RPC endpoints return 403 "This feature is not included in your current plan". Tabs say "New chat" (merged: "New session").
@@ -156,6 +197,8 @@ Precedence rules:
 - Calling `/completion` directly still works on merged chats, but ignores the merged chat's model (it replied with Opus 5.5 on a Haiku chat). Irrelevant under D1, but useful to know.
 
 ## Feature map (starting point for the drill-down)
+
+Every "splice" / "rewrite" / "watch the stream" below means a patch registered with the [interceptor host](#interceptor-host-contentmainbard-hostjs): `onSnapshot` / `onHistoryPage` / `onLiveUpdate` / `onSend` / `observe`.
 
 | Feature | Merged approach | Notes |
 | --- | --- | --- |

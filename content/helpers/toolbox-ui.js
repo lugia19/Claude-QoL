@@ -5,6 +5,17 @@
 // common/README.md):
 document.documentElement.setAttribute('data-claude-qol-installed', 'true');
 
+// Whether the active account is on claude.ai's merged experience: 'merged', 'legacy' or 'unknown'.
+// Written by the MAIN world's bard-host.js (from the account's RPC traffic and an hourly probe) to
+// page localStorage, so it's readable here in both worlds.
+function qolAccountMode() {
+	try {
+		return JSON.parse(localStorage.getItem('claude_qol_account_mode'))?.[getActiveOrgId()]?.mode ?? 'unknown';
+	} catch (e) {
+		return 'unknown';
+	}
+}
+
 // Warn on any mismatch between the source conversation's feature settings and
 // the current account settings. Informational only — never switches anything.
 // Returns the current feature settings (fed to prepareNew for addFile routing).
