@@ -163,13 +163,19 @@
 		// Retry logic to find the native button (DOM might not be ready yet).
 		const maxRetries = 10;
 		const retryDelay = 300;
-		// The row keyed by the reply's own uuid; a just-streamed original reply is keyed
-		// "<parent>-hub-reply" instead (message-ui.js), and it's the last assistant row, which is
-		// what auto-speak targets anyway. TODO(rework): port auto-speak to QolBardHost.observe
-		// (the stream's settle carries the reply and its parent).
-		const lastAssistantRow = () => turnRowOf(getUIMessages().assistantMessages.at(-1));
+		// The reply's own row: a just-streamed original reply is keyed "<parent>-hub-reply"
+		// (message-ui.js), so it's found through the tree, fetched fresh so it includes the reply. The
+		// loop waits for that exact row; never guess "the last reply", which can still be the previous
+		// one while the new row mounts. TODO(rework): port auto-speak to QolBardHost.observe (the
+		// stream's settle carries the reply and its parent).
+		let tree = null;
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
-			const messageElement = document.querySelector(`[data-turn-key="${CSS.escape(String(messageUuid))}"]`) ?? lastAssistantRow();
+			let messageElement = document.querySelector(`[data-turn-key="${CSS.escape(String(messageUuid))}"]`);
+			if (!messageElement) {
+				tree ??= await new ClaudeConversation(getOrgId(), getConversationId()).getData(true)
+					.then(data => data.chat_messages ?? [], () => []);
+				messageElement = rowForUuid(String(messageUuid), tree);
+			}
 			if (messageElement) {
 				const nativeBtn = messageElement.querySelector('button[data-testid="action-bar-read-aloud"]');
 				if (nativeBtn) {
