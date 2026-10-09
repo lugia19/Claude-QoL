@@ -163,8 +163,13 @@
 		// Retry logic to find the native button (DOM might not be ready yet).
 		const maxRetries = 10;
 		const retryDelay = 300;
+		// The row keyed by the reply's own uuid; a just-streamed original reply is keyed
+		// "<parent>-hub-reply" instead (message-ui.js), and it's the last assistant row, which is
+		// what auto-speak targets anyway. TODO(rework): port auto-speak to QolBardHost.observe
+		// (the stream's settle carries the reply and its parent).
+		const lastAssistantRow = () => turnRowOf(getUIMessages().assistantMessages.at(-1));
 		for (let attempt = 0; attempt < maxRetries; attempt++) {
-			const messageElement = document.querySelector(`[data-message-uuid="${CSS.escape(String(messageUuid))}"]`);
+			const messageElement = document.querySelector(`[data-turn-key="${CSS.escape(String(messageUuid))}"]`) ?? lastAssistantRow();
 			if (messageElement) {
 				const nativeBtn = messageElement.querySelector('button[data-testid="action-bar-read-aloud"]');
 				if (nativeBtn) {

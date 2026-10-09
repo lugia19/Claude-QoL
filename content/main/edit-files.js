@@ -37,41 +37,11 @@
 		return btn;
 	}
 
-	function messageUuidOf(element) {
-		let el = element;
-		while (el && !el.hasAttribute('data-message-uuid')) el = el.parentElement;
-		return el?.getAttribute('data-message-uuid') ?? null;
-	}
-
-	// User messages carry no uuid of their own, so identify the clicked one through
-	// the assistant message next to it. Pairing the two selector lists by array
-	// index does NOT work: the list is virtualized, so the rendered window is an
-	// arbitrary slice that can start with either sender.
+	// The user message whose toolbar holds controlsContainer: user rows are keyed by their own uuid
+	// (data-turn-key, see message-ui.js).
 	function findExistingMessage(controlsContainer, messages) {
-		const { userMessages, assistantMessages } = getUIMessages();
-		const userElement = userMessages.find(msg => findMessageControls(msg) === controlsContainer);
-		if (!userElement) return null;
-
-		// The reply below it: its parent_message_uuid is the message we want.
-		const reply = assistantMessages.find(el =>
-			userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
-		if (reply && areMessagesAdjacent(userElement, reply)) {
-			const apiReply = messages.find(m => m.uuid === messageUuidOf(reply));
-			const existing = apiReply && messages.find(m => m.uuid === apiReply.parent_message_uuid);
-			if (existing) return existing;
-		}
-
-		// The window can end on a user message, in which case the "next" assistant
-		// element is the pinned tail of the conversation rather than the reply.
-		// Fall back to the message above and take its child on this branch.
-		const preceding = assistantMessages.filter(el =>
-			userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING).pop();
-		if (preceding && areMessagesAdjacent(preceding, userElement)) {
-			const parentUuid = messageUuidOf(preceding);
-			if (parentUuid) return messages.find(m => m.parent_message_uuid === parentUuid && m.sender === 'human');
-		}
-
-		return null;
+		const uuid = resolveUserMessageUuid(controlsContainer);
+		return uuid ? messages.find(m => m.uuid === uuid) ?? null : null;
 	}
 
 	function insertAdvancedEditButton(button, controlsContainer) {

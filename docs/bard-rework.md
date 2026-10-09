@@ -107,6 +107,14 @@ with the header `conversation_id` = **a new uuid we choose**.
 
 ## Message identity in the DOM
 
+**Implemented (PR C), in `content/helpers/message-ui.js`:**
+- `turnRowOf(el)`, `uuidForTurnKey(key, tree)`, `turnKeyResolver(tree)`, `rowForUuid(uuid, tree)`;
+- `messageUuidOfElement(el)` for click handlers;
+- `resolveUserMessageUuid(userEl)`;
+- `revealMessageByUuid` on turn keys; it reveals user and assistant messages directly.
+
+`tree` is the whole conversation (`chat_messages`), not a branch. The injected `====UUID:…====` markers and `data-message-uuid` are gone.
+
 - **Every row has `[data-turn-key]`**, rendered by the page, readable from ISOLATED, and updated in place on version switches.
   - **User rows:** the message's own id.
   - **Assistant rows:** their own id, except the **original reply to a merged-era send**, which is keyed `<parent user id>-hub-reply`. Retries and pre-merge replies use their own id, so every version of a reply has a distinct key.

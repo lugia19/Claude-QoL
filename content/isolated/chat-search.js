@@ -212,8 +212,7 @@
 			const loadingModal = createLoadingModal(localize('search.navigating_to_message'));
 			loadingModal.show();
 
-			// Human messages carry no data-message-uuid in the DOM, but
-			// revealMessageByUuid resolves them via the adjacent assistant message.
+			// Any message, human or assistant: revealMessageByUuid finds rows by data-turn-key.
 			sessionStorage.setItem('message_uuid_to_find', result.matched_message_id);
 
 			const longestLeaf = conversation.findLongestLeaf(result.matched_message_id);

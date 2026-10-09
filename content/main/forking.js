@@ -42,8 +42,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 			e.preventDefault();
 			e.stopPropagation();
 
-			const messageContainer = e.target.closest('[data-message-uuid]');
-			const messageUuid = messageContainer?.dataset.messageUuid;
+			const messageUuid = await messageUuidOfElement(e.target);
 
 			if (!messageUuid) {
 				showClaudeAlert(localize('common.error'), localize('fork.no_message_uuid'));

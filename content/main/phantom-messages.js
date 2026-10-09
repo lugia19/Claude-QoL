@@ -6,8 +6,6 @@ const phantomLog = createLogger('PhantomMessages');
 const PHANTOM_PREFIX = 'phantom_messages_';
 const OLD_FORK_PREFIX = 'fork_history_';
 const PHANTOM_MARKER = '====PHANTOM_MESSAGE====';
-const UUID_MARKER_PREFIX = '====UUID:';
-const UUID_MARKER_SUFFIX = '====';
 const GALLERY_BREAK_MARKER = '====GALLERY_BREAK===='; // injected by image-extractor.js between galleries
 
 // ==== STORAGE FUNCTIONS ====
@@ -53,6 +51,8 @@ getPhantomMessages = async function (conversationId) {
 		const url = net.getFetchUrl(input);
 		const method = net.getFetchMethod(input, config);
 
+		// QoL's own reads (ClaudeConversation.getData) carry this flag: they must see the server's
+		// data, without phantoms. (The name predates message identity moving to data-turn-key.)
 		if (url.includes('skip_uuid_injection=true')) {
 			return originalFetch(...args);
 		}
@@ -106,8 +106,6 @@ getPhantomMessages = async function (conversationId) {
 				if (phantomMessages && phantomMessages.length > 0) {
 					injectPhantomMessages(conversationData, phantomMessages);
 				}
-
-				injectUUIDMarkers(conversationData);
 
 				return net.jsonResponse(response, conversationData);
 			}
@@ -232,19 +230,6 @@ function injectPhantomMessages(data, phantomMessages) {
 	phantomLog('Chat messages after injecting phantoms:', data.chat_messages.length);
 }
 
-function injectUUIDMarkers(data) {
-	const assistantMessages = data.chat_messages.filter(msg => msg.sender !== 'human');
-
-	assistantMessages.forEach(msg => {
-		const uuidMarker = UUID_MARKER_PREFIX + msg.uuid + UUID_MARKER_SUFFIX;
-		msg.content.push({
-			type: "text",
-			text: uuidMarker
-		});
-	});
-}
-
-
 // Style phantom messages in the DOM
 function stylePhantomMessages() {
 	const { allMessages } = getUIMessages();
@@ -287,48 +272,8 @@ function removePhantomMarkerFromElement(element) {
 	});
 }
 
-// Add new function to extract and store UUIDs
-function extractAndStoreUUIDs() {
-	const { allMessages } = getUIMessages();
-	allMessages.forEach(container => {
-		const textContent = container.textContent || '';
-
-		// Look for UUID marker using lastIndexOf
-		const markerStart = textContent.lastIndexOf(UUID_MARKER_PREFIX);
-		if (markerStart !== -1) {
-			const uuidStart = markerStart + UUID_MARKER_PREFIX.length;
-			const uuidEnd = textContent.indexOf(UUID_MARKER_SUFFIX, uuidStart);
-
-			if (uuidEnd !== -1) {
-				const uuid = textContent.substring(uuidStart, uuidEnd);
-
-				// Put UUID on parent container instead of the message element itself
-				const parentContainer = container?.parentElement?.parentElement?.parentElement;
-				if (parentContainer) {
-					parentContainer.setAttribute('data-message-uuid', uuid);
-				}
-
-				// Remove the marker from DOM
-				removeUUIDMarkerFromElement(container);
-			}
-		}
-	});
-}
-
-function removeUUIDMarkerFromElement(element) {
-	// Markers are now separate content items rendered as their own <p> elements.
-	// Just hide them — no textContent modification needed, avoids React DOM desync.
-	const paragraphs = element.querySelectorAll('p');
-	paragraphs.forEach(p => {
-		if (p.textContent.includes(UUID_MARKER_PREFIX)) {
-			p.style.display = 'none';
-		}
-	});
-}
-
-// Gallery-break markers sit between injected image galleries (image-extractor.js). Unlike the
-// UUID marker they also appear mid-stream, so they're hidden on every pass, not just once a
-// message has been tagged.
+// Gallery-break markers sit between injected image galleries (image-extractor.js). They also appear
+// mid-stream, so they're hidden on every pass.
 function hideGalleryBreakMarkers() {
 	const { allMessages } = getUIMessages();
 	allMessages.forEach(container => {
@@ -402,7 +347,6 @@ let _passScheduled = false;
 
 function runTaggingPass() {
 	stylePhantomMessages();
-	extractAndStoreUUIDs();
 	hideGalleryBreakMarkers();
 }
 

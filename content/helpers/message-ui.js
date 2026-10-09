@@ -31,8 +31,8 @@ function getUIMessages() {
 	//
 	// NOTE: the result is NOT contiguous. The virtualizer permanently pins the last
 	// human and last assistant rows (lastHumanMessageRef / lastAssistantMessageRef),
-	// so this is really "the current window PLUS the tail". Anything doing positional
-	// work on it must check adjacency — see areMessagesAdjacent().
+	// so this is really "the current window PLUS the tail". Don't do positional work on
+	// it: identify rows by their data-turn-key (see MESSAGE IDENTITY), or by data-index.
 	const allMessages = [...userMessages, ...assistantMessages].sort((a, b) =>
 		(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1);
 
@@ -43,17 +43,89 @@ function getUIMessages() {
 	};
 }
 
+// ======== MESSAGE IDENTITY ========
+// Every message row carries data-turn-key, rendered by claude.ai itself and updated in place when a
+// version switch changes what the row shows. User rows: the message's uuid. Assistant rows: their
+// uuid, except the original reply to a send made in the merged experience, which is keyed
+// "<parent user uuid>-hub-reply"; that one is the lowest-index assistant child of the parent
+// (verified against the page's own data, docs/bard-rework.md "Message identity in the DOM").
+// The key is read live from the row, never cached, so it can't go stale.
+
+const HUB_REPLY_SUFFIX = '-hub-reply';
+
+// The [data-turn-key] element of the row containing el (a message, its toolbar, a button), or null.
+function turnRowOf(el) {
+	return el?.closest?.('[data-turn-key]') ?? null;
+}
+
+// The original reply to every user message, from the whole tree: parent uuid -> reply uuid.
+function _originalReplies(tree) {
+	const best = new Map();
+	for (const msg of tree) {
+		if (msg.sender === 'human' || !msg.parent_message_uuid) continue;
+		const current = best.get(msg.parent_message_uuid);
+		const earlier = !current
+			|| (msg.index ?? 0) < (current.index ?? 0)
+			|| ((msg.index ?? 0) === (current.index ?? 0) && String(msg.created_at) < String(current.created_at));
+		if (earlier) best.set(msg.parent_message_uuid, msg);
+	}
+	return new Map([...best].map(([parent, msg]) => [parent, msg.uuid]));
+}
+
+// key -> message uuid, or null. `tree` must be every message of the conversation
+// (conversationData.chat_messages, getMessages(true)), not a branch: after a client-side version
+// switch, the row on screen can be off the server's current branch.
+function turnKeyResolver(tree) {
+	const originals = _originalReplies(tree);
+	return (key) => {
+		if (!key) return null;
+		if (!key.endsWith(HUB_REPLY_SUFFIX)) return key;
+		return originals.get(key.slice(0, -HUB_REPLY_SUFFIX.length)) ?? null;
+	};
+}
+
+function uuidForTurnKey(key, tree) {
+	return turnKeyResolver(tree)(key);
+}
+
+// The mounted row element showing uuid, or null.
+function rowForUuid(uuid, tree) {
+	if (!uuid) return null;
+	const own = document.querySelector(`[data-turn-key="${CSS.escape(uuid)}"]`);
+	if (own) return own;
+	const msg = tree.find(m => m.uuid === uuid);
+	if (!msg || msg.sender === 'human' || !msg.parent_message_uuid) return null;
+	const hubKey = msg.parent_message_uuid + HUB_REPLY_SUFFIX;
+	if (_originalReplies(tree).get(msg.parent_message_uuid) !== uuid) return null;
+	return document.querySelector(`[data-turn-key="${CSS.escape(hubKey)}"]`);
+}
+
+// The uuid of the message whose row contains el (for click handlers). Plain keys need nothing else;
+// a "-hub-reply" key loads the conversation (getData caches per instance: pass one you already
+// have) to apply the tree rule. null if el isn't in a message row.
+async function messageUuidOfElement(el, conversation = null) {
+	const key = turnRowOf(el)?.getAttribute('data-turn-key');
+	if (!key) return null;
+	if (!key.endsWith(HUB_REPLY_SUFFIX)) return key;
+	const conv = conversation ?? new ClaudeConversation(getOrgId(), getConversationId());
+	const data = await conv.getData();
+	return uuidForTurnKey(key, data.chat_messages ?? []);
+}
+
+// A user message element's uuid: user rows are always keyed by their own uuid.
+function resolveUserMessageUuid(userElement) {
+	return turnRowOf(userElement)?.getAttribute('data-turn-key') ?? null;
+}
+
 // ======== VIRTUALIZED MESSAGE LIST ========
 // claude.ai renders the conversation through a virtualizer: only a window of
 // messages around the viewport exists in the DOM, everything else is a spacer.
 // Anything that needs an off-screen message has to drive the scroll container
 // until the virtualizer renders it.
 //
-// The ordering signal used here is the data-message-uuid markers injected by
-// phantom-messages.js, NOT the virtualizer's own data-index. Both the target and
-// the on-screen anchors are then looked up in the same branch array, so the
-// offset introduced by prepended phantom messages cancels out, and none of this
-// depends on the virtualizer's attribute names.
+// The ordering signal is each row's data-turn-key (see MESSAGE IDENTITY), NOT the virtualizer's
+// data-index: both the target and the on-screen rows are looked up in the same rendered branch, so
+// the offset introduced by prepended phantom messages cancels out.
 
 // Walk up from a rendered message row to the scroll container.
 function getMessageScroller() {
@@ -68,22 +140,8 @@ function getMessageScroller() {
 	return null;
 }
 
-// Two message elements are "adjacent" if they are actually next to each other on
-// screen. Needed because the virtualizer keeps the tail of the conversation
-// mounted forever, so the element following the last row of the current window is
-// the pinned last message, hundreds of entries away.
-function areMessagesAdjacent(a, b) {
-	if (!a || !b) return false;
-	const scroller = getMessageScroller();
-	const limit = scroller ? scroller.clientHeight * 1.5 : 1200;
-	const rectA = a.getBoundingClientRect();
-	const rectB = b.getBoundingClientRect();
-	const gap = rectB.top >= rectA.top ? rectB.top - rectA.bottom : rectA.top - rectB.bottom;
-	return gap < limit;
-}
-
-// The tagged row we are actually looking at, as its position in `positions`
-// (uuid -> branch index). Used to tell which side of the scroll range a target is on.
+// The row we are actually looking at, as its position in the rendered branch (positionOf: row
+// element -> index, or undefined). Used to tell which side of the scroll range a target is on.
 //
 // Nearest-by-distance rather than a distance cutoff, deliberately. The virtualizer
 // keeps rows mounted that are nowhere near the viewport (it pins the tail of the
@@ -92,73 +150,36 @@ function areMessagesAdjacent(a, b) {
 // because single messages are routinely taller than the viewport. Taking the closest
 // row needs no threshold, can't discard a legitimate row, and doesn't care *why*
 // anything else is mounted.
-function getNearestAnchor(positions) {
+function getNearestAnchor(positionOf) {
 	const scroller = getMessageScroller();
 	if (!scroller) return null;
 	const viewportTop = scroller.getBoundingClientRect().top;
 
 	let nearest = null;
-	for (const el of document.querySelectorAll('[data-message-uuid]')) {
-		const position = positions.get(el.getAttribute('data-message-uuid'));
-		if (position === undefined) continue; // not on this branch (e.g. a phantom)
+	for (const el of document.querySelectorAll('[data-turn-key]')) {
+		const position = positionOf(el);
+		if (position === undefined) continue; // not on this branch
 		const distance = Math.abs(el.getBoundingClientRect().top - viewportTop);
 		if (!nearest || distance < nearest.distance) nearest = { position, distance };
 	}
 	return nearest;
 }
 
-// User messages carry no marker of their own (injecting into their content would corrupt
-// the native edit box), so identify one through the assistant message beside it.
-//
-// Tries both sides on purpose, regardless of which way the caller intends to travel: at a
-// window edge only one neighbour is rendered, and keying off travel direction means the
-// arrow pointing at the missing side silently does nothing. `messages` must be the branch
-// as rendered — see ClaudeConversation.getRenderedMessages.
-function resolveUserMessageUuid(userElement, messages) {
-	const { assistantMessages } = getUIMessages();
-	const uuidOf = el => {
-		let node = el;
-		while (node && !node.hasAttribute('data-message-uuid')) node = node.parentElement;
-		return node?.getAttribute('data-message-uuid') ?? null;
-	};
-
-	// The reply below it: its parent is the message we want.
-	const reply = assistantMessages.find(el =>
-		userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
-	if (reply && areMessagesAdjacent(userElement, reply)) {
-		const apiReply = messages.find(msg => msg.uuid === uuidOf(reply));
-		if (apiReply?.parent_message_uuid) return apiReply.parent_message_uuid;
-	}
-
-	// Otherwise the message above it: we want its human child on this branch.
-	const parent = assistantMessages.filter(el =>
-		userElement.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING).pop();
-	if (parent && areMessagesAdjacent(parent, userElement)) {
-		const parentUuid = uuidOf(parent);
-		const child = parentUuid && messages.find(msg =>
-			msg.parent_message_uuid === parentUuid && msg.sender === 'human');
-		if (child) return child.uuid;
-	}
-
-	return null;
-}
-
 let _revealInFlight = false;
 
 // Callers fire shortly after a reload (bookmark / "Go to Message"), when the
-// conversation may not be mounted or tagged yet.
+// conversation may not be mounted yet.
 async function _waitForMessageList(timeoutMs = 10000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
-		if (getMessageScroller() && document.querySelector('[data-message-uuid]')) return true;
+		if (getMessageScroller() && document.querySelector('[data-turn-key]')) return true;
 		await new Promise(resolve => setTimeout(resolve, 100));
 	}
 	return false;
 }
 
-// Scroll a message into view by uuid, rendering it first if the virtualizer has
-// it unmounted. Works for human messages too, even though only assistant rows
-// carry a uuid, by anchoring on the adjacent assistant message.
+// Scroll a message (user or assistant) into view by uuid, rendering it first if the virtualizer
+// has it unmounted.
 //
 // Pass `conversation` if you already have one — getData caches per instance, so it saves
 // a refetch. It deliberately takes the conversation rather than a message array: the
@@ -175,53 +196,37 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 	_revealInFlight = true;
 	try {
 		if (!await _waitForMessageList()) return null;
-		const findRendered = () => document.querySelector(`[data-message-uuid="${uuid}"]`);
-
-		// Already on screen — nothing to hunt for.
-		const alreadyThere = findRendered();
-		if (alreadyThere) return _settleOnMessage(alreadyThere, 0, highlight);
 
 		const conv = conversation ?? new ClaudeConversation(getOrgId(), getConversationId());
+		const tree = (await conv.getData()).chat_messages ?? [];
+		const findTarget = () => rowForUuid(uuid, tree);
+
+		// Already on screen — nothing to hunt for.
+		const alreadyThere = findTarget();
+		if (alreadyThere) return _settleOnMessage(alreadyThere, highlight);
+
 		const messages = await conv.getRenderedMessages();
 		const positions = new Map(messages.map((msg, i) => [msg.uuid, i]));
 		const targetPosition = positions.get(uuid);
 		if (targetPosition === undefined) return null;
-
-		// Human messages have no marker of their own, so aim at the assistant
-		// reply below them (or, for an unanswered last message, the assistant
-		// above) and step back onto the human row once it is rendered.
-		let anchorUuid = uuid;
-		let step = 0;
-		if (messages[targetPosition].sender === 'human') {
-			const child = messages[targetPosition + 1];
-			if (child && child.sender !== 'human') {
-				anchorUuid = child.uuid;
-				step = -1;
-			} else {
-				const parent = messages[targetPosition - 1];
-				if (!parent) return null;
-				anchorUuid = parent.uuid;
-				step = 1;
-			}
-		}
+		const resolve = turnKeyResolver(tree);
+		const positionOf = (row) => positions.get(resolve(row.getAttribute('data-turn-key')));
 
 		const scroller = getMessageScroller();
 		if (!scroller) return null;
-		const findAnchor = () => document.querySelector(`[data-message-uuid="${anchorUuid}"]`);
-		const anchorPosition = positions.get(anchorUuid);
 
 		if (strategy === 'step') {
 			// Nearby target: walk toward it. Falls back to bracketing if the guess that it
 			// was close turns out to be wrong.
-			const arrived = await _stepTowardAnchor(scroller, findAnchor, positions, anchorPosition);
-			if (!arrived) await _bracketTowardAnchor(scroller, findAnchor, positions, anchorPosition, maxProbes);
+			const arrived = await _stepTowardAnchor(scroller, findTarget, positionOf, targetPosition);
+			if (!arrived) await _bracketTowardAnchor(scroller, findTarget, positionOf, targetPosition, maxProbes);
 		} else {
-			await _bracketTowardAnchor(scroller, findAnchor, positions, anchorPosition, maxProbes);
+			await _bracketTowardAnchor(scroller, findTarget, positionOf, targetPosition, maxProbes);
 		}
 
-		const anchorElement = findAnchor();
-		if (!anchorElement) return null;
-		return _settleOnMessage(anchorElement, step, highlight);
+		const target = findTarget();
+		if (!target) return null;
+		return _settleOnMessage(target, highlight);
 	} catch (error) {
 		messageUiLog.error('revealMessageByUuid failed:', error);
 		return null;
@@ -230,20 +235,20 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 	}
 }
 
-// Tagging can lag a freshly mounted window by a frame or two.
-async function _awaitNearestAnchor(positions, attempts = 6) {
-	let nearest = getNearestAnchor(positions);
+// Rows can lag a freshly mounted window by a frame or two.
+async function _awaitNearestAnchor(positionOf, attempts = 6) {
+	let nearest = getNearestAnchor(positionOf);
 	for (let wait = 0; !nearest && wait < attempts; wait++) {
 		await new Promise(resolve => setTimeout(resolve, 100));
-		nearest = getNearestAnchor(positions);
+		nearest = getNearestAnchor(positionOf);
 	}
 	return nearest;
 }
 
-async function _awaitAnchorChange(positions, previousPosition, attempts = 14) {
+async function _awaitAnchorChange(positionOf, previousPosition, attempts = 14) {
 	for (let wait = 0; wait < attempts; wait++) {
 		await new Promise(resolve => setTimeout(resolve, 50));
-		if (getNearestAnchor(positions)?.position !== previousPosition) return;
+		if (getNearestAnchor(positionOf)?.position !== previousPosition) return;
 	}
 }
 
@@ -251,11 +256,11 @@ async function _awaitAnchorChange(positions, previousPosition, attempts = 14) {
 // Nudge half a viewport at a time in its direction. A couple of small scrolls beats
 // bracketing a 400,000px range, and it lands the same way a human would scroll there.
 // Returns whether it arrived.
-async function _stepTowardAnchor(scroller, findAnchor, positions, targetPosition, maxSteps = 12) {
+async function _stepTowardAnchor(scroller, findAnchor, positionOf, targetPosition, maxSteps = 12) {
 	for (let step = 0; step < maxSteps; step++) {
 		if (findAnchor()) return true;
 
-		const nearest = await _awaitNearestAnchor(positions);
+		const nearest = await _awaitNearestAnchor(positionOf);
 		if (!nearest) return false;
 
 		const from = scroller.scrollTop;
@@ -276,14 +281,14 @@ async function _stepTowardAnchor(scroller, findAnchor, positions, targetPosition
 // Binary search on scroll position: message heights vary far too much to convert a
 // position into a pixel offset, but the nearest rendered row always says which side of
 // the target we are on, which is enough to bracket it.
-async function _bracketTowardAnchor(scroller, findAnchor, positions, targetPosition, maxProbes) {
+async function _bracketTowardAnchor(scroller, findAnchor, positionOf, targetPosition, maxProbes) {
 	let low = 0;
 	let high = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
 
 	for (let probe = 0; probe < maxProbes; probe++) {
 		if (findAnchor()) return true;
 
-		const nearest = await _awaitNearestAnchor(positions);
+		const nearest = await _awaitNearestAnchor(positionOf);
 		if (!nearest) return false;
 
 		// Re-bracket from where we actually ended up: the virtualizer revises its height
@@ -298,37 +303,13 @@ async function _bracketTowardAnchor(scroller, findAnchor, positions, targetPosit
 		if (Math.abs(next - scroller.scrollTop) < 1) return !!findAnchor();
 
 		scroller.scrollTop = next;
-		await _awaitAnchorChange(positions, nearest.position);
+		await _awaitAnchorChange(positionOf, nearest.position);
 	}
 	return !!findAnchor();
 }
 
-// Find the message element one `step` away from `anchorElement` in document order
-// (-1 for the human message above an assistant row).
-function _neighbourOf(anchorElement, step) {
-	const { allMessages } = getUIMessages();
-	const index = allMessages.findIndex(el => el === anchorElement || anchorElement.contains(el));
-	const neighbour = index === -1 ? null : allMessages[index + step];
-	return neighbour && areMessagesAdjacent(anchorElement, neighbour) ? neighbour : null;
-}
-
-// Centre the message and flash it. `step` walks to a neighbouring message.
-async function _settleOnMessage(anchorElement, step, highlight) {
-	let target = anchorElement;
-
-	if (step !== 0) {
-		// Bring the anchor on screen before looking for the neighbour. The
-		// neighbour is the message we actually want, but it can still be unmounted
-		// just past the window edge — the virtualizer only mounts rows around the
-		// viewport, so the anchor has to be in view before its neighbour exists.
-		anchorElement.scrollIntoView({ block: 'center' });
-		for (let wait = 0; wait < 10; wait++) {
-			await new Promise(resolve => setTimeout(resolve, 50));
-			const neighbour = _neighbourOf(anchorElement, step);
-			if (neighbour) { target = neighbour; break; }
-		}
-	}
-
+// Centre the message and flash it.
+function _settleOnMessage(target, highlight) {
 	// Instant, not smooth: smooth-scrolling across a virtualized list unmounts
 	// rows mid-flight and the scroll lands nowhere.
 	//

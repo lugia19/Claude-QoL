@@ -448,18 +448,18 @@
 			return;
 		}
 
+		const clickedUuid = resolveUserMessageUuid(messageElement);
+		if (!clickedUuid) return;
+
 		let conversation = await getCachedConversation();
 		let messages = await conversation.getRenderedMessages();
-		let clickedUuid = resolveUserMessageUuid(messageElement, messages);
 
 		// A cached branch goes stale as soon as new messages are sent — if the clicked
 		// message isn't in it, rebuild once and retry.
-		if (!clickedUuid) {
+		if (!messages.some(msg => msg.uuid === clickedUuid)) {
 			conversation = await getCachedConversation(true);
 			messages = await conversation.getRenderedMessages();
-			clickedUuid = resolveUserMessageUuid(messageElement, messages);
 		}
-		if (!clickedUuid) return;
 
 		let cursor = messages.findIndex(msg => msg.uuid === clickedUuid);
 		if (cursor === -1) return;
@@ -544,8 +544,7 @@
 			e.preventDefault();
 			e.stopPropagation();
 
-			const messageContainer = e.target.closest('[data-message-uuid]');
-			const messageUuid = messageContainer?.dataset.messageUuid;
+			const messageUuid = await messageUuidOfElement(e.target);
 
 			if (!messageUuid) {
 				showClaudeAlert(localize('common.error'), localize('nav.message_uuid_not_found'));
