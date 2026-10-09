@@ -56,6 +56,24 @@
 		return (result.content ?? []).map(textOf).filter(Boolean).join('\n');
 	}
 
+	// A tool_result's images as result_images: image_gallery items (image-extractor.js, image search) and
+	// bare image items (MCP tools), the latter by url or, failing that, by file uuid in this org.
+	function resultImages(result, orgId) {
+		if (!Array.isArray(result?.content)) return [];
+		const images = [];
+		for (const item of result.content) {
+			if (item.type === 'image_gallery') {
+				for (const image of item.images ?? []) {
+					if (image.url) images.push({ url: image.url, thumbnail_url: image.thumbnail_url || image.url });
+				}
+			} else if (item.type === 'image') {
+				const url = item.url || item.preview_url || (item.file_uuid && orgId ? `/api/${orgId}/files/${item.file_uuid}/preview` : null);
+				if (url) images.push({ url, thumbnail_url: item.thumbnail_url || url });
+			}
+		}
+		return images;
+	}
+
 	// Legacy files (files_v2: ClaudeFile.toApiFormat) and text attachments as Message.attachments.
 	function attachmentsOf(json) {
 		const out = [];
@@ -80,7 +98,7 @@
 	// One phantom (legacy history JSON) as a Message plus its display groups and content blocks.
 	// Text becomes inline markdown, each tool_use (with its tool_result) a timeline tool row. Thinking
 	// is left out: claude.ai doesn't show it any more.
-	function buildPhantom(json, conversationId, index, parentId, out) {
+	function buildPhantom(json, conversationId, orgId, index, parentId, out) {
 		const id = json.uuid;
 		const isUser = json.sender === 'human';
 		const attachments = attachmentsOf(json);
@@ -111,11 +129,13 @@
 				const name = item.name || 'tool';
 				const input = item.input === undefined ? '' : (typeof item.input === 'string' ? item.input : JSON.stringify(item.input));
 				const result = resultText(results.get(item.id));
+				const images = resultImages(results.get(item.id), orgId);
 				addGroup('GROUP_STYLE_TIMELINE', { summary: `Used ${name}`, summary_source: 'TITLE_SOURCE_LIFECYCLE' }, [{
 					title: `Used ${name}`, icon: { builtin: { type: 'BUILTIN_ICON_TYPE_WRENCH' } }, state: 'CONTENT_BLOCK_STATE_COMPLETE',
 					tool_display_name: name, title_verb: 'Used', title_object: name, row_kind: 'TOOL_ROW_KIND_GENERIC',
 					input_summary: input.slice(0, 300), input_summary_kind: 'INPUT_SUMMARY_KIND_TEXT', input_visibility: 'INPUT_VISIBILITY_SHOWN',
 					...(result ? { text: result, text_format: { style: 'STYLE_PLAIN' } } : {}),
+					...(images.length ? { result_images: images } : {}),
 					tool_use_id: item.id || `toolu_qolphantom_${id}_${groupIndex}`,
 				}]);
 			}
@@ -125,13 +145,13 @@
 
 	// The phantoms as a ConversationUpdate fragment, or null. A phantom chain ending on a user message
 	// gets an assistant acknowledgement, as the legacy version did (and the fork's handshake expects).
-	function buildPhantoms(conversationId, phantoms) {
+	function buildPhantoms(conversationId, orgId, phantoms) {
 		const chain = [...phantoms];
 		if (chain.at(-1)?.sender === 'human') {
 			chain.push({ uuid: `${chain.at(-1).uuid}-qol-ack`, sender: 'assistant', content: [{ type: 'text', text: ACK_TEXT }], created_at: chain.at(-1).created_at });
 		}
 		const out = { messages: [], display_groups: [], content_blocks: [] };
-		chain.forEach((json, i) => buildPhantom(json, conversationId, i - chain.length, i ? chain[i - 1].uuid : null, out));
+		chain.forEach((json, i) => buildPhantom(json, conversationId, orgId, i - chain.length, i ? chain[i - 1].uuid : null, out));
 		return { update: out, lastId: chain.at(-1).uuid, ids: chain.map(json => json.uuid) };
 	}
 
@@ -161,7 +181,7 @@
 		return messages;
 	}
 
-	function prepare(conversationId, snapshot) {
+	function prepare(conversationId, orgId, snapshot) {
 		if (!prepared.has(conversationId)) {
 			const pending = (async () => {
 				// Always ask the database first, even when the mirror doesn't list the chat (it may not
@@ -173,7 +193,7 @@
 				const phantoms = stored?.length ? stored : await reconstruct(snapshot);
 				if (!phantoms?.length) return null;
 				if (!stored?.length) await storePhantomMessages(conversationId, phantoms);
-				const built = buildPhantoms(conversationId, phantoms);
+				const built = buildPhantoms(conversationId, orgId, phantoms);
 				for (const phantomId of built.ids) {
 					phantomRowKeys.add(phantomId);
 					phantomRowKeys.add(`${phantomId}-hub-reply`);
@@ -215,7 +235,7 @@
 		if (!ctx.conversationId || !worthWaiting(ctx.conversationId, update)) return false;
 		let timer;
 		const timeout = new Promise(resolve => { timer = setTimeout(() => resolve('timeout'), WAIT_MS); });
-		const built = await Promise.race([prepare(ctx.conversationId, update), timeout]);
+		const built = await Promise.race([prepare(ctx.conversationId, ctx.orgId, update), timeout]);
 		clearTimeout(timer);
 		if (built === 'timeout') {
 			logger().warn(`phantoms for ${ctx.conversationId} took over ${WAIT_MS}ms; this snapshot goes through without them`);
