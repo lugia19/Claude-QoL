@@ -1,202 +1,267 @@
 // pref-switcher.js
+// Preset switchers: a top-right button opening a list of saved texts, one of which is active. The list,
+// its CRUD and both modals are shared; each target has its own list, its own notion of "active" and its
+// own way of applying a text:
+// - Preferences (chat, home): claude.ai's account preferences (PUT /api/account_profile).
+// - Claude Code system prompt (/code, /epitaxy): a setting, mirrored to localStorage for
+//   content/main/code-session-prompt.js, which adds it to every new Code session.
 (function () {
 	'use strict';
 	const log = createLogger('PrefSwitcher');
-	const channel = new BroadcastChannel('pref-switcher-updates');
 
 	const PRESET_ICON_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>`;
+	const PROMPT_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4.5 6.5l2 1.5-2 1.5M8.5 10h3"/></svg>`;
 
-	channel.addEventListener('message', (event) => {
-		if (event.data.type === 'preferences-changed') {
-			updatePresetButtonAppearance();
-		}
-	});
+	// A target: { buttonClass, icon, pages, forceDisplayOnMobile, presetsKey, getActive(), apply(text) -> ok,
+	//   strings: { tooltip, title, info, applying, unsavedTitle, unsavedConfirm, unsavedRow, placeholder,
+	//   updateFailed }, extraContent?() -> element shown under the list }.
+	function createPresetSwitcher(target) {
+		const { strings } = target;
 
-	// ======== API FUNCTIONS ========
-	async function getCurrentPreferences() {
-		try {
-			const response = await fetch('https://claude.ai/api/account_profile', { method: 'GET' });
-			const data = await response.json();
-			return data.conversation_preferences || '';
-		} catch (error) {
-			log.error('Failed to fetch preferences:', error);
-			return '';
-		}
-	}
+		// ======== PRESETS ========
+		const getStoredPresets = () => settingsRegistry.get(target.presetsKey);
 
-	async function setPreferences(preferencesText) {
-		try {
-			const response = await fetch('https://claude.ai/api/account_profile?source=preset-manager', {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ conversation_preferences: preferencesText })
-			});
-			if (response.ok) {
-				channel.postMessage({ type: 'preferences-changed' });
-				updatePresetButtonAppearance();
-			}
-			return response.ok;
-		} catch (error) {
-			log.error('Failed to set preferences:', error);
-			return false;
-		}
-	}
-
-	// ======== PRESET MANAGEMENT ========
-	async function getStoredPresets() {
-		return await settingsRegistry.get(SETTINGS_KEYS.PREF_SWITCHER.PRESETS);
-	}
-
-	async function savePreset(id, name, content) {
-		const presets = await getStoredPresets();
-		if (!id) id = crypto.randomUUID();
-		presets[id] = { id, name, content: content.trim(), lastModified: Date.now() };
-		await settingsRegistry.set(SETTINGS_KEYS.PREF_SWITCHER.PRESETS, presets);
-		return id;
-	}
-
-	async function deletePreset(id) {
-		const presets = await getStoredPresets();
-		delete presets[id];
-		await settingsRegistry.set(SETTINGS_KEYS.PREF_SWITCHER.PRESETS, presets);
-	}
-
-	async function getCurrentPresetId() {
-		const currentPrefs = await getCurrentPreferences();
-		const presets = await getStoredPresets();
-		for (const [id, preset] of Object.entries(presets)) {
-			if (preset.content.trim() === currentPrefs.trim()) return id;
-		}
-		return currentPrefs.trim() ? 'unsaved' : 'none';
-	}
-
-	// ======== HEADER BUTTON ========
-	function createPresetButton() {
-		const button = createClaudeButton(PRESET_ICON_SVG, 'icon');
-		button.classList.add('shrink-0', 'preset-switcher-button');
-		button.onclick = () => showPresetListModal();
-		return button;
-	}
-
-	async function updatePresetButtonAppearance() {
-		const activeId = await getCurrentPresetId();
-		let label = localize('prefs.none');
-		if (activeId === 'unsaved') {
-			label = localize('prefs.unsaved');
-		} else if (activeId !== 'none') {
+		async function savePreset(id, name, content) {
 			const presets = await getStoredPresets();
-			if (presets[activeId]) label = presets[activeId].name;
+			if (!id) id = crypto.randomUUID();
+			presets[id] = { id, name, content: content.trim(), lastModified: Date.now() };
+			await settingsRegistry.set(target.presetsKey, presets);
+			return id;
 		}
-		ButtonBar.updateTooltip('preset-switcher-button', localize('prefs.preset_tooltip', { name: label }));
-		const button = document.querySelector('.preset-switcher-button');
-		if (button) button.style.color = activeId === 'none' ? '' : '#0084ff';
-	}
 
-	// ======== LIST MODAL ========
-	async function showPresetListModal() {
-		const loadingModal = createLoadingModal(localize('prefs.loading_presets'));
-		loadingModal.show();
+		async function deletePreset(id) {
+			const presets = await getStoredPresets();
+			delete presets[id];
+			await settingsRegistry.set(target.presetsKey, presets);
+		}
 
-		try {
+		// The active preset is the one whose content is the active text: 'none' when there's no text,
+		// 'unsaved' when the text matches no preset.
+		async function getCurrentPresetId(active) {
+			active ??= await target.getActive();
+			const presets = await getStoredPresets();
+			for (const [id, preset] of Object.entries(presets)) {
+				if (preset.content.trim() === active.trim()) return id;
+			}
+			return active.trim() ? 'unsaved' : 'none';
+		}
+
+		async function apply(content) {
+			const ok = await target.apply(content);
+			if (ok) updateButtonAppearance();
+			return ok;
+		}
+
+		// ======== HEADER BUTTON ========
+		function createButton() {
+			const button = createClaudeButton(target.icon, 'icon');
+			button.classList.add('shrink-0', target.buttonClass);
+			button.onclick = () => showListModal();
+			return button;
+		}
+
+		async function updateButtonAppearance() {
+			const activeId = await getCurrentPresetId();
+			let label = localize('prefs.none');
+			if (activeId === 'unsaved') {
+				label = localize('prefs.unsaved');
+			} else if (activeId !== 'none') {
+				const presets = await getStoredPresets();
+				if (presets[activeId]) label = presets[activeId].name;
+			}
+			ButtonBar.updateTooltip(target.buttonClass, strings.tooltip(label));
+			const button = document.querySelector('.' + target.buttonClass);
+			if (button) button.style.color = activeId === 'none' ? '' : '#0084ff';
+		}
+
+		// ======== LIST MODAL ========
+		async function showListModal() {
+			const loadingModal = createLoadingModal(localize('prefs.loading_presets'));
+			loadingModal.show();
+
+			try {
+				const contentContainer = document.createElement('div');
+
+				const list = document.createElement('div');
+				list.className = CLAUDE_CLASSES.LIST_CONTAINER;
+				list.style.maxHeight = '300px';
+				contentContainer.appendChild(list);
+
+				async function applyPreset(content) {
+					const applyingModal = createLoadingModal(strings.applying);
+					applyingModal.show();
+					try {
+						await apply(content);
+						await renderList();
+					} finally {
+						applyingModal.destroy();
+					}
+				}
+
+				const confirmLeavingUnsaved = async (activeId) =>
+					activeId !== 'unsaved' || await showClaudeConfirm(strings.unsavedTitle, strings.unsavedConfirm);
+
+				async function renderList() {
+					const presets = await getStoredPresets();
+					const active = await target.getActive();
+					const nowActiveId = await getCurrentPresetId(active);
+					list.innerHTML = '';
+
+					// "None" row — always first
+					list.appendChild(createPresetRow({
+						id: 'none', name: localize('prefs.none'), isActive: nowActiveId === 'none',
+						onApply: async () => {
+							if (!await confirmLeavingUnsaved(nowActiveId)) return;
+							await applyPreset('');
+						}
+					}));
+
+					// "Unsaved" row
+					if (nowActiveId === 'unsaved') {
+						list.appendChild(createPresetRow({
+							id: 'unsaved', name: strings.unsavedRow, isActive: true, isUnsaved: true,
+							onEdit: () => showEditPresetModal(null, active, renderList),
+						}));
+					}
+
+					// Stored presets
+					for (const [id, preset] of Object.entries(presets)) {
+						list.appendChild(createPresetRow({
+							id, name: preset.name, isActive: nowActiveId === id,
+							onApply: async () => {
+								if (!await confirmLeavingUnsaved(nowActiveId)) return;
+								await applyPreset(preset.content);
+							},
+							onEdit: () => showEditPresetModal(id, null, renderList),
+							onDelete: async () => {
+								if (!await showClaudeConfirm(localize('prefs.delete_preset_title'), localize('prefs.delete_preset_confirm', { name: preset.name }))) return;
+								const deletingModal = createLoadingModal(localize('prefs.deleting_preset'));
+								deletingModal.show();
+								try {
+									await deletePreset(id);
+									if (nowActiveId === id) await apply('');
+									await renderList();
+								} finally {
+									deletingModal.destroy();
+								}
+							}
+						}));
+					}
+				}
+
+				// The first render does the fetching, so the loading modal stays up until it's done.
+				await renderList();
+				loadingModal.destroy();
+
+				// "+ New Preset" button
+				const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
+				newBtn.classList.add('mt-3');
+				newBtn.onclick = () => showEditPresetModal(null, null, renderList);
+				contentContainer.appendChild(newBtn);
+
+				if (target.extraContent) contentContainer.appendChild(await target.extraContent());
+
+				// Info text
+				const infoText = document.createElement('div');
+				infoText.className = CLAUDE_CLASSES.TEXT_MUTED + ' mt-4';
+				infoText.textContent = strings.info;
+				contentContainer.appendChild(infoText);
+
+				const modal = new ClaudeModal(strings.title, contentContainer);
+				modal.modal.classList.remove('max-w-md');
+				modal.modal.classList.add('max-w-lg');
+				modal.addCancel(localize('common.close'));
+				modal.show();
+			} catch (error) {
+				log.error('Error loading presets:', error);
+				loadingModal.destroy();
+				showClaudeAlert(localize('common.error'), localize('prefs.load_presets_failed'));
+			}
+		}
+
+		// ======== EDIT MODAL ========
+		async function showEditPresetModal(presetId, unsavedContent, onSaved) {
+			let existingName = '';
+			let existingContent = '';
+
+			if (presetId) {
+				const presets = await getStoredPresets();
+				const preset = presets[presetId];
+				if (preset) {
+					existingName = preset.name;
+					existingContent = preset.content;
+				}
+			} else if (unsavedContent) {
+				existingContent = unsavedContent;
+			}
+
 			const contentContainer = document.createElement('div');
 
-			const list = document.createElement('div');
-			list.className = CLAUDE_CLASSES.LIST_CONTAINER;
-			list.style.maxHeight = '300px';
-			contentContainer.appendChild(list);
+			const nameLabel = document.createElement('label');
+			nameLabel.className = CLAUDE_CLASSES.LABEL;
+			nameLabel.textContent = localize('prefs.preset_name_label');
+			contentContainer.appendChild(nameLabel);
 
-			async function applyPreset(content) {
-				const applyingModal = createLoadingModal(localize('prefs.applying_preferences'));
-				applyingModal.show();
-				try {
-					await setPreferences(content);
-					await renderList();
-				} finally {
-					applyingModal.destroy();
-				}
-			}
+			const nameInput = createClaudeInput({ placeholder: localize('prefs.preset_name_placeholder'), value: existingName });
+			nameInput.classList.add('mb-4');
+			contentContainer.appendChild(nameInput);
 
-			async function renderList() {
-				const presets = await getStoredPresets();
-				const nowActiveId = await getCurrentPresetId();
-				list.innerHTML = '';
+			const contentLabel = document.createElement('label');
+			contentLabel.className = CLAUDE_CLASSES.LABEL;
+			contentLabel.textContent = localize('prefs.content_label');
+			contentContainer.appendChild(contentLabel);
 
-				// "None" row — always first
-				list.appendChild(createPresetRow({
-					id: 'none', name: localize('prefs.none'), isActive: nowActiveId === 'none',
-					onApply: async () => {
-						if (nowActiveId === 'unsaved') {
-							if (!await showClaudeConfirm(localize('prefs.unsaved_preferences_title'), localize('prefs.unsaved_preferences_confirm'))) return;
-						}
-						await applyPreset('');
-					}
-				}));
+			const textarea = document.createElement('textarea');
+			textarea.className = 'bg-bg-000 border border-border-300 p-3 leading-5 rounded-[0.6rem] transition-colors hover:border-border-200 focus:border-border-200 focus:outline-none placeholder:text-text-500 w-full';
+			textarea.style.resize = 'vertical';
+			textarea.rows = 8;
+			textarea.placeholder = strings.placeholder;
+			textarea.setAttribute('data-1p-ignore', 'true');
+			textarea.value = existingContent;
+			contentContainer.appendChild(textarea);
 
-				// "Unsaved" row
-				if (nowActiveId === 'unsaved') {
-					const unsavedPrefs = await getCurrentPreferences();
-					list.appendChild(createPresetRow({
-						id: 'unsaved', name: localize('prefs.unsaved_preferences'), isActive: true, isUnsaved: true,
-						onEdit: () => showEditPresetModal(null, unsavedPrefs, renderList),
-					}));
-				}
-
-				// Stored presets
-				for (const [id, preset] of Object.entries(presets)) {
-					list.appendChild(createPresetRow({
-						id, name: preset.name, isActive: nowActiveId === id,
-						onApply: async () => {
-							if (nowActiveId === 'unsaved') {
-								if (!await showClaudeConfirm(localize('prefs.unsaved_preferences_title'), localize('prefs.unsaved_preferences_confirm'))) return;
-							}
-							await applyPreset(preset.content);
-						},
-						onEdit: () => showEditPresetModal(id, null, renderList),
-						onDelete: async () => {
-							if (!await showClaudeConfirm(localize('prefs.delete_preset_title'), localize('prefs.delete_preset_confirm', { name: preset.name }))) return;
-							const deletingModal = createLoadingModal(localize('prefs.deleting_preset'));
-							deletingModal.show();
-							try {
-								await deletePreset(id);
-								if (nowActiveId === id) await setPreferences('');
-								await renderList();
-							} finally {
-								deletingModal.destroy();
-							}
-						}
-					}));
-				}
-			}
-
-			// The first render does the fetching, so the loading modal stays up until it's done.
-			await renderList();
-			loadingModal.destroy();
-
-			// "+ New Preset" button
-			const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
-			newBtn.classList.add('mt-3');
-			newBtn.onclick = () => showEditPresetModal(null, null, renderList);
-			contentContainer.appendChild(newBtn);
-
-			// Info text
-			const infoText = document.createElement('div');
-			infoText.className = CLAUDE_CLASSES.TEXT_MUTED + ' mt-4';
-			infoText.textContent = localize('prefs.caching_reset_info');
-			contentContainer.appendChild(infoText);
-
-			const modal = new ClaudeModal(localize('prefs.manage_presets_title'), contentContainer);
+			const modal = new ClaudeModal(presetId ? localize('prefs.edit_preset_title') : localize('prefs.new_preset_title'), contentContainer);
 			modal.modal.classList.remove('max-w-md');
-			modal.modal.classList.add('max-w-lg');
-			modal.addCancel(localize('common.close'));
+			modal.modal.classList.add('max-w-xl');
+
+			modal.addCancel();
+			modal.addConfirm(localize('prefs.save_and_apply'), async () => {
+				const name = nameInput.value.trim();
+				if (!name) {
+					showClaudeAlert(localize('prefs.name_required_title'), localize('prefs.name_required'));
+					return false;
+				}
+				const content = textarea.value;
+				const savingModal = createLoadingModal(strings.applying);
+				savingModal.show();
+				try {
+					await savePreset(presetId, name, content);
+					if (!await apply(content)) {
+						showClaudeAlert(localize('common.error'), strings.updateFailed);
+						return false;
+					}
+					if (onSaved) await onSaved();
+				} finally {
+					savingModal.destroy();
+				}
+			});
+
 			modal.show();
-		} catch (error) {
-			log.error('Error loading presets:', error);
-			loadingModal.destroy();
-			showClaudeAlert(localize('common.error'), localize('prefs.load_presets_failed'));
 		}
+
+		ButtonBar.register({
+			buttonClass: target.buttonClass,
+			createFn: createButton,
+			tooltip: strings.tooltip(localize('prefs.none')),
+			forceDisplayOnMobile: target.forceDisplayOnMobile,
+			pages: target.pages,
+			onInjected: () => updateButtonAppearance(),
+		});
+
+		return { updateButtonAppearance };
 	}
 
-	function createPresetRow({ id, name, isActive, isUnsaved, onApply, onEdit, onDelete }) {
+	function createPresetRow({ name, isActive, isUnsaved, onApply, onEdit, onDelete }) {
 		const row = document.createElement('div');
 		row.className = CLAUDE_CLASSES.LIST_ITEM + ' flex items-center gap-2';
 
@@ -239,88 +304,139 @@
 		return row;
 	}
 
-	// ======== EDIT MODAL ========
-	async function showEditPresetModal(presetId, unsavedContent, onSaved) {
-		let existingName = '';
-		let existingContent = '';
+	// ======== PREFERENCES ========
+	function initPreferences() {
+		const channel = new BroadcastChannel('pref-switcher-updates');
 
-		if (presetId) {
-			const presets = await getStoredPresets();
-			const preset = presets[presetId];
-			if (preset) {
-				existingName = preset.name;
-				existingContent = preset.content;
+		async function getCurrentPreferences() {
+			try {
+				const response = await fetch('https://claude.ai/api/account_profile', { method: 'GET' });
+				const data = await response.json();
+				return data.conversation_preferences || '';
+			} catch (error) {
+				log.error('Failed to fetch preferences:', error);
+				return '';
 			}
-		} else if (unsavedContent) {
-			existingContent = unsavedContent;
 		}
 
-		const contentContainer = document.createElement('div');
-
-		const nameLabel = document.createElement('label');
-		nameLabel.className = CLAUDE_CLASSES.LABEL;
-		nameLabel.textContent = localize('prefs.preset_name_label');
-		contentContainer.appendChild(nameLabel);
-
-		const nameInput = createClaudeInput({ placeholder: localize('prefs.preset_name_placeholder'), value: existingName });
-		nameInput.classList.add('mb-4');
-		contentContainer.appendChild(nameInput);
-
-		const contentLabel = document.createElement('label');
-		contentLabel.className = CLAUDE_CLASSES.LABEL;
-		contentLabel.textContent = localize('prefs.content_label');
-		contentContainer.appendChild(contentLabel);
-
-		const textarea = document.createElement('textarea');
-		textarea.className = 'bg-bg-000 border border-border-300 p-3 leading-5 rounded-[0.6rem] transition-colors hover:border-border-200 focus:border-border-200 focus:outline-none placeholder:text-text-500 w-full';
-		textarea.style.resize = 'vertical';
-		textarea.rows = 8;
-		textarea.placeholder = localize('prefs.content_placeholder');
-		textarea.setAttribute('data-1p-ignore', 'true');
-		textarea.value = existingContent;
-		contentContainer.appendChild(textarea);
-
-		const modal = new ClaudeModal(presetId ? localize('prefs.edit_preset_title') : localize('prefs.new_preset_title'), contentContainer);
-		modal.modal.classList.remove('max-w-md');
-		modal.modal.classList.add('max-w-xl');
-
-		modal.addCancel();
-		modal.addConfirm(localize('prefs.save_and_apply'), async () => {
-			const name = nameInput.value.trim();
-			if (!name) {
-				showClaudeAlert(localize('prefs.name_required_title'), localize('prefs.name_required'));
+		async function setPreferences(preferencesText) {
+			try {
+				const response = await fetch('https://claude.ai/api/account_profile?source=preset-manager', {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ conversation_preferences: preferencesText })
+				});
+				if (response.ok) channel.postMessage({ type: 'preferences-changed' });
+				return response.ok;
+			} catch (error) {
+				log.error('Failed to set preferences:', error);
 				return false;
 			}
-			const content = textarea.value;
-			const savingModal = createLoadingModal(localize('prefs.applying_preferences'));
-			savingModal.show();
+		}
+
+		const switcher = createPresetSwitcher({
+			buttonClass: 'preset-switcher-button',
+			icon: PRESET_ICON_SVG,
+			pages: ['chat', 'home'],
+			forceDisplayOnMobile: true, // the one button kept out of the More-actions menu on phones
+			presetsKey: SETTINGS_KEYS.PREF_SWITCHER.PRESETS,
+			getActive: getCurrentPreferences,
+			apply: setPreferences,
+			strings: {
+				tooltip: (name) => localize('prefs.preset_tooltip', { name }),
+				title: localize('prefs.manage_presets_title'),
+				info: localize('prefs.caching_reset_info'),
+				applying: localize('prefs.applying_preferences'),
+				unsavedTitle: localize('prefs.unsaved_preferences_title'),
+				unsavedConfirm: localize('prefs.unsaved_preferences_confirm'),
+				unsavedRow: localize('prefs.unsaved_preferences'),
+				placeholder: localize('prefs.content_placeholder'),
+				updateFailed: localize('prefs.update_preferences_failed'),
+			},
+		});
+
+		// Changed in another tab (here or by pref-switcher-fetch-watcher.js, from claude.ai's own settings).
+		channel.addEventListener('message', (event) => {
+			if (event.data.type === 'preferences-changed') switcher.updateButtonAppearance();
+		});
+	}
+
+	// ======== CLAUDE CODE SYSTEM PROMPT ========
+	function initCodePrompt() {
+		const P = SETTINGS_KEYS.CODE_PROMPT;
+		// code-session-prompt.js (MAIN) reads this when a session is created: same origin, synchronous.
+		// Kept current on init, on cross-tab changes and on apply; removed when there's no prompt.
+		const MIRROR_KEY = 'claude_qol_code_prompt';
+
+		async function writeMirror() {
 			try {
-				await savePreset(presetId, name, content);
-				const ok = await setPreferences(content);
-				if (!ok) {
-					showClaudeAlert(localize('common.error'), localize('prefs.update_preferences_failed'));
+				const [text, mode] = await Promise.all([settingsRegistry.get(P.TEXT), settingsRegistry.get(P.MODE)]);
+				if (text.trim()) localStorage.setItem(MIRROR_KEY, JSON.stringify({ text, mode }));
+				else localStorage.removeItem(MIRROR_KEY);
+			} catch (e) { /* storage unavailable: sessions start without the prompt */ }
+		}
+
+		// Replace (the default) or append, under the list. Saved as soon as it changes.
+		async function modeSelect() {
+			const section = document.createElement('div');
+			section.className = 'mt-4 space-y-2';
+			const label = document.createElement('label');
+			label.className = CLAUDE_CLASSES.LABEL;
+			label.textContent = localize('code_prompt.mode_label');
+			section.appendChild(label);
+			const warning = document.createElement('p');
+			warning.className = CLAUDE_CLASSES.TEXT_MUTED;
+			warning.textContent = localize('code_prompt.replace_warning');
+			const select = createClaudeSelect([
+				{ value: 'replace', label: localize('code_prompt.mode_replace') },
+				{ value: 'append', label: localize('code_prompt.mode_append') },
+			], await settingsRegistry.get(P.MODE), async () => {
+				warning.hidden = select.value !== 'replace';
+				await settingsRegistry.set(P.MODE, select.value);
+				await writeMirror();
+			});
+			warning.hidden = select.value !== 'replace';
+			section.appendChild(select);
+			section.appendChild(warning);
+			return section;
+		}
+
+		const switcher = createPresetSwitcher({
+			buttonClass: 'code-prompt-button',
+			icon: PROMPT_ICON_SVG,
+			pages: ['codeHome', 'codeChat'],
+			presetsKey: P.PRESETS,
+			getActive: () => settingsRegistry.get(P.TEXT),
+			apply: async (text) => {
+				try {
+					await settingsRegistry.set(P.TEXT, text.trim() ? text : '');
+					await writeMirror();
+					return true;
+				} catch (e) {
+					log.error('Failed to save the Claude Code system prompt:', e);
 					return false;
 				}
-				if (onSaved) await onSaved();
-			} finally {
-				savingModal.destroy();
-			}
+			},
+			extraContent: modeSelect,
+			strings: {
+				tooltip: (name) => localize('code_prompt.tooltip', { name }),
+				title: localize('code_prompt.title'),
+				info: localize('code_prompt.hint'),
+				applying: localize('code_prompt.applying'),
+				unsavedTitle: localize('code_prompt.unsaved_title'),
+				unsavedConfirm: localize('code_prompt.unsaved_confirm'),
+				unsavedRow: localize('code_prompt.unsaved_row'),
+				placeholder: localize('code_prompt.placeholder'),
+				updateFailed: localize('code_prompt.update_failed'),
+			},
 		});
 
-		modal.show();
+		writeMirror();
+		[P.TEXT, P.MODE].forEach(k => settingsRegistry.onChange(k, () => { writeMirror(); switcher.updateButtonAppearance(); }));
 	}
 
-	// ======== INITIALIZATION ========
-	function initialize() {
-		ButtonBar.register({
-			buttonClass: 'preset-switcher-button',
-			createFn: createPresetButton,
-			tooltip: localize('prefs.preset_tooltip', { name: localize('prefs.none') }),
-			forceDisplayOnMobile: true, // the one button kept out of the More-actions menu on phones
-			pages: ['chat', 'home'],
-			onInjected: () => updatePresetButtonAppearance(),
-		});
-	}
-
-	setTimeout(initialize);
+	setTimeout(() => {
+		initPreferences();
+		initCodePrompt();
+	});
 })();

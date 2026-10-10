@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// settings
 	"settings.full_load": "会話全体を読み込む",
 	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
+
+	// code_prompt
+	"code_prompt.title": "Claude Code のシステムプロンプト",
+	"code_prompt.tooltip": "Claude Code のシステムプロンプト: {name}",
+	"code_prompt.hint": "新しく開始する Claude Code セッションで使われます。既存のセッションは開始時のプロンプトのままです。",
+	"code_prompt.placeholder": "Claude Code への指示...",
+	"code_prompt.applying": "システムプロンプトを適用しています...",
+	"code_prompt.unsaved_title": "未保存のシステムプロンプト",
+	"code_prompt.unsaved_confirm": "現在のシステムプロンプトはプリセットとして保存されておらず、失われます。切り替えますか？",
+	"code_prompt.unsaved_row": "未保存のシステムプロンプト",
+	"code_prompt.update_failed": "システムプロンプトを保存できませんでした。もう一度お試しください。",
+	"code_prompt.mode_label": "適用方法",
+	"code_prompt.mode_replace": "Claude Code の指示を置き換える",
+	"code_prompt.mode_append": "Claude Code の指示に追加する",
+	"code_prompt.replace_warning": "置き換えると、コード作業に関する Claude Code の組み込みガイダンスがなくなり、コーディングの品質が大きく下がることがあります。",
 });

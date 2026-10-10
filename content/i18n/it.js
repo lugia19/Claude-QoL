@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	// settings
 	"settings.full_load": "Carica le conversazioni intere",
 	"settings.full_load_hint": "Carica tutti i messaggi all'apertura di una chat, così Ctrl+F, la ricerca nella chat e i segnalibri raggiungono anche i messaggi vecchi. Disattivalo se le chat lunghe sembrano lente.",
+
+	// code_prompt
+	"code_prompt.title": "Prompt di sistema di Claude Code",
+	"code_prompt.tooltip": "Prompt di sistema di Claude Code: {name}",
+	"code_prompt.hint": "Usato per le nuove sessioni di Claude Code che avvii. Le sessioni esistenti mantengono il prompt con cui sono partite.",
+	"code_prompt.placeholder": "Istruzioni per Claude Code...",
+	"code_prompt.applying": "Applicazione del prompt di sistema...",
+	"code_prompt.unsaved_title": "Prompt di sistema non salvato",
+	"code_prompt.unsaved_confirm": "Il prompt di sistema attuale non è salvato come preset e andrà perso. Cambiare comunque?",
+	"code_prompt.unsaved_row": "Prompt di sistema non salvato",
+	"code_prompt.update_failed": "Impossibile salvare il prompt di sistema. Riprova.",
+	"code_prompt.mode_label": "Come applicarlo",
+	"code_prompt.mode_replace": "Sostituisci le istruzioni di Claude Code",
+	"code_prompt.mode_append": "Aggiungi alle istruzioni di Claude Code",
+	"code_prompt.replace_warning": "Sostituendole si perdono le indicazioni integrate di Claude Code su come lavorare sul codice, e questo può peggiorare sensibilmente i risultati nella programmazione.",
 });

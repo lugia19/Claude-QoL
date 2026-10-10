@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	// settings
 	"settings.full_load": "Load whole conversations",
 	"settings.full_load_hint": "Loads every message when a chat opens, so Ctrl+F, chat search and bookmarks can reach old messages. Turn it off if long chats feel slow.",
+
+	// code_prompt
+	"code_prompt.title": "Claude Code System Prompts",
+	"code_prompt.tooltip": "Claude Code system prompt: {name}",
+	"code_prompt.hint": "Used for new Claude Code sessions you start. Sessions that already exist keep the prompt they started with.",
+	"code_prompt.placeholder": "Instructions for Claude Code...",
+	"code_prompt.applying": "Applying system prompt...",
+	"code_prompt.unsaved_title": "Unsaved System Prompt",
+	"code_prompt.unsaved_confirm": "The current system prompt isn't saved as a preset and will be lost. Switch anyway?",
+	"code_prompt.unsaved_row": "Unsaved system prompt",
+	"code_prompt.update_failed": "Failed to save the system prompt. Please try again.",
+	"code_prompt.mode_label": "How to apply it",
+	"code_prompt.mode_replace": "Replace Claude Code's instructions",
+	"code_prompt.mode_append": "Add to Claude Code's instructions",
+	"code_prompt.replace_warning": "Replacing drops Claude Code's built-in guidance on how to work on code, which can make it noticeably worse at coding tasks.",
 });

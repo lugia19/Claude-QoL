@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// settings
 	"settings.full_load": "전체 대화 불러오기",
 	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
+
+	// code_prompt
+	"code_prompt.title": "Claude Code 시스템 프롬프트",
+	"code_prompt.tooltip": "Claude Code 시스템 프롬프트: {name}",
+	"code_prompt.hint": "새로 시작하는 Claude Code 세션에 사용됩니다. 기존 세션은 시작할 때의 프롬프트를 유지합니다.",
+	"code_prompt.placeholder": "Claude Code에 대한 지침...",
+	"code_prompt.applying": "시스템 프롬프트를 적용하는 중...",
+	"code_prompt.unsaved_title": "저장되지 않은 시스템 프롬프트",
+	"code_prompt.unsaved_confirm": "현재 시스템 프롬프트가 프리셋으로 저장되지 않아 사라집니다. 그래도 전환할까요?",
+	"code_prompt.unsaved_row": "저장되지 않은 시스템 프롬프트",
+	"code_prompt.update_failed": "시스템 프롬프트를 저장하지 못했습니다. 다시 시도해 주세요.",
+	"code_prompt.mode_label": "적용 방식",
+	"code_prompt.mode_replace": "Claude Code의 지침 대체",
+	"code_prompt.mode_append": "Claude Code의 지침에 추가",
+	"code_prompt.replace_warning": "대체하면 코드 작업에 관한 Claude Code의 기본 지침이 사라져 코딩 작업 품질이 크게 떨어질 수 있습니다.",
 });

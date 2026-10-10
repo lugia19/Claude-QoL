@@ -8,32 +8,27 @@
 // Page layouts for top-right ButtonBar injection only.
 // Each layout defines where the toolbox button container is anchored in the DOM.
 // Code layouts must be checked before chat/home to avoid false matches.
+// Claude Code: /code on the web, /epitaxy in the desktop client (its /code redirects there). Both draw a
+// title bar whose end cluster (.epitaxy-titlebar-end) holds the native buttons (Changes, Files, Share on
+// a session; empty on the start page). That cluster pushes itself right with ml-auto, so we sit just after
+// it (before it we'd be left behind next to the title). Other Code pages (/code/artifacts, ...) get no
+// buttons.
+function codeTitlebarAnchor() {
+	const end = document.querySelector('.epitaxy-titlebar-end');
+	if (!end) return null;
+	return { parent: end.parentElement, referenceNode: end.nextSibling, mode: 'inline', fitToHeader: true };
+}
+
 const pageLayouts = {
 	codeHome: {
 		group: 'codeHome',
-		match() { return !!window.location.pathname.match(/\/claude-code-desktop\/draft_/); },
-		// Disabled for code web (aka claude.ai/code) for now due to being totally different.
-		getAnchor() {
-			const mainContent = document.getElementById('main-content');
-			if (!mainContent) return null;
-			return { parent: mainContent, referenceNode: null, mode: 'self-container' };
-		},
+		match() { return /^\/(code|epitaxy)\/?$/.test(location.pathname); },
+		getAnchor: codeTitlebarAnchor,
 	},
 	codeChat: {
 		group: 'codeChat',
-		match() {
-			return !!window.location.pathname.match(/\/claude-code-desktop\/session_/)
-			//|| !!window.location.pathname.match(/\/code\//);	// Disable it on web for now.
-		},
-		getAnchor() {
-			const sticky = document.querySelector('.sticky.top-0.z-20');
-			if (!sticky) return null;
-			const row = sticky.querySelector('.flex.items-center.gap-1');
-			if (!row) return null;
-			// Insert before the share/actions container (last child of the row)
-			const actionsContainer = row.lastElementChild;
-			return { parent: row, referenceNode: actionsContainer, mode: 'inline' };
-		},
+		match() { return /^\/(code|epitaxy)\/session_/.test(location.pathname); },
+		getAnchor: codeTitlebarAnchor,
 	},
 	chatActions: {
 		group: 'chat',
@@ -149,6 +144,7 @@ const ButtonBar = {
 		'navigation-button',
 		'preset-switcher-button',
 		'export-button',
+		'code-prompt-button',
 		'tts-settings-button',
 	],
 

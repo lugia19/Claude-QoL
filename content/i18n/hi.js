@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// settings
 	"settings.full_load": "पूरी बातचीत लोड करें",
 	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
+
+	// code_prompt
+	"code_prompt.title": "Claude Code सिस्टम प्रॉम्प्ट",
+	"code_prompt.tooltip": "Claude Code सिस्टम प्रॉम्प्ट: {name}",
+	"code_prompt.hint": "आपके शुरू किए गए नए Claude Code सेशन में इस्तेमाल होता है। मौजूदा सेशन अपना शुरुआती प्रॉम्प्ट ही रखते हैं।",
+	"code_prompt.placeholder": "Claude Code के लिए निर्देश...",
+	"code_prompt.applying": "सिस्टम प्रॉम्प्ट लागू किया जा रहा है...",
+	"code_prompt.unsaved_title": "बिना सहेजा सिस्टम प्रॉम्प्ट",
+	"code_prompt.unsaved_confirm": "मौजूदा सिस्टम प्रॉम्प्ट प्रीसेट के रूप में सहेजा नहीं गया है और खो जाएगा। फिर भी बदलें?",
+	"code_prompt.unsaved_row": "बिना सहेजा सिस्टम प्रॉम्प्ट",
+	"code_prompt.update_failed": "सिस्टम प्रॉम्प्ट सहेजा नहीं जा सका। कृपया फिर से कोशिश करें।",
+	"code_prompt.mode_label": "कैसे लागू करें",
+	"code_prompt.mode_replace": "Claude Code के निर्देशों को बदलें",
+	"code_prompt.mode_append": "Claude Code के निर्देशों में जोड़ें",
+	"code_prompt.replace_warning": "बदलने पर Claude Code के कोड पर काम करने के अंतर्निहित निर्देश हट जाते हैं, जिससे कोडिंग कार्यों में उसका प्रदर्शन काफ़ी खराब हो सकता है।",
 });

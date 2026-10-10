@@ -368,4 +368,19 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// settings
 	"settings.full_load": "Muat seluruh percakapan",
 	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
+
+	// code_prompt
+	"code_prompt.title": "Prompt sistem Claude Code",
+	"code_prompt.tooltip": "Prompt sistem Claude Code: {name}",
+	"code_prompt.hint": "Dipakai untuk sesi Claude Code baru yang Anda mulai. Sesi yang sudah ada tetap memakai prompt awalnya.",
+	"code_prompt.placeholder": "Instruksi untuk Claude Code...",
+	"code_prompt.applying": "Menerapkan prompt sistem...",
+	"code_prompt.unsaved_title": "Prompt sistem belum disimpan",
+	"code_prompt.unsaved_confirm": "Prompt sistem saat ini belum disimpan sebagai preset dan akan hilang. Tetap beralih?",
+	"code_prompt.unsaved_row": "Prompt sistem belum disimpan",
+	"code_prompt.update_failed": "Gagal menyimpan prompt sistem. Silakan coba lagi.",
+	"code_prompt.mode_label": "Cara menerapkan",
+	"code_prompt.mode_replace": "Ganti instruksi Claude Code",
+	"code_prompt.mode_append": "Tambahkan ke instruksi Claude Code",
+	"code_prompt.replace_warning": "Mengganti akan menghapus panduan bawaan Claude Code tentang cara mengerjakan kode, yang bisa membuatnya jauh lebih buruk dalam tugas pemrograman.",
 });

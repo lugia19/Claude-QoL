@@ -1031,7 +1031,7 @@
 			createFn: createSettingsButton,
 			tooltip: localize('tts.settings_title'),
 			forceDisplayOnMobile: false, // on phones: in the More-actions menu (the preset switcher stays out)
-			pages: ['chat', 'home'],
+			pages: ['chat', 'home', 'codeHome', 'codeChat'],
 		});
 		pushHijackConfig();
 		// Re-push the hijack decision + recolor the icon whenever a relevant setting changes.
