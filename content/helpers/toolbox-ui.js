@@ -1,5 +1,5 @@
 // toolbox-ui.js
-// Toolbox-only UI glue: the installed marker, the settings-mismatch warning and the alert override.
+// Toolbox-only UI glue: the installed marker, the settings-mismatch warning, two-column modals and the alert override.
 
 // Tells Claude Usage Tracker that QoL is installed (see "How the two extensions coordinate" in
 // common/README.md):
@@ -50,6 +50,28 @@ async function warnAboutSettingsMismatch(sourceSettings) {
 	if (!proceed) throw new Error('USER_CANCELLED');
 
 	return currentSettings;
+}
+
+// Two columns for a modal too tall for one (fork, TTS settings, export & import): left and right panels
+// split by a divider, stacked with a divider between them on phones. Put `container` in the modal's
+// content, fill `left` and `right`, then call widenModal(modal).
+function createModalColumns() {
+	const stacked = isMobileLayout();
+	const container = document.createElement('div');
+	container.className = stacked ? 'flex flex-col gap-4' : 'flex gap-4';
+	const left = document.createElement('div');
+	left.className = 'flex-1 min-w-0';
+	const right = document.createElement('div');
+	right.className = stacked ? 'min-w-0 pt-4 border-t border-border-300' : 'flex-1 min-w-0 pl-4 border-l border-border-300';
+	container.append(left, right);
+	return { container, left, right };
+}
+
+// Room for createModalColumns' two columns. Phones keep the default width (the modal fills the screen).
+function widenModal(modal, widthClass = 'max-w-3xl') {
+	if (isMobileLayout()) return;
+	modal.modal.classList.remove('max-w-md');
+	modal.modal.classList.add(widthClass);
 }
 
 // Simple alert overwrite for ISOLATED context

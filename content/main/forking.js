@@ -79,12 +79,9 @@ If this is a writing or creative discussion, include sections for characters, pl
 			});
 
 		// === Two-panel layout ===
-		const content = document.createElement('div');
-		content.className = 'flex gap-4';
+		const { container: content, left: leftPanel, right: rightPanel } = createModalColumns();
 
 		// --- LEFT PANEL ---
-		const leftPanel = document.createElement('div');
-		leftPanel.className = 'flex-1 min-w-0';
 
 		// Shown once the conversation data says the chat is upgraded (see the fetch above).
 		const upgradedWarning = document.createElement('div');
@@ -144,11 +141,8 @@ If this is a writing or creative discussion, include sections for characters, pl
 		leftPanel.appendChild(useSelectedModelToggle.container);
 
 
-		content.appendChild(leftPanel);
-
 		// --- RIGHT PANEL (Summary Details) ---
-		const rightPanel = document.createElement('div');
-		rightPanel.className = 'flex-1 min-w-0 pl-4 border-l border-border-300 space-y-3';
+		rightPanel.classList.add('space-y-3');
 		rightPanel.style.transition = 'opacity 0.2s';
 
 		// % input + token estimate
@@ -200,7 +194,6 @@ If this is a writing or creative discussion, include sections for characters, pl
 		promptInput.id = 'summaryPrompt';
 		rightPanel.appendChild(promptInput);
 
-		content.appendChild(rightPanel);
 
 		// === Sync & Display Logic ===
 		let isSyncing = false;
@@ -281,8 +274,7 @@ If this is a writing or creative discussion, include sections for characters, pl
 
 		// Create modal
 		const modal = new ClaudeModal(localize('fork.modal_title'), content);
-		modal.modal.classList.remove('max-w-md');
-		modal.modal.classList.add('max-w-3xl');
+		widenModal(modal);
 
 		modal.addCancel();
 		modal.addConfirm(localize('fork.fork_chat'), async () => {

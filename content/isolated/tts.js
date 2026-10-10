@@ -486,13 +486,21 @@
 			actorSection.appendChild(actorContainer);
 			perChatSection.appendChild(actorSection);
 
-			// Only add the per-chat section if we're in... a chat.
-			if (window.location.href.includes('claude.ai/chat')) {
-				content.appendChild(perChatSection);
+			// Only add the per-chat section if we're in... a chat: then the account-wide settings and the
+			// per-chat ones are side by side.
+			let modalContent = content;
+			const inChat = window.location.href.includes('claude.ai/chat');
+			if (inChat) {
+				const columns = createModalColumns();
+				perChatSection.className = '';
+				columns.left.appendChild(content);
+				columns.right.appendChild(perChatSection);
+				modalContent = columns.container;
 			}
 
 			// Create modal with new class
-			const modal = new ClaudeModal(localize('tts.settings_title'), content);
+			const modal = new ClaudeModal(localize('tts.settings_title'), modalContent);
+			if (inChat) widenModal(modal);
 
 			modal.addCancel();
 			modal.addConfirm(localize('common.save'), async () => {

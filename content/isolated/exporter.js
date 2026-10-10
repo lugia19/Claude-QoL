@@ -1971,8 +1971,8 @@
 		// Get last used format from localStorage (default to zip for full fidelity)
 		const lastFormat = localStorage.getItem('lastExportFormat') || 'html_html';
 
-		// Build the modal content
-		const content = document.createElement('div');
+		// Build the modal content: export on the left, import (and phantom replacement) on the right.
+		const { container: content, left: exportPanel, right: importPanel } = createModalColumns();
 
 		// Variables to hold references (may not be created)
 		let formatSelect, toggleInput, thinkingToggleInput, attachmentsToggleInput, imagesToggleInput, dateInput;
@@ -1983,7 +1983,7 @@
 			const formatLabel = document.createElement('label');
 			formatLabel.className = CLAUDE_CLASSES.LABEL;
 			formatLabel.textContent = localize('export.format_label');
-			content.appendChild(formatLabel);
+			exportPanel.appendChild(formatLabel);
 
 			const exportContainer = document.createElement('div');
 			exportContainer.className = 'mb-4 flex gap-2';
@@ -2033,7 +2033,7 @@
 				exportContainer.appendChild(copyButton);
 			}
 
-			content.appendChild(exportContainer);
+			exportPanel.appendChild(exportContainer);
 
 			// Tree option container
 			const treeOption = document.createElement('div');
@@ -2044,7 +2044,7 @@
 			const { container: toggleContainer, input: treeToggleInput } = createClaudeToggle(localize('export.toggle_tree'), initialTreeDefault);
 			toggleInput = treeToggleInput;
 			treeOption.appendChild(toggleContainer);
-			content.appendChild(treeOption);
+			exportPanel.appendChild(treeOption);
 
 			// Thinking option container (for markdown export)
 			const thinkingOption = document.createElement('div');
@@ -2054,7 +2054,7 @@
 			const { container: thinkingToggleContainer, input: thinkingInput } = createClaudeToggle(localize('export.toggle_thinking'), false);
 			thinkingToggleInput = thinkingInput;
 			thinkingOption.appendChild(thinkingToggleContainer);
-			content.appendChild(thinkingOption);
+			exportPanel.appendChild(thinkingOption);
 
 			// Attachments option container (for markdown export)
 			const attachmentsOption = document.createElement('div');
@@ -2064,7 +2064,7 @@
 			const { container: attachmentsToggleContainer, input: attachmentsInput } = createClaudeToggle(localize('export.toggle_text_attachments'), false);
 			attachmentsToggleInput = attachmentsInput;
 			attachmentsOption.appendChild(attachmentsToggleContainer);
-			content.appendChild(attachmentsOption);
+			exportPanel.appendChild(attachmentsOption);
 
 			// Images option (librechat + html). Every image is downloaded and inlined as a base64
 			// data URI, so it dominates both file size and export time. Off by default for
@@ -2078,7 +2078,7 @@
 			const { container: imagesToggleContainer, input: imagesInput } = createClaudeToggle(localize('export.toggle_images'), initialImagesDefault);
 			imagesToggleInput = imagesInput;
 			imagesOption.appendChild(imagesToggleContainer);
-			content.appendChild(imagesOption);
+			exportPanel.appendChild(imagesOption);
 
 			// Date filter option (bulk export only)
 			const dateOption = document.createElement('div');
@@ -2091,7 +2091,7 @@
 
 			dateInput = createClaudeInput({ type: 'date' });
 			dateOption.appendChild(dateInput);
-			content.appendChild(dateOption);
+			exportPanel.appendChild(dateOption);
 
 			// Show/hide options based on initial value
 			const initialFormat = selectedFormat.split('_')[0];
@@ -2196,10 +2196,6 @@
 				}
 			};
 
-			// Divider
-			const divider = document.createElement('hr');
-			divider.className = 'my-4 border-border-300';
-			content.appendChild(divider);
 		}
 		//#endregion
 
@@ -2208,7 +2204,7 @@
 		const modelLabel = document.createElement('label');
 		modelLabel.className = CLAUDE_CLASSES.LABEL;
 		modelLabel.textContent = localize('export.import_model_label');
-		content.appendChild(modelLabel);
+		importPanel.appendChild(modelLabel);
 
 		const importContainer = document.createElement('div');
 		importContainer.className = 'mb-2 flex gap-2';
@@ -2224,22 +2220,22 @@
 		importButton.style.minWidth = '80px';
 		importContainer.appendChild(importButton);
 
-		content.appendChild(importContainer);
+		importPanel.appendChild(importContainer);
 
 		// Add toggles
 		const importFilesToggle = createClaudeToggle(localize('export.toggle_import_files'), true);
 		importFilesToggle.container.classList.add('mb-2', 'mt-2');
-		content.appendChild(importFilesToggle.container);
+		importPanel.appendChild(importFilesToggle.container);
 
 		const importToolCallsToggle = createClaudeToggle(localize('export.toggle_import_tool_calls'), false);
 		importToolCallsToggle.container.classList.add('mb-4');
-		content.appendChild(importToolCallsToggle.container);
+		importPanel.appendChild(importToolCallsToggle.container);
 
 		// Import note
 		const note = document.createElement('p');
 		note.className = CLAUDE_CLASSES.TEXT_SM + ' text-text-400';
 		note.textContent = localize('export.import_note');
-		content.appendChild(note);
+		importPanel.appendChild(note);
 
 		// Import button handler
 		importButton.onclick = () =>
@@ -2255,22 +2251,22 @@
 			// Divider
 			const divider2 = document.createElement('hr');
 			divider2.className = 'my-4 border-border-300';
-			content.appendChild(divider2);
+			importPanel.appendChild(divider2);
 
 			// Replace phantom messages section
 			const replaceLabel = document.createElement('label');
 			replaceLabel.className = CLAUDE_CLASSES.LABEL;
 			replaceLabel.textContent = localize('export.replace_label');
-			content.appendChild(replaceLabel);
+			importPanel.appendChild(replaceLabel);
 
 			const replaceNote = document.createElement('p');
 			replaceNote.className = CLAUDE_CLASSES.TEXT_SM + ' text-text-400';
 			replaceNote.textContent = localize('export.replace_note');
-			content.appendChild(replaceNote);
+			importPanel.appendChild(replaceNote);
 
 			const replaceButton = createClaudeButton(localize('export.replace_button'), 'secondary');
 			replaceButton.className += ' mb-2';
-			content.appendChild(replaceButton);
+			importPanel.appendChild(replaceButton);
 			replaceButton.onclick = () => handleReplacePhantom(replaceButton);
 
 			// Warning note
@@ -2279,7 +2275,7 @@
 			warningNote.style.color = '#de2929';
 			warningNote.innerHTML = '⚠️ ' + localize('export.replace_warning');
 			warningNote.className += ' mb-3';
-			content.appendChild(warningNote);
+			importPanel.appendChild(warningNote);
 		}
 		//#endregion
 
@@ -2287,8 +2283,7 @@
 		const modalTitle = localize('export.modal_title');
 		const modal = new ClaudeModal(modalTitle, content);
 
-		// Override max width
-		modal.modal.style.maxWidth = '28rem';
+		widenModal(modal);
 
 		modal.show();
 	}
