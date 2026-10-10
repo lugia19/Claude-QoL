@@ -176,7 +176,9 @@ let _revealInFlight = false;
 
 // Callers fire shortly after a reload (bookmark / "Go to Message"), when the
 // conversation may not be mounted yet.
-async function _waitForMessageList(timeoutMs = 10000) {
+// The default outlasts the host's snapshot wait budget (SNAPSHOT_WAIT_MS in bard-host.js, 15 s): a
+// jump's reload can hold the first snapshot that long for the full tree, and the reveal starts ~1 s in.
+async function _waitForMessageList(timeoutMs = 20000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		if (getMessageScroller() && document.querySelector('[data-turn-key]')) return true;
@@ -261,6 +263,7 @@ async function jumpToMessage(conversation, uuid, loadingText) {
 		sessionStorage.setItem('message_uuid_to_find', uuid);
 		if (leafId !== data.current_leaf_message_uuid) {
 			sessionStorage.setItem('claude_qol_jump_view', JSON.stringify({ conversationId: conversation.conversationId, leafId }));
+			sessionStorage.setItem('claude_qol_jump_reveal', '1'); // the reveal waits for the jump (chat-search.js)
 		}
 		await bustReactQueryCache();
 		location.reload();
