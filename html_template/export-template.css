@@ -39,41 +39,37 @@
 	font-style: normal
 }
 
-/* ── Design tokens ── */
+/* ── Design tokens (claude.ai's own, as of 2026-10) ── */
 :root {
 	--bg-000: 0 0% 100%;
-	--bg-100: 48 33.3% 97.1%;
-	--bg-200: 53 28.6% 94.5%;
-	--bg-300: 48 25% 92.2%;
-	--bg-400: 50 20.7% 88.6%;
-	--text-000: 60 2.6% 7.6%;
-	--text-100: 60 2.6% 7.6%;
-	--text-200: 60 2.5% 23.3%;
-	--text-300: 60 2.5% 23.3%;
-	--text-400: 51 3.1% 43.7%;
-	--text-500: 51 3.1% 43.7%;
-	--border-300: 30 3.3% 11.8%;
-	--border-400: 30 3.3% 11.8%;
-	--accent-main-000: 15 54.2% 51.2%;
-	--danger-000: 0 58.6% 34.1%
+	--bg-100: 60 14.3% 97.3%;
+	--bg-200: 60 11.1% 94.7%;
+	--bg-300: 45 11.8% 93.3%;
+	--text-100: 0 0% 7.5%;
+	--text-200: 60 2.8% 21.4%;
+	--text-400: 42.9 2.9% 46.9%;
+	--border-300: 60 1.7% 11.6%;
+	--danger-000: 0 57.8% 35.3%;
+	--link: 211 70% 43%;
+	--sans: anthropicSans, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--serif: anthropicSerif, Georgia, "Times New Roman", serif;
+	--mono: jetbrains, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	--hairline: 0.7px solid hsl(var(--border-300) / 10%);
+	color-scheme: light
 }
 
 .dark {
-	--bg-000: 60 2.1% 18.4%;
-	--bg-100: 60 2.7% 14.5%;
-	--bg-200: 30 3.3% 11.8%;
-	--bg-300: 60 2.6% 7.6%;
-	--bg-400: 0 0% 0%;
-	--text-000: 48 33.3% 97.1%;
-	--text-100: 48 33.3% 97.1%;
-	--text-200: 50 9% 73.7%;
-	--text-300: 50 9% 73.7%;
-	--text-400: 48 4.8% 59.2%;
-	--text-500: 48 4.8% 59.2%;
-	--border-300: 51 16.5% 84.5%;
-	--border-400: 51 16.5% 84.5%;
-	--accent-main-000: 15 54.2% 51.2%;
-	--danger-000: 0 98.4% 75.1%
+	--bg-000: 60 1.6% 12.4%;
+	--bg-100: 0 0% 8.2%;
+	--bg-200: 0 0% 6.7%;
+	--bg-300: 0 0% 5.1%;
+	--text-100: 60 14.3% 97.3%;
+	--text-200: 55 9.1% 74.1%;
+	--text-400: 48 4.6% 57.3%;
+	--border-300: 52.5 11.8% 86.7%;
+	--danger-000: 0 76.8% 71%;
+	--link: 213 78% 68%;
+	color-scheme: dark
 }
 
 /* ── Reset & base ── */
@@ -84,101 +80,109 @@
 }
 
 body {
-	font-family: anthropicSans, system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-	font-weight: 430;
+	font-family: var(--sans);
+	font-size: 15px;
 	line-height: 1.5;
-	max-width: 800px;
+	max-width: 768px;
 	margin: 0 auto;
-	padding: 24px 16px;
+	padding: 32px 16px 96px;
 	background: hsl(var(--bg-100));
-	color: hsl(var(--text-100))
+	color: hsl(var(--text-100));
+	-webkit-font-smoothing: antialiased
 }
 
-h1 {
-	font-size: 1.5rem;
-	font-weight: 580;
-	margin: 0 0 16px
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap
 }
 
 /* ── Export header ── */
 .export-meta {
-	margin-bottom: 24px
+	margin-bottom: 32px;
+	padding-bottom: 16px;
+	border-bottom: var(--hairline)
+}
+
+.export-meta h1 {
+	font-size: 1.125rem;
+	font-weight: 500;
+	margin: 0
 }
 
 .export-model {
-	font-size: 0.85rem;
+	font-size: 0.8125rem;
 	color: hsl(var(--text-400));
-	margin-top: 2px
+	margin-top: 4px
 }
 
 /* ── Messages ── */
 .msg {
-	margin-bottom: 24px
-}
-
-.msg-header {
-	font-weight: 580;
-	font-size: 0.8rem;
-	margin-bottom: 6px;
-	color: hsl(var(--text-500));
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 8px
-}
-
-.msg-timestamp {
-	display: block;
-	font-weight: 400;
-	font-size: 0.75rem;
-	color: hsl(var(--text-400));
-	margin-bottom: 4px
+	margin-top: 24px
 }
 
 /* User: right-aligned bubble */
 .msg-user {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-end;
-	margin-top: 32px;
-	margin-bottom: 8px
+	align-items: flex-end
 }
 
 .msg-user .msg-body {
-	background: hsl(var(--bg-300));
-	border-radius: 1rem;
-	padding: 10px 16px;
-	max-width: 75ch;
-	color: hsl(var(--text-100))
+	background: hsl(var(--text-100) / 5%);
+	border-radius: 12px;
+	padding: 12px 16px;
+	max-width: 85%;
+	line-height: 20px;
+	overflow-wrap: anywhere
 }
 
-.msg-user .msg-header {
-	padding-right: 4px
-}
-
-/* Assistant: no background, serif font */
-.msg-assistant {
-	padding-bottom: 16px;
-	margin-top: 8px
-}
-
+/* Assistant: no bubble, serif */
 .msg-assistant .msg-body {
-	font-family: anthropicSerif, Georgia, "Times New Roman", serif;
-	line-height: 1.65
+	font-family: var(--serif);
+	line-height: 22px;
+	padding-left: 4px
 }
 
 .msg-assistant .msg-body strong,
 .msg-assistant .msg-body b {
-	font-weight: 530
+	font-weight: 600
+}
+
+/* Hover row under each message: branch arrows (always shown) + timestamp (on hover), like claude.ai's action bar */
+.msg-footer {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-height: 28px;
+	margin-top: 2px;
+	font-size: 11px;
+	color: hsl(var(--text-400))
+}
+
+.msg-user .msg-footer {
+	flex-direction: row-reverse
+}
+
+.msg-timestamp {
+	padding: 0 6px;
+	opacity: 0;
+	transition: opacity 0.15s
+}
+
+.msg:hover .msg-timestamp,
+.msg:focus-within .msg-timestamp {
+	opacity: 1
 }
 
 /* ── Branch navigation ── */
 .branch-nav {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	justify-content: flex-end;
-	gap: 2px;
-	margin-top: 4px
+	gap: 2px
 }
 
 .branch-btn {
@@ -186,15 +190,15 @@ h1 {
 	align-items: center;
 	justify-content: center;
 	width: 24px;
-	height: 32px;
+	height: 28px;
 	border-radius: 6px;
-	color: hsl(var(--text-500));
+	color: hsl(var(--text-400));
 	text-decoration: none;
-	transition: background 0.2s, color 0.2s
+	transition: background 0.15s, color 0.15s
 }
 
 .branch-btn:hover {
-	background: hsl(var(--bg-300));
+	background: hsl(var(--text-100) / 6%);
 	color: hsl(var(--text-100))
 }
 
@@ -204,66 +208,341 @@ h1 {
 }
 
 .branch-count {
-	font-size: 0.75rem;
-	color: hsl(var(--text-500));
+	font-size: 12px;
 	user-select: none;
 	padding: 0 2px
 }
 
 /* ── Markdown content ── */
 .text-content {
-	margin: 0
+	margin: 0;
+	overflow-wrap: break-word
+}
+
+.text-content > :first-child {
+	margin-top: 0
 }
 
 .text-content p {
-	margin: 0 0 0.75em;
-	line-height: 1.7;
-	word-wrap: break-word
+	margin: 0.5em 0 0
 }
 
-.text-content p:last-child {
-	margin-bottom: 0
+.text-content h1,
+.text-content h2,
+.text-content h3,
+.text-content h4,
+.text-content h5,
+.text-content h6 {
+	font-weight: 600;
+	line-height: 1.3;
+	margin: 1em 0 0
 }
 
-/* Code blocks */
-.text-content pre {
-	border: 1px solid hsl(var(--border-400) / 15%);
-	border-radius: 0.5rem;
-	overflow-x: auto;
-	margin: 0.75em 0
+.text-content h1 {
+	font-size: 1.25em
 }
 
+.text-content h2 {
+	font-size: 1.125em
+}
+
+.text-content h3,
+.text-content h4,
+.text-content h5,
+.text-content h6 {
+	font-size: 1em
+}
+
+/* Lists */
+.text-content ul,
+.text-content ol {
+	padding-left: 30px;
+	margin: 0.75em 0 0
+}
+
+.text-content li {
+	padding-left: 7.5px
+}
+
+.text-content li > ul,
+.text-content li > ol {
+	margin-top: 0
+}
+
+/* Blockquote */
+.text-content blockquote {
+	border-left: 3.5px solid hsl(var(--border-300) / 10%);
+	padding-left: 15px;
+	margin: 1.5em 0 0 7.5px;
+	color: hsl(var(--text-200))
+}
+
+.text-content blockquote > :first-child {
+	margin-top: 0
+}
+
+/* Rule */
+.text-content hr {
+	border: 0;
+	border-top: var(--hairline);
+	margin: 1.5em 6px 0
+}
+
+/* Links */
+.text-content a,
+ul.tool-sources a {
+	color: hsl(var(--link));
+	text-decoration: underline;
+	text-underline-offset: 2px
+}
+
+/* Inline code */
 .text-content code {
-	font-family: jetbrains, ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+	font-family: var(--mono);
 	font-size: 0.9em;
-	background: hsl(var(--text-200) / 5%);
-	border: 1px solid hsl(var(--border-300) / 15%);
+	background: hsl(var(--text-100) / 5%);
+	border: var(--hairline);
 	color: hsl(var(--danger-000));
-	padding: 1px 4px;
-	border-radius: 0.4rem;
+	padding: 1px 3.4px;
+	border-radius: 5.4px;
 	white-space: pre-wrap
 }
 
+/* Code blocks: a rounded card, language label and copy button showing on hover */
+.text-content pre {
+	position: relative;
+	margin: 0.75em 0 0;
+	background: hsl(var(--bg-000) / 50%);
+	border: var(--hairline);
+	border-radius: 12px;
+	overflow-x: auto
+}
+
 .text-content pre code {
+	display: block;
 	background: none;
 	border: none;
-	padding: 0;
 	border-radius: 0;
-	font-size: 0.85em;
 	color: inherit;
+	font-size: 14px;
+	line-height: 1.625;
+	padding: 14px;
 	white-space: pre
 }
 
-/* ── Code: light theme (default) ── */
-pre code.hljs {
+.code-lang {
 	display: block;
-	overflow-x: auto;
-	padding: 1em
+	padding: 10px 14px 0;
+	font-family: var(--sans);
+	font-size: 12px;
+	color: hsl(var(--text-400));
+	user-select: none
 }
 
+.code-lang + code {
+	padding-top: 6px
+}
+
+/* Tables */
+.text-content table {
+	border-collapse: separate;
+	border-spacing: 0;
+	border: var(--hairline);
+	border-radius: 7px;
+	margin: 0.75em 0 0;
+	width: 100%;
+	overflow: hidden
+}
+
+.text-content th,
+.text-content td {
+	padding: 6.5px 11.25px;
+	text-align: left;
+	vertical-align: top
+}
+
+.text-content th {
+	background: hsl(var(--text-100) / 5%);
+	font-weight: 500
+}
+
+.text-content tr + tr td,
+.text-content tbody tr:first-child td {
+	border-top: var(--hairline)
+}
+
+/* Images */
+.msg-body img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	border-radius: 12px;
+	margin: 0.75em 0 0
+}
+
+.msg-user .msg-body img {
+	max-height: 16rem;
+	border-radius: 8px;
+	margin: 0 0 8px
+}
+
+/* ── File cards ── */
+.file-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	background: hsl(var(--text-100) / 3%);
+	border: var(--hairline);
+	color: inherit;
+	padding: 6px 10px;
+	border-radius: 8px;
+	font-family: var(--sans);
+	font-size: 13px;
+	margin: 8px 6px 0 0;
+	text-decoration: none;
+	overflow-wrap: anywhere
+}
+
+.file-pill::before {
+	content: "";
+	flex: none;
+	width: 14px;
+	height: 14px;
+	background: currentColor;
+	opacity: 0.6;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 2A1.5 1.5 0 0 0 4 3.5v13A1.5 1.5 0 0 0 5.5 18h9a1.5 1.5 0 0 0 1.5-1.5V7.2a1 1 0 0 0-.3-.7l-4.2-4.2a1 1 0 0 0-.7-.3H5.5zm0 1H10v3.5A1.5 1.5 0 0 0 11.5 8H15v8.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5zM11 3.4 14.6 7h-3.1a.5.5 0 0 1-.5-.5V3.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 2A1.5 1.5 0 0 0 4 3.5v13A1.5 1.5 0 0 0 5.5 18h9a1.5 1.5 0 0 0 1.5-1.5V7.2a1 1 0 0 0-.3-.7l-4.2-4.2a1 1 0 0 0-.7-.3H5.5zm0 1H10v3.5A1.5 1.5 0 0 0 11.5 8H15v8.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5zM11 3.4 14.6 7h-3.1a.5.5 0 0 1-.5-.5V3.4z'/%3E%3C/svg%3E") center / contain no-repeat
+}
+
+a.file-pill::after {
+	content: "↓";
+	font-size: 0.9em;
+	opacity: 0.6
+}
+
+a.file-pill:hover {
+	background: hsl(var(--text-100) / 7%);
+	cursor: pointer
+}
+
+span.file-pill {
+	opacity: 0.6
+}
+
+/* ── Thinking and tool blocks: one muted line with a chevron, like claude.ai's "Used <tool> ›" ── */
+details.thinking-block,
+details.tool-block {
+	margin: 0.5em 0;
+	font-family: var(--sans)
+}
+
+.msg-body > details:first-child {
+	margin-top: 0
+}
+
+details.thinking-block summary,
+details.tool-block summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	cursor: pointer;
+	list-style: none;
+	font-size: 14px;
+	line-height: 22px;
+	color: hsl(var(--text-400));
+	transition: color 0.15s
+}
+
+details.thinking-block summary::-webkit-details-marker,
+details.tool-block summary::-webkit-details-marker {
+	display: none
+}
+
+details.thinking-block summary::after,
+details.tool-block summary::after {
+	content: "›";
+	font-size: 16px;
+	line-height: 1;
+	transition: transform 0.15s
+}
+
+details[open].thinking-block > summary::after,
+details[open].tool-block > summary::after {
+	transform: rotate(90deg)
+}
+
+details.thinking-block summary:hover,
+details.tool-block summary:hover {
+	color: hsl(var(--text-100))
+}
+
+details.thinking-block > :not(summary),
+details.tool-block > :not(summary) {
+	margin-left: 4px;
+	padding-left: 12px;
+	border-left: 1px solid hsl(var(--border-300) / 15%)
+}
+
+pre.thinking-content {
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	font-family: var(--sans);
+	font-size: 14px;
+	line-height: 1.5;
+	margin: 8px 0 4px;
+	color: hsl(var(--text-200))
+}
+
+details.tool-block .tool-name {
+	font-family: var(--mono);
+	font-size: 12px;
+	opacity: 0.7
+}
+
+details.tool-block .tool-failed {
+	color: hsl(var(--danger-000));
+	font-size: 12px
+}
+
+pre.tool-args,
+pre.tool-output {
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	font-family: var(--mono);
+	font-size: 12.5px;
+	line-height: 1.5;
+	margin: 8px 0 4px;
+	color: hsl(var(--text-200))
+}
+
+.tool-empty {
+	font-size: 13px;
+	font-style: italic;
+	margin: 8px 0 4px;
+	color: hsl(var(--text-400))
+}
+
+ul.tool-sources {
+	margin: 8px 0 4px;
+	padding-left: 1.2em;
+	font-size: 14px
+}
+
+ul.tool-sources li {
+	margin: 3px 0
+}
+
+ul.tool-sources .tool-source-site {
+	color: hsl(var(--text-400));
+	font-size: 12px;
+	margin-left: 6px
+}
+
+/* ── Syntax highlighting: light (default) ── */
 .hljs {
-	color: #383a42;
-	background: hsl(var(--bg-000) / 50%)
+	color: #383a42
 }
 
 .hljs-comment,
@@ -332,10 +611,9 @@ pre code.hljs {
 	font-weight: 700
 }
 
-/* ── Code: dark theme ── */
+/* ── Syntax highlighting: dark ── */
 .dark .hljs {
-	color: #abb2bf;
-	background: #22262e
+	color: #abb2bf
 }
 
 .dark .hljs-comment,
@@ -396,189 +674,6 @@ pre code.hljs {
 	color: #e6c07b
 }
 
-
-/* Lists */
-.text-content ul,
-.text-content ol {
-	padding-left: 2em;
-	margin: 0.75em 0
-}
-
-.text-content ol {
-	list-style: decimal
-}
-
-.text-content li {
-	margin-bottom: 4px;
-	padding-left: 0.5em
-}
-
-/* Blockquote */
-.text-content blockquote {
-	border-left: 3px solid hsl(var(--border-300) / 30%);
-	padding-left: 12px;
-	margin: 0.75em 0;
-	color: hsl(var(--text-300))
-}
-
-/* Links */
-.text-content a {
-	color: hsl(var(--accent-main-000))
-}
-
-/* Tables */
-.text-content table {
-	border-collapse: collapse;
-	margin: 0.75em 0;
-	width: 100%
-}
-
-.text-content th,
-.text-content td {
-	border: 1px solid hsl(var(--border-300) / 20%);
-	padding: 6px 10px;
-	text-align: left
-}
-
-.text-content th {
-	background: hsl(var(--bg-200));
-	font-weight: 580
-}
-
-/* Images */
-.msg-body img {
-	max-width: 100%;
-	border-radius: 6px;
-	margin: 0.5em 0
-}
-
-/* ── File pills ── */
-.file-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: hsl(var(--accent-main-000) / 12%);
-	border: 1px solid hsl(var(--accent-main-000) / 25%);
-	color: hsl(var(--accent-main-000));
-	padding: 3px 10px;
-	border-radius: 6px;
-	font-family: jetbrains, ui-monospace, monospace;
-	font-size: 0.8em;
-	margin: 4px 4px 4px 0;
-	text-decoration: none
-}
-
-a.file-pill::after {
-	content: "↓";
-	font-size: 0.9em;
-	font-weight: 600
-}
-
-a.file-pill:hover {
-	background: hsl(var(--accent-main-000) / 20%);
-	border-color: hsl(var(--accent-main-000) / 40%);
-	cursor: pointer
-}
-
-span.file-pill {
-	opacity: 0.6
-}
-
-/* ── Thinking blocks ── */
-details.thinking-block {
-	margin-bottom: 8px;
-	padding: 6px 8px;
-	border-radius: 6px
-}
-
-details.thinking-block summary {
-	cursor: pointer;
-	font-size: 0.85rem;
-	color: hsl(var(--text-500));
-	font-family: anthropicSans, system-ui, sans-serif;
-	font-weight: 430
-}
-
-pre.thinking-content {
-	white-space: pre-wrap;
-	word-wrap: break-word;
-	font-family: jetbrains, ui-monospace, monospace;
-	font-size: 0.85rem;
-	margin: 8px 0 4px;
-	color: hsl(var(--text-400))
-}
-
-/* ── Tool call blocks ── */
-details.tool-block {
-	margin-bottom: 8px;
-	padding: 6px 8px;
-	border-radius: 6px;
-	border: 1px solid hsl(var(--border-400) / 15%)
-}
-
-details.tool-block summary {
-	cursor: pointer;
-	font-size: 0.85rem;
-	color: hsl(var(--text-500));
-	font-family: anthropicSans, system-ui, sans-serif;
-	font-weight: 430
-}
-
-details.tool-block .tool-name {
-	font-family: jetbrains, ui-monospace, monospace;
-	font-size: 0.78em;
-	opacity: 0.6;
-	margin-left: 6px
-}
-
-details.tool-block .tool-failed {
-	color: hsl(var(--danger-000));
-	font-size: 0.78em;
-	margin-left: 6px
-}
-
-details.tool-block.tool-error {
-	border-color: hsl(var(--danger-000) / 40%)
-}
-
-pre.tool-args,
-pre.tool-output {
-	white-space: pre-wrap;
-	word-wrap: break-word;
-	font-family: jetbrains, ui-monospace, monospace;
-	font-size: 0.8rem;
-	margin: 8px 0 4px;
-	color: hsl(var(--text-400))
-}
-
-.tool-empty {
-	font-size: 0.8rem;
-	font-style: italic;
-	margin: 8px 0 4px;
-	color: hsl(var(--text-400))
-}
-
-ul.tool-sources {
-	margin: 8px 0 4px;
-	padding-left: 1.2em;
-	font-size: 0.85rem
-}
-
-ul.tool-sources li {
-	margin: 3px 0
-}
-
-ul.tool-sources .tool-source-site {
-	color: hsl(var(--text-400));
-	font-size: 0.85em;
-	margin-left: 6px
-}
-
-/* Generated images sit outside the collapsed block, on their own line */
-img.tool-image {
-	display: block
-}
-
 /* ── Theme toggle ── */
 #theme-toggle {
 	position: fixed;
@@ -587,52 +682,58 @@ img.tool-image {
 	width: 36px;
 	height: 36px;
 	border-radius: 50%;
-	border: 1px solid hsl(var(--border-300) / 20%);
-	background: hsl(var(--bg-200));
-	color: hsl(var(--text-100));
+	border: var(--hairline);
+	background: hsl(var(--bg-000));
+	color: hsl(var(--text-200));
 	cursor: pointer;
-	font-size: 18px;
+	font-size: 16px;
 	line-height: 36px;
 	text-align: center;
 	padding: 0;
-	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	z-index: 100
+}
+
+#theme-toggle:hover {
+	color: hsl(var(--text-100))
 }
 
 /* ── Copy buttons ── */
 .copy-btn {
 	position: absolute;
-	top: 8px;
-	right: 8px;
-	background: hsl(var(--bg-200));
+	top: 6px;
+	right: 6px;
+	background: hsl(var(--bg-000));
 	color: hsl(var(--text-400));
-	border: 1px solid hsl(var(--border-300) / 20%);
+	border: var(--hairline);
 	border-radius: 6px;
 	padding: 2px 10px;
-	font-family: anthropicSans, system-ui, sans-serif;
-	font-size: 0.75rem;
+	font-family: var(--sans);
+	font-size: 12px;
 	cursor: pointer;
 	opacity: 0;
-	transition: opacity 0.2s
+	transition: opacity 0.15s
 }
 
-pre:hover .copy-btn {
+pre:hover .copy-btn,
+.copy-btn:focus-visible {
 	opacity: 1
 }
 
 .copy-btn:hover {
-	background: hsl(var(--bg-300));
 	color: hsl(var(--text-100))
 }
 
 /* ── Print ── */
 @media print {
-	.branch-nav {
+	.branch-nav,
+	#theme-toggle,
+	.copy-btn {
 		display: none
 	}
 
-	#theme-toggle {
-		display: none
+	.msg-timestamp {
+		opacity: 1
 	}
 
 	body {

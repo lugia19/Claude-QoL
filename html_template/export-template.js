@@ -44,7 +44,7 @@
 				h += '<span class="branch-btn disabled">' + rightSvg + '</span>';
 			}
 			nav.innerHTML = h;
-			el.querySelector('.msg-body').after(nav);
+			el.querySelector('.msg-footer').prepend(nav);
 		}
 	});
 	if (location.hash) { var t = document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); }
@@ -54,13 +54,15 @@
 	applyTheme();
 	btn.onclick = function () { isDark = !isDark; applyTheme(); };
 
+	// Shown on hover, in the reader's locale (claude.ai's action-bar timestamp, but absolute: an archive
+	// read years later shouldn't say "2 minutes ago").
 	document.querySelectorAll('.msg[data-timestamp]').forEach(function (msg) {
 		var ts = parseInt(msg.getAttribute('data-timestamp'), 10);
 		if (!ts) return;
-		var span = document.createElement('span');
-		span.className = 'msg-timestamp';
-		span.textContent = new Date(ts).toLocaleString();
-		msg.querySelector('.msg-header').after(span);
+		var date = new Date(ts);
+		var span = msg.querySelector('.msg-timestamp');
+		span.textContent = date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+		span.title = date.toLocaleString();
 	});
 
 	document.querySelectorAll('.text-content pre code').forEach(function (code) {

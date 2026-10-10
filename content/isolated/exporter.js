@@ -688,7 +688,8 @@
 					} else {
 						highlighted = hljs.highlightAuto(text).value;
 					}
-					return `<pre><code class="hljs">${highlighted}</code></pre>`;
+					const label = lang ? `<span class="code-lang">${esc(lang)}</span>` : '';
+					return `<pre>${label}<code class="hljs">${highlighted}</code></pre>`;
 				}
 			}
 		});
@@ -732,7 +733,8 @@
 		// Render ALL messages as hidden divs
 		let messagesHtml = `<div class="export-meta"><h1>${esc(title)}</h1>`;
 		if (conversationData.model) {
-			messagesHtml += `<div class="export-model">Model: ${esc(conversationData.model)}</div>`;
+			const modelName = CLAUDE_MODELS.find(m => m.value === conversationData.model)?.label || conversationData.model;
+			messagesHtml += `<div class="export-model">${esc(modelName)}</div>`;
 		}
 		messagesHtml += `</div>\n`;
 		for (const message of messages) {
@@ -793,14 +795,14 @@
 				if (file instanceof ClaudeAttachment) {
 					const b64 = btoa(unescape(encodeURIComponent(file.extracted_content || '')));
 					const mimeType = mime.getType(file.file_name) || 'text/plain';
-					fileResults.push(`<a class="file-pill" href="data:${mimeType};base64,${b64}" download="${esc(file.file_name)}">File: ${esc(file.file_name)}</a>`);
+					fileResults.push(`<a class="file-pill" href="data:${mimeType};base64,${b64}" download="${esc(file.file_name)}">${esc(file.file_name)}</a>`);
 					continue;
 				}
 
 				// Images dominate an export's size and download time. With them off, keep the record
 				// of what was attached without paying for the bytes — or for the pacing delay.
 				if (!includeImages && file.file_kind === 'image') {
-					fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
+					fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
 					continue;
 				}
 
@@ -808,7 +810,7 @@
 					await paceDownload();
 					const blob = await file.download();
 					if (!blob) {
-						fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
+						fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
 						continue;
 					}
 
@@ -817,16 +819,18 @@
 					if (file.file_kind === 'image') {
 						fileResults.push(`<img src="${dataUri}" alt="${esc(file.file_name)}">`);
 					} else {
-						fileResults.push(`<a class="file-pill" href="${dataUri}" download="${esc(file.file_name)}">File: ${esc(file.file_name)}</a>`);
+						fileResults.push(`<a class="file-pill" href="${dataUri}" download="${esc(file.file_name)}">${esc(file.file_name)}</a>`);
 					}
 				} catch (e) {
-					fileResults.push(`<span class="file-pill">File: ${esc(file.file_name)}</span>`);
+					fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
 				}
 			}
 
 			contentHtml += fileResults.join('');
 			const tsAttr = message.created_at ? ` data-timestamp="${new Date(message.created_at).getTime()}"` : '';
-			messagesHtml += `<div class="msg ${roleClass}" id="msg-${message.uuid}"${tsAttr} style="display:none"><div class="msg-header">${role}</div><div class="msg-body">${contentHtml}</div></div>\n`;
+			// No visible role label, as on claude.ai (the bubble says who spoke); the footer holds the
+			// branch arrows and the hover-only timestamp, both filled in by the template script.
+			messagesHtml += `<div class="msg ${roleClass}" id="msg-${message.uuid}"${tsAttr} style="display:none"><span class="sr-only">${role}</span><div class="msg-body">${contentHtml}</div><div class="msg-footer"><span class="msg-timestamp"></span></div></div>\n`;
 		}
 
 		// Assemble from template in a SINGLE replace pass. Chained .replace() calls
