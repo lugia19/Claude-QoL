@@ -232,7 +232,7 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
 
 - **A patch** is `fn(target, ctx)`. It may be async, edits `target` in place (decoded with `keepUnknown`), and returns `true` if it changed something. The host re-encodes only then; otherwise the original bytes pass through.
 - **`ctx`:** `{ source, orgId, conversationId }`, plus `displayLanguage` on streams.
-- **`ctx.within(promise)`** (snapshot patches only) is how a patch waits for something: it resolves to `{ value }`, or to `null` once the snapshot's wait budget (6 s, shared by all its patches) is spent. The snapshot and every frame behind it are held meanwhile, so a fork with full load and phantoms waits 6 s at worst, not 12.
+- **`ctx.within(promise)`** (snapshot patches only) is how a patch waits for something: it resolves to `{ value }`, or to `null` once the snapshot's wait budget (15 s, shared by all its patches; raised from 6 s on 2026-10-10, so a slow full tree on a jump still lands) is spent. The snapshot and every frame behind it are held meanwhile, so a fork with full load and phantoms waits 15 s at worst, not 30.
 - **Registration order is execution order.** An optional `{ label }` names a patch in logs.
 - **Fail-open:**
   - a throwing patch is logged and skipped;

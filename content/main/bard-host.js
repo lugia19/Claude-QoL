@@ -44,7 +44,7 @@
 	const SERVICE_PATH = '/claudeai-rpc/anthropic.bard.api.v1alpha.ConversationService/';
 	const KILL_SWITCH = 'claude_qol_bard_host_off';
 	const MODE_KEY = 'claude_qol_account_mode'; // read by qolAccountMode() (toolbox-ui.js) too
-	const SNAPSHOT_WAIT_MS = 6000; // see ctx.within; the largest full-load trees measured took 0.7-2.4 s
+	const SNAPSHOT_WAIT_MS = 15000; // see ctx.within; the largest full-load trees measured took 0.7-2.4 s
 	const MODE_TTL_MS = 60 * 60 * 1000; // re-probe hourly: the rollout moves accounts over without warning
 
 	const net = () => globalThis.ClaudeExtNet;
