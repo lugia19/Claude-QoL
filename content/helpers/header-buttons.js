@@ -27,7 +27,7 @@ const pageLayouts = {
 	},
 	codeChat: {
 		group: 'codeChat',
-		match() { return /^\/(code|epitaxy)\/session_/.test(location.pathname); },
+		match() { return /^\/(code|epitaxy)\/(session|local)_/.test(location.pathname); }, // cloud and desktop-local sessions
 		getAnchor: codeTitlebarAnchor,
 	},
 	chatActions: {

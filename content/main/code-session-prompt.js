@@ -20,7 +20,14 @@
 		}
 	}
 
-	const isCreateUrl = (url) => new URL(url).pathname === '/v1/code/sessions';
+	// getFetchUrl resolves relative URLs, but returns '' for an input it can't read: never throw on the way past.
+	const isCreateUrl = (url) => {
+		try {
+			return new URL(url).pathname === '/v1/code/sessions';
+		} catch (e) {
+			return false;
+		}
+	};
 
 	const originalFetch = window.fetch;
 	window.fetch = async (...args) => {
