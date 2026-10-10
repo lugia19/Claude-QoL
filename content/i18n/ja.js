@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"nav.success_title": "完了",
 	"nav.bookmark_added": "ブックマークを追加しました！",
 	"nav.continue_anyway_text": "QoL: このバージョンをここで続けることもできます。",
-	"nav.continue_anyway_button": "このまま続ける",
+	"nav.continue_anyway_button": "ここから続ける",
 	"nav.continuing": "このバージョンに切り替えています...",
-	"nav.continue_upgraded_text": "QoL: このチャットではファイルがすべてのバージョンで共有されているため、以前のバージョンを続けることはできません。",
+	"nav.continue_upgraded_text": "QoL: このチャットではファイルがすべてのバージョンで共有されているため、以前のバージョンをこの場で続けることはできません。代わりにフォークできます。",
+	"nav.jump_view_text": "QoL: このチャットの以前のバージョンを表示しています。ここでは送信が一時停止されています。",
+	"nav.back_to_latest": "最新に戻る",
 
 	// search
 	"search.branched_messages_ago": "{n}件前のメッセージで分岐",

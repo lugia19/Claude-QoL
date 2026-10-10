@@ -517,12 +517,12 @@ class ClaudeConversation {
 		return result.data;
 	}
 
-	// Reconstruct the current trunk from full tree data: walk from current leaf to root
-	_trunkFrom(data) {
+	// Reconstruct a branch from full tree data: walk from a leaf (default: the current one) to root
+	_trunkFrom(data, leafId = data.current_leaf_message_uuid) {
 		const allMessages = data.chat_messages || [];
 		const messageMap = new Map(allMessages.map(msg => [msg.uuid, msg]));
 		const trunk = [];
-		let currentId = data.current_leaf_message_uuid;
+		let currentId = leafId;
 
 		while (currentId && currentId !== ROOT_MESSAGE_UUID) {
 			const msg = messageMap.get(currentId);
@@ -546,6 +546,12 @@ class ClaudeConversation {
 		}
 
 		return this._trunkFrom(data);
+	}
+
+	// The messages from the root down to messageId, whichever branch it's on (the server's current
+	// branch or not, e.g. one viewed with the version arrows or a jump).
+	async getMessagesTo(messageId, forceRefresh = false) {
+		return this._trunkFrom(await this.getData(forceRefresh), messageId);
 	}
 
 	// The current branch as the UI renders it: phantom (forked-in) history first, then the

@@ -14,11 +14,12 @@
 //
 // Setting: "Load whole conversations" (extension-settings.js), on by default, mirrored to
 // localStorage[claude_qol_full_load] ('0' = off) because settings live in the ISOLATED world and load
-// after the first snapshot. A change applies on the next page load.
+// after the first snapshot. A change applies on the next page load. Jumped snapshots (jump-view.js)
+// are loaded whole even with the setting off: the jumped branch can be outside the loaded window.
 (function () {
 	'use strict';
 
-	if (localStorage.getItem('claude_qol_full_load') === '0') return;
+	const enabled = localStorage.getItem('claude_qol_full_load') !== '0';
 
 	const TREE_TTL_MS = 5 * 60 * 1000;
 	const MAX_TREES = 3;
@@ -74,6 +75,7 @@
 	// Registered first, so the other onSnapshot patches see the full snapshot.
 	QolBardHost.onSnapshot(async function fullLoad(update, ctx) {
 		if (!ctx.conversationId || !update.older_history_cursor) return false; // nothing more to load
+		if (!enabled && !globalThis.QolJumpView?.isJumped(ctx.conversationId)) return false;
 		// Past the host's wait budget the snapshot goes through as it came (the page pages as usual), and
 		// the tree still lands in the cache for the next snapshot. Most reconnects resume without one, so
 		// that may be the next load.

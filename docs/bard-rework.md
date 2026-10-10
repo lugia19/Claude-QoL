@@ -90,7 +90,7 @@ desktop client (zip import) and Firefox Android (TTS dialogue analysis).
 - **The reply:** read from the legacy tree GET once the known assistant id has a `stop_reason`. A
   rejected send is only reported on the stream: our message showing up in the tree means accepted
   (then no practical limit, polled with back-off); never showing up within a minute means rejected.
-- claude.ai's own first send is preceded by a `warm_turn (15) { intended_send }` action; we skip it.
+- claude.ai sends a `warm_turn (15) { intended_send }` action on the first keystroke in the composer (`intended_send` empty, no text): a "the user is typing, get ready" signal, maybe cache warming. A refused one shows nothing and isn't retried. Our own sends skip it.
 
 ## Native fork
 
@@ -126,10 +126,18 @@ with the header `conversation_id` = **a new uuid we choose**.
 - **Which version the client shows after a flip:** the newest child at each step down (verified 2026-10-09: a fork at message 3 of `7c25d951…` showed the highest-index of 4 replies).
 - **Implemented (feat/navigation):**
   - **Arrows:** `content/main/branch-arrows.js` sets `siblings_viewable` on every message of snapshots, history pages and live updates. Always on. Works in upgraded chats too (except, apparently, first-message forks).
-  - **D7 banner** (`navigation.js`): when claude.ai's earlier-version banner appears (hook: `[data-testid="hub-earlier-version-back"]`; upgraded chats have no "Continue in a new session" button, so not `…-continue`), ours goes above it inside the dock card.
-    - **Non-upgraded chats:** "Continue anyway" scrolls to the bottom, takes the last row's message (the viewed leaf; newest child down if it has children), sets it as the current leaf (`set_current_leaf`) and reloads.
-    - **Upgraded chats** (`workspace_upgraded` on the legacy tree): an explanation only.
-  - **Jumps** (`jumpToMessage` in `message-ui.js`; bookmarks, chat search, latest/longest): always move the leaf (`set_current_leaf`) and reload, then reveal the target after the load. No scroll-only shortcut for on-branch targets: the arrows switch versions client-side, so the server's branch isn't necessarily the one on screen.
+  - **D7 banner** (`navigation.js`): when claude.ai's earlier-version banner appears (hook: `[data-testid="hub-earlier-version-back"]`; upgraded chats have no "Continue in a new session" button, so not `…-continue`), ours goes above it inside the dock card. Blue border (`#2c84db`), compact buttons.
+    - **Non-upgraded chats:** "Continue from here" scrolls to the bottom, takes the last row's message (the viewed leaf; newest child down if it has children), sets it as the current leaf (`set_current_leaf`) and reloads.
+    - **Upgraded chats** (`workspace_upgraded` on the legacy tree): "Fork from here" opens QoL's fork modal on the viewed leaf (`qol-fork-from` postMessage to `forking.js`). The fork takes the branch down to that message (`ClaudeConversation.getMessagesTo`), not the server's current branch. `continue_branch_as_new_chat` (PerformAction 37) is refused there for every message (`continue_branch_not_an_old_branch` / `continue_branch_message_unavailable`; its header needs the *new* chat's id).
+  - **Jumps are a view, not a leaf move** (decided 2026-10-10, `feat/jump-view`): bookmarks, chat search and latest/longest (`jumpToMessage` in `message-ui.js`) show the target's branch for one page load, like claude.ai's own arrows, in every chat.
+    - The jump writes `sessionStorage.claude_qol_jump_view = { conversationId, leafId }` (only when the leaf isn't the current one) and reloads. `content/main/jump-view.js` reads and deletes it at document_start (so a later reload is back to latest) and rewrites `conversation.current_leaf_message_id` in that conversation's snapshots: the page loads on that branch, with no banner of its own.
+    - While jumped, the input would send to the server's real leaf (the page sends no parent; tested: the message landed on the other branch and the page followed it). So:
+      - `navigation.js` shows our banner above the composer (before `[data-composer-card-holder]`): "Continue from here" / "Fork from here" as above, plus "Back to latest" (a reload). It blocks Enter in `[data-testid="chat-input"]` and clicks on `[data-testid="chat-input-send"]` (capture phase), and hides Retry (`user-message-retry`, `action-bar-retry`), Edit (`user-message-edit`), QoL's advanced edit and claude.ai's own earlier-version banner (a hand flip back to the real latest would show it).
+      - `jump-view.js` refuses every `send_message` and `warm_turn` for the conversation (`QolBardHost.guardSend`): the page gets a Connect `failed_precondition` and shows its own "Failed to send · Retry · Discard" row (`[data-testid="failed-send-discard"]`); nothing reaches the server.
+    - The view lasts for the page's life: leaving the chat and coming back restores the page's cached state (still the jumped branch) without a new snapshot. `<html data-qol-jump-view>` holds the conversation id; ISOLATED mirrors it to `data-qol-jump-active` only while that chat is open. It ends on a live update with an unseen message (a send from elsewhere: the page follows it).
+    - With "Load whole conversations" off, a jumped snapshot is still loaded whole (the jumped branch can be outside the loaded window).
+    - The banner check runs on a timer, not an animation frame (frames don't run in a hidden desktop window).
+    - Verified 2026-10-10 in Chrome (normal and upgraded chats) and the desktop client.
   - **Leaf setting uses `PerformAction set_current_leaf`** (`ClaudeConversation.setCurrentLeaf`, Connect JSON so it works in both worlds without the protobuf schema; `header.mutation_id` is required). Revised 2026-10-09: the legacy PUT updates the legacy GET and `ReadConversation` at once, but the `StreamTimeline` snapshot kept serving the old leaf across several reloads (once a second snapshot corrected it), so a jump could land on the old branch. After `set_current_leaf`, the first snapshot carries the new leaf every time. The RPCs check `Origin`: in Firefox content scripts it goes through `content.fetch` (the page's origin); Chrome's content-script fetch already sends the page's. Verified in Chrome (both worlds), Firefox Android (ISOLATED, through chat search) and the desktop client.
   - **Viewing versions isn't saved:** flipping with the arrows never moves the server's leaf, so a reload shows the current leaf again, which is normally the latest message (every send moves it).
   - **Reveals right after a load:** the list pins its tail until the user scrolls, undoing any scroll of ours; a synthetic wheel event on the scroller releases it. Freshly mounted rows also get re-measured over a few frames, so the settle re-checks and scrolls again if the target drifted.
@@ -218,6 +226,7 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
 | `onLiveUpdate(fn)` | other `StreamTimeline` updates carrying messages / display groups / content blocks |
 | `onHistoryPage(fn)` | `ReadConversationHistoryResponse.update` |
 | `onSend(fn)` | `PerformAction`'s `send_message`, before it leaves |
+| `guardSend(fn)` | `fn(ctx)` before every `send_message` and `warm_turn` (`ctx.action`); a string return refuses it: the host answers with a Connect `failed_precondition` and sends nothing. The only fail-closed hook, kept to refusals (`jump-view.js`). |
 | `observe(fn)` | read-only, every non-heartbeat `StreamTimeline` event as the server sent it |
 
 - **A patch** is `fn(target, ctx)`. It may be async, edits `target` in place (decoded with `keepUnknown`), and returns `true` if it changed something. The host re-encodes only then; otherwise the original bytes pass through.
@@ -267,7 +276,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | Forking, summaryless | QoL's own fork (D8) | Unchanged: works on merged accounts (verified 2026-10-09), phantoms display. Upgraded chats: warning in the dialog. |
 | Forking, summary / compaction | QoL's own fork (D8) | Unchanged flow: summaries in a throwaway chat, on Haiku 5.5 (`FAST_MODEL`). Every send (fork, summary, rewrite, TTS dialogue analysis, import) now goes through `PerformAction` `send_message`, see [Sending our own messages](#sending-our-own-messages). |
 | Advanced edit (files) | Rewrite the edit's `send_message` (`onSend`) | **Implemented** (feat/advanced-edit). claude.ai's own edit sends the original files in full in `attachments`; the patch replaces `text`, `attachments` (minimal `{ id, file_name, file_kind }` is enough) and `inline_attachments` from the modal, so removal is just leaving a file out. Verified: removed a PDF, added a text file and an uploaded image; the model saw exactly those. |
-| Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + `set_current_leaf` | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
+| Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + a one-load snapshot leaf rewrite | Implemented (feat/navigation, feat/jump-view): jumps are a view, in upgraded chats too; continuing is `set_current_leaf` (normal) or a fork (upgraded). |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |
 | Image gallery | Add native image-search-shaped gallery groups after tool runs with result images (snapshots, history pages, live updates) | **Implemented** (feat/image-gallery). See "Image galleries". |
 | TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | **Implemented** (feat/tts-autospeak): `tts-interceptor.js` observes; updates during a turn carry `STATUS_RUNNING` with `status_assistant_message_id` = the reply, and the settle is one update with `STATUS_IDLE` and that reply `is_complete` + `stop_reason`. Only a reply seen running, in the chat on screen, is spoken (snapshots and reconnect replays never are). Verified in Chrome (end to end), the desktop client and Firefox Android (trigger). |
@@ -310,8 +319,6 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 
 ## Still open
 
-- **To be implemented: jumps to another branch in upgraded chats.** Their leaf can't move, so a bookmark or search result on another branch can't be reached by moving it (today the PUT is a silent no-op and the reveal finds nothing). Idea: drive the version arrows programmatically to show that branch.
-
 - Firefox (MAIN-world ordering) and Electron, for every interceptor.
 - Cross-chat attachment ids; the untested `send_message` fields listed above.
 - What a multi-message row chain (`isChain`) is.
@@ -326,4 +333,5 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
   - UI fork of 4c18a389: `8d5de03a…`
   - Hand forks: `12274be5…`, `7e601b34…`
   - Upgraded-chat branch test: `0a8b7ec1…` (has a sandbox with `a.txt` / `b.txt`)
+  - Jump view tests: normal `a4797953…`, upgraded `34a28a6d…`, and a fork of the upgraded one `86130d94…`
 - **After any experiment** that rewrites the stream, delete that conversation's entries from IndexedDB `claude-conversation-store` (`trees` and `meta`).

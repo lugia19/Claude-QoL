@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"nav.success_title": "Operazione riuscita",
 	"nav.bookmark_added": "Segnalibro aggiunto!",
 	"nav.continue_anyway_text": "QoL: puoi anche continuare questa versione qui.",
-	"nav.continue_anyway_button": "Continua comunque",
+	"nav.continue_anyway_button": "Continua da qui",
 	"nav.continuing": "Passaggio a questa versione...",
-	"nav.continue_upgraded_text": "QoL: questa chat non può continuare una versione precedente, perché i suoi file sono condivisi tra le versioni.",
+	"nav.continue_upgraded_text": "QoL: questa chat non può continuare una versione precedente sul posto, perché i suoi file sono condivisi tra le versioni. Puoi crearne un fork invece.",
+	"nav.jump_view_text": "QoL: stai guardando una versione precedente di questa chat. L'invio è in pausa qui.",
+	"nav.back_to_latest": "Torna all'ultima",
 
 	// search
 	"search.branched_messages_ago": "Ramificato {n} messaggi fa",

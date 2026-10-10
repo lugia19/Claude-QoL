@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"nav.success_title": "완료",
 	"nav.bookmark_added": "북마크가 추가되었습니다!",
 	"nav.continue_anyway_text": "QoL: 이 버전을 여기에서 이어갈 수도 있습니다.",
-	"nav.continue_anyway_button": "그래도 계속하기",
+	"nav.continue_anyway_button": "여기서 계속하기",
 	"nav.continuing": "이 버전으로 전환하는 중...",
-	"nav.continue_upgraded_text": "QoL: 이 채팅은 파일이 모든 버전에서 공유되므로 이전 버전을 이어갈 수 없습니다.",
+	"nav.continue_upgraded_text": "QoL: 이 채팅은 파일이 모든 버전에서 공유되므로 이전 버전을 그 자리에서 이어갈 수 없습니다. 대신 포크할 수 있습니다.",
+	"nav.jump_view_text": "QoL: 이 채팅의 이전 버전을 보고 있습니다. 여기서는 전송이 일시 중지됩니다.",
+	"nav.back_to_latest": "최신으로 돌아가기",
 
 	// search
 	"search.branched_messages_ago": "{n}개 메시지 전에 분기됨",

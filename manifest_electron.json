@@ -80,6 +80,7 @@
 				"content/main/phantom-messages.js",
 				"content/main/image-extractor.js",
 				"content/main/branch-arrows.js",
+				"content/main/jump-view.js",
 				"lib/mime.min.js",
 				"common/i18n/all.js",
 				"content/i18n/all.js",

@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"nav.success_title": "Berhasil",
 	"nav.bookmark_added": "Penanda ditambahkan!",
 	"nav.continue_anyway_text": "QoL: Anda juga bisa melanjutkan versi ini di sini.",
-	"nav.continue_anyway_button": "Tetap lanjutkan",
+	"nav.continue_anyway_button": "Lanjutkan dari sini",
 	"nav.continuing": "Beralih ke versi ini...",
-	"nav.continue_upgraded_text": "QoL: obrolan ini tidak dapat melanjutkan versi sebelumnya, karena berkasnya dibagikan di semua versi.",
+	"nav.continue_upgraded_text": "QoL: obrolan ini tidak dapat melanjutkan versi sebelumnya di tempat, karena berkasnya dibagikan di semua versi. Anda bisa mem-fork-nya sebagai gantinya.",
+	"nav.jump_view_text": "QoL: Anda sedang melihat versi sebelumnya dari obrolan ini. Pengiriman dijeda di sini.",
+	"nav.back_to_latest": "Kembali ke terbaru",
 
 	// search
 	"search.branched_messages_ago": "Bercabang {n} pesan yang lalu",

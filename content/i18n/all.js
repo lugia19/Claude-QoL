@@ -40,9 +40,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"nav.success_title": "Success",
 	"nav.bookmark_added": "Bookmark added!",
 	"nav.continue_anyway_text": "QoL: you can continue this version here instead.",
-	"nav.continue_anyway_button": "Continue anyway",
+	"nav.continue_anyway_button": "Continue from here",
 	"nav.continuing": "Switching to this version...",
-	"nav.continue_upgraded_text": "QoL: this chat can't continue an earlier version, because its files are shared across versions.",
+	"nav.continue_upgraded_text": "QoL: this chat can't continue an earlier version in place, because its files are shared across versions. You can fork it instead.",
+	"nav.jump_view_text": "QoL: you're viewing an earlier version of this chat. Sending is paused here.",
+	"nav.back_to_latest": "Back to latest",
 
 	// search
 	"search.branched_messages_ago": "Branched {n} messages ago",
@@ -411,9 +413,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"nav.success_title": "Erfolg",
 	"nav.bookmark_added": "Lesezeichen hinzugefügt!",
 	"nav.continue_anyway_text": "QoL: Du kannst diese Version auch hier fortsetzen.",
-	"nav.continue_anyway_button": "Trotzdem fortsetzen",
+	"nav.continue_anyway_button": "Von hier fortsetzen",
 	"nav.continuing": "Wechsle zu dieser Version...",
-	"nav.continue_upgraded_text": "QoL: Dieser Chat kann keine frühere Version fortsetzen, da seine Dateien von allen Versionen geteilt werden.",
+	"nav.continue_upgraded_text": "QoL: Dieser Chat kann eine frühere Version nicht direkt fortsetzen, da seine Dateien von allen Versionen geteilt werden. Du kannst sie stattdessen abzweigen.",
+	"nav.jump_view_text": "QoL: Du siehst eine frühere Version dieses Chats. Senden ist hier pausiert.",
+	"nav.back_to_latest": "Zur neuesten",
 
 	// search
 	"search.branched_messages_ago": "Vor {n} Nachrichten verzweigt",
@@ -782,9 +786,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"nav.success_title": "Listo",
 	"nav.bookmark_added": "¡Marcador añadido!",
 	"nav.continue_anyway_text": "QoL: también puedes continuar esta versión aquí.",
-	"nav.continue_anyway_button": "Continuar de todos modos",
+	"nav.continue_anyway_button": "Continuar desde aquí",
 	"nav.continuing": "Cambiando a esta versión...",
-	"nav.continue_upgraded_text": "QoL: este chat no puede continuar una versión anterior, porque sus archivos se comparten entre versiones.",
+	"nav.continue_upgraded_text": "QoL: este chat no puede continuar una versión anterior en el mismo chat, porque sus archivos se comparten entre versiones. Puedes bifurcarla en su lugar.",
+	"nav.jump_view_text": "QoL: estás viendo una versión anterior de este chat. El envío está en pausa aquí.",
+	"nav.back_to_latest": "Volver a la última",
 
 	// search
 	"search.branched_messages_ago": "Ramificado hace {n} mensajes",
@@ -1153,9 +1159,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"nav.success_title": "Succès",
 	"nav.bookmark_added": "Signet ajouté !",
 	"nav.continue_anyway_text": "QoL : vous pouvez aussi continuer cette version ici.",
-	"nav.continue_anyway_button": "Continuer quand même",
+	"nav.continue_anyway_button": "Continuer à partir d'ici",
 	"nav.continuing": "Passage à cette version...",
-	"nav.continue_upgraded_text": "QoL : ce chat ne peut pas continuer une version antérieure, car ses fichiers sont partagés entre les versions.",
+	"nav.continue_upgraded_text": "QoL : ce chat ne peut pas continuer une version antérieure sur place, car ses fichiers sont partagés entre les versions. Vous pouvez la bifurquer à la place.",
+	"nav.jump_view_text": "QoL : vous consultez une version antérieure de ce chat. L'envoi est en pause ici.",
+	"nav.back_to_latest": "Revenir à la dernière",
 
 	// search
 	"search.branched_messages_ago": "Branche créée il y a {n} messages",
@@ -1524,9 +1532,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"nav.success_title": "सफल",
 	"nav.bookmark_added": "बुकमार्क जोड़ा गया!",
 	"nav.continue_anyway_text": "QoL: आप इस संस्करण को यहीं जारी रख सकते हैं।",
-	"nav.continue_anyway_button": "फिर भी जारी रखें",
+	"nav.continue_anyway_button": "यहाँ से जारी रखें",
 	"nav.continuing": "इस संस्करण पर जा रहे हैं...",
-	"nav.continue_upgraded_text": "QoL: यह चैट किसी पुराने संस्करण को जारी नहीं रख सकती, क्योंकि इसकी फ़ाइलें सभी संस्करणों में साझा होती हैं।",
+	"nav.continue_upgraded_text": "QoL: यह चैट किसी पुराने संस्करण को यहीं जारी नहीं रख सकती, क्योंकि इसकी फ़ाइलें सभी संस्करणों में साझा होती हैं। इसके बजाय आप उसे फ़ोर्क कर सकते हैं।",
+	"nav.jump_view_text": "QoL: आप इस चैट का एक पुराना संस्करण देख रहे हैं। यहाँ भेजना रुका हुआ है।",
+	"nav.back_to_latest": "नवीनतम पर वापस जाएँ",
 
 	// search
 	"search.branched_messages_ago": "{n} संदेश पहले शाखा बनी",
@@ -1895,9 +1905,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"nav.success_title": "Berhasil",
 	"nav.bookmark_added": "Penanda ditambahkan!",
 	"nav.continue_anyway_text": "QoL: Anda juga bisa melanjutkan versi ini di sini.",
-	"nav.continue_anyway_button": "Tetap lanjutkan",
+	"nav.continue_anyway_button": "Lanjutkan dari sini",
 	"nav.continuing": "Beralih ke versi ini...",
-	"nav.continue_upgraded_text": "QoL: obrolan ini tidak dapat melanjutkan versi sebelumnya, karena berkasnya dibagikan di semua versi.",
+	"nav.continue_upgraded_text": "QoL: obrolan ini tidak dapat melanjutkan versi sebelumnya di tempat, karena berkasnya dibagikan di semua versi. Anda bisa mem-fork-nya sebagai gantinya.",
+	"nav.jump_view_text": "QoL: Anda sedang melihat versi sebelumnya dari obrolan ini. Pengiriman dijeda di sini.",
+	"nav.back_to_latest": "Kembali ke terbaru",
 
 	// search
 	"search.branched_messages_ago": "Bercabang {n} pesan yang lalu",
@@ -2266,9 +2278,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"nav.success_title": "Operazione riuscita",
 	"nav.bookmark_added": "Segnalibro aggiunto!",
 	"nav.continue_anyway_text": "QoL: puoi anche continuare questa versione qui.",
-	"nav.continue_anyway_button": "Continua comunque",
+	"nav.continue_anyway_button": "Continua da qui",
 	"nav.continuing": "Passaggio a questa versione...",
-	"nav.continue_upgraded_text": "QoL: questa chat non può continuare una versione precedente, perché i suoi file sono condivisi tra le versioni.",
+	"nav.continue_upgraded_text": "QoL: questa chat non può continuare una versione precedente sul posto, perché i suoi file sono condivisi tra le versioni. Puoi crearne un fork invece.",
+	"nav.jump_view_text": "QoL: stai guardando una versione precedente di questa chat. L'invio è in pausa qui.",
+	"nav.back_to_latest": "Torna all'ultima",
 
 	// search
 	"search.branched_messages_ago": "Ramificato {n} messaggi fa",
@@ -2637,9 +2651,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"nav.success_title": "完了",
 	"nav.bookmark_added": "ブックマークを追加しました！",
 	"nav.continue_anyway_text": "QoL: このバージョンをここで続けることもできます。",
-	"nav.continue_anyway_button": "このまま続ける",
+	"nav.continue_anyway_button": "ここから続ける",
 	"nav.continuing": "このバージョンに切り替えています...",
-	"nav.continue_upgraded_text": "QoL: このチャットではファイルがすべてのバージョンで共有されているため、以前のバージョンを続けることはできません。",
+	"nav.continue_upgraded_text": "QoL: このチャットではファイルがすべてのバージョンで共有されているため、以前のバージョンをこの場で続けることはできません。代わりにフォークできます。",
+	"nav.jump_view_text": "QoL: このチャットの以前のバージョンを表示しています。ここでは送信が一時停止されています。",
+	"nav.back_to_latest": "最新に戻る",
 
 	// search
 	"search.branched_messages_ago": "{n}件前のメッセージで分岐",
@@ -3008,9 +3024,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"nav.success_title": "완료",
 	"nav.bookmark_added": "북마크가 추가되었습니다!",
 	"nav.continue_anyway_text": "QoL: 이 버전을 여기에서 이어갈 수도 있습니다.",
-	"nav.continue_anyway_button": "그래도 계속하기",
+	"nav.continue_anyway_button": "여기서 계속하기",
 	"nav.continuing": "이 버전으로 전환하는 중...",
-	"nav.continue_upgraded_text": "QoL: 이 채팅은 파일이 모든 버전에서 공유되므로 이전 버전을 이어갈 수 없습니다.",
+	"nav.continue_upgraded_text": "QoL: 이 채팅은 파일이 모든 버전에서 공유되므로 이전 버전을 그 자리에서 이어갈 수 없습니다. 대신 포크할 수 있습니다.",
+	"nav.jump_view_text": "QoL: 이 채팅의 이전 버전을 보고 있습니다. 여기서는 전송이 일시 중지됩니다.",
+	"nav.back_to_latest": "최신으로 돌아가기",
 
 	// search
 	"search.branched_messages_ago": "{n}개 메시지 전에 분기됨",
@@ -3379,9 +3397,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"nav.success_title": "Sucesso",
 	"nav.bookmark_added": "Favorito adicionado!",
 	"nav.continue_anyway_text": "QoL: você também pode continuar esta versão aqui.",
-	"nav.continue_anyway_button": "Continuar mesmo assim",
+	"nav.continue_anyway_button": "Continuar daqui",
 	"nav.continuing": "Mudando para esta versão...",
-	"nav.continue_upgraded_text": "QoL: este chat não pode continuar uma versão anterior, porque os arquivos são compartilhados entre as versões.",
+	"nav.continue_upgraded_text": "QoL: este chat não pode continuar uma versão anterior no mesmo lugar, porque os arquivos são compartilhados entre as versões. Você pode bifurcá-la em vez disso.",
+	"nav.jump_view_text": "QoL: você está vendo uma versão anterior deste chat. O envio está pausado aqui.",
+	"nav.back_to_latest": "Voltar para a mais recente",
 
 	// search
 	"search.branched_messages_ago": "Ramificada há {n} mensagens",

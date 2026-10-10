@@ -245,20 +245,25 @@ async function revealMessageByUuid(uuid, { highlight = true, conversation = null
 	}
 }
 
-// "Go to" for any message in the tree (bookmarks, chat search, latest/longest): moves the current leaf
-// to the longest leaf below the target and reloads, with a loading modal (loadingText) until then and
-// an alert if it fails; chat-search.js's scrollToMessageByUuid reveals the target after the load.
-// Always a reload, even for a target that looks on-branch: the branch arrows switch versions
-// client-side, so the server's branch isn't necessarily the one on screen.
-// Upgraded (workspace) chats can't move their leaf: jumps to another branch there are still to be
-// implemented (docs/bard-rework.md, "Still open").
+// "Go to" for any message in the tree (bookmarks, chat search, latest/longest): reloads onto the
+// longest leaf below the target, with a loading modal (loadingText) until then and an alert if it
+// fails; chat-search.js's scrollToMessageByUuid reveals the target after the load. A leaf other than
+// the chat's current one is shown for that one load (jump-view.js, banner in navigation.js), like
+// claude.ai's own version arrows: the server's leaf doesn't move. Always a reload, even for a target
+// that looks on-branch: the arrows switch versions client-side, so the server's branch isn't
+// necessarily the one on screen.
 async function jumpToMessage(conversation, uuid, loadingText) {
 	const loadingModal = createLoadingModal(loadingText);
 	loadingModal.show();
 	try {
-		await conversation.getData();
+		const data = await conversation.getData();
+		const leafId = conversation.findLongestLeaf(uuid).leafId;
 		sessionStorage.setItem('message_uuid_to_find', uuid);
-		await conversation.setCurrentLeaf(conversation.findLongestLeaf(uuid).leafId); // reloads
+		if (leafId !== data.current_leaf_message_uuid) {
+			sessionStorage.setItem('claude_qol_jump_view', JSON.stringify({ conversationId: conversation.conversationId, leafId }));
+		}
+		await bustReactQueryCache();
+		location.reload();
 	} catch (error) {
 		messageUiLog.error('Navigation failed:', error);
 		loadingModal.destroy();
@@ -393,15 +398,38 @@ async function _settleOnMessage(findTarget, highlight) {
 	}
 	if (!target) return null;
 
-	if (highlight) {
-		target.style.transition = 'background-color 0.3s';
-		target.style.backgroundColor = '#2c84db4d';
-		setTimeout(() => {
-			if (target.isConnected) target.style.backgroundColor = '';
-		}, 4000);
-	}
+	if (highlight) highlightMessage(target);
 
 	return target;
+}
+
+// Tints what reads as the message, not its whole row: a user message's bubble (the first box with a
+// background around [data-testid="user-message"]), or a reply's text, padded out like a bubble.
+function highlightMessage(row) {
+	const COLOR = '#2c84db4d';
+	let bubble = null;
+	for (let el = row.querySelector('[data-testid="user-message"]'); el && el !== row; el = el.parentElement) {
+		const bg = getComputedStyle(el).backgroundColor;
+		if (bg && bg !== 'transparent' && !/^rgba\(0, 0, 0, 0\)$/.test(bg)) {
+			bubble = el;
+			break;
+		}
+	}
+	const prose = bubble ? null : row.querySelector('[data-cds="Prose"]');
+	const el = bubble ?? prose ?? row;
+	const saved = { transition: el.style.transition, backgroundColor: el.style.backgroundColor, boxShadow: el.style.boxShadow, borderRadius: el.style.borderRadius };
+	el.style.transition = 'background-color 0.3s, box-shadow 0.3s';
+	el.style.backgroundColor = COLOR;
+	if (prose) {
+		el.style.boxShadow = `0 0 0 8px ${COLOR}`;
+		el.style.borderRadius = '4px';
+	}
+	setTimeout(() => {
+		if (!el.isConnected) return;
+		el.style.backgroundColor = saved.backgroundColor;
+		el.style.boxShadow = saved.boxShadow;
+		setTimeout(() => Object.assign(el.style, saved), 300);
+	}, 4000);
 }
 
 // ======== MESSAGE BUTTON BAR SINGLETON ========

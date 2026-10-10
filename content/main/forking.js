@@ -487,16 +487,9 @@ If this is a writing or creative discussion, include sections for characters, pl
 	async function getConversationMessages(orgId, conversationId, targetUUID) {
 		const conversation = new ClaudeConversation(orgId, conversationId);
 		const conversationData = await conversation.getData();
-		const allMessages = await conversation.getMessages();
-
-		// Extract up to targetUUID as ClaudeMessage[]
-		const messages = [];
-		for (const message of allMessages) {
-			messages.push(message);
-			if (message.uuid === targetUUID) {
-				break;
-			}
-		}
+		// The branch down to the target, which needn't be the server's current one (version arrows,
+		// jumps).
+		const messages = await conversation.getMessagesTo(targetUUID);
 
 		return {
 			conversation,      // The ClaudeConversation instance
@@ -1355,6 +1348,20 @@ Provide the complete rewritten summary.`;
 	}
 
 	//#endregion
+
+	// "Fork from here" on the earlier-version banner (navigation.js, ISOLATED): the same modal as the
+	// fork button. It only opens the modal; the fork still needs the user's confirmation.
+	window.addEventListener('message', async (event) => {
+		if (event.source !== window || event.origin !== window.location.origin) return;
+		if (event.data?.type !== 'qol-fork-from') return;
+		const { messageUuid } = event.data;
+		if (typeof messageUuid !== 'string' || !/^[0-9a-f-]{36}$/i.test(messageUuid)) return;
+		try {
+			(await createConfigModal(messageUuid)).show();
+		} catch (error) {
+			log.error('Could not open the fork modal:', error);
+		}
+	});
 
 	MessageButtonBar.register({
 		buttonClass: 'fork-button',

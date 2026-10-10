@@ -565,15 +565,30 @@
 		document.head.appendChild(style);
 	}
 
-	//#region CONTINUE ANYWAY
-	// Viewing an earlier version (the branch arrows are client-only) makes claude.ai show "You're viewing
-	// an earlier version" with Send disabled. Next to it we offer to continue that version here: move the
-	// current leaf to the version's leaf and reload. Upgraded (workspace) chats can't move their leaf
-	// (their sandbox is shared across branches), so there we only explain. See docs/bard-rework.md (D7).
-	// "Back to latest version": in every earlier-version banner (upgraded chats have no "Continue in a
-	// new session" button there).
+	//#region EARLIER VERSIONS
+	// Two ways to be on a version that isn't the chat's current one, one banner for both:
+	// - claude.ai's own version arrows (client-only): it shows "You're viewing an earlier version" with
+	//   Send disabled, and ours goes above it;
+	// - a QoL jump (jumpToMessage; jump-view.js marks <html data-qol-jump-view="<conversation id>"> for
+	//   that page load, kept when the user leaves and comes back, since the page then restores the
+	//   jumped branch from its cache; we mirror it to data-qol-jump-active while that chat is open): the
+	//   page thinks it's on the current version, so ours stands alone above the composer, claude.ai's is
+	//   hidden (a hand flip back to the real latest would show it), and sending is blocked here (the
+	//   input would send to the real leaf; jump-view.js also refuses the request itself).
+	// The banner offers to continue the version on screen: normal chats move the current leaf to it and
+	// reload; upgraded (workspace) chats can't move their leaf (their sandbox is shared across
+	// branches), so they fork it instead. In a jump, "Back to latest" just reloads. See docs/bard-rework.md
+	// (D7 and "Jumps").
 	const EARLIER_VERSION = '[data-testid="hub-earlier-version-back"]';
+	const JUMP_ATTRIBUTE = 'data-qol-jump-view';
+	const JUMP_ACTIVE = 'data-qol-jump-active';
+	// claude.ai's banner look (its Banner classes), with our accent instead of its grey ring.
+	const BANNER_CLASS = 'flex items-center gap-xs py-md font-sans text-body font-normal px-md rounded-composer bg-surface-1 text-primary qol-version-banner';
 	const bannersSeen = new WeakSet();
+	const isJumped = () => {
+		const jumped = document.documentElement.getAttribute(JUMP_ATTRIBUTE);
+		return !!jumped && jumped === getConversationId();
+	};
 
 	// The leaf of the version on screen: the bottom row of the list once scrolled to the end. If it
 	// somehow has children, follow the newest one down, as claude.ai does when showing a version.
@@ -595,59 +610,138 @@
 		return uuid;
 	}
 
-	async function addContinueBanner(nativeBanner) {
-		const conversation = await getConversation();
-		const upgraded = !!(await conversation.getData()).workspace_upgraded;
-		if (!nativeBanner.isConnected) return;
-
-		const banner = document.createElement('div');
-		banner.className = `${nativeBanner.className.replace(/\bitems-start\b/, 'items-center')} qol-continue-banner`;
-		banner.style.marginBottom = '6px';
-		const text = document.createElement('div');
-		text.className = 'flex-1 min-w-0';
-		text.textContent = localize(upgraded ? 'nav.continue_upgraded_text' : 'nav.continue_anyway_text');
-		banner.appendChild(text);
-
-		if (!upgraded) {
-			banner.appendChild(createClaudeButton(localize('nav.continue_anyway_button'), 'primary', async () => {
-				const loadingModal = createLoadingModal(localize('nav.continuing'));
-				loadingModal.show();
-				try {
-					const leaf = await viewedLeaf(conversation);
-					if (!leaf) throw new Error('could not tell which version is on screen');
-					await conversation.setCurrentLeaf(leaf); // reloads onto that version
-				} catch (error) {
-					log.error('Continue anyway failed:', error);
-					loadingModal.destroy();
-					showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
-				}
-			}));
-		}
-		// Inside claude.ai's dock card, above its banner: it goes away with it.
-		nativeBanner.before(banner);
+	// The kit's buttons are h-9, too tall for a banner row.
+	function bannerButton(label, variant, onClick) {
+		const button = createClaudeButton(label, variant, onClick);
+		button.className = button.className.replace(/\bh-9\b/, 'h-7').replace(/\bpx-4\b/, 'px-3').replace(/\bpy-2\b/, 'py-0') + ' text-sm shrink-0';
+		return button;
 	}
 
-	// At most one look per frame: the observer fires constantly while a reply streams.
-	function watchEarlierVersionBanner() {
+	async function continueHere(conversation) {
+		const loadingModal = createLoadingModal(localize('nav.continuing'));
+		loadingModal.show();
+		try {
+			const leaf = await viewedLeaf(conversation);
+			if (!leaf) throw new Error('could not tell which version is on screen');
+			await conversation.setCurrentLeaf(leaf); // reloads onto that version
+		} catch (error) {
+			log.error('Continue from here failed:', error);
+			loadingModal.destroy();
+			showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
+		}
+	}
+
+	// The fork modal lives in MAIN (forking.js); it opens on the version's leaf.
+	async function forkHere(conversation) {
+		const leaf = await viewedLeaf(conversation).catch(() => null);
+		if (!leaf) {
+			showClaudeAlert(localize('nav.navigation_error_title'), localize('nav.navigation_failed'));
+			return;
+		}
+		window.postMessage({ type: 'qol-fork-from', messageUuid: leaf }, window.location.origin);
+	}
+
+	async function createVersionBanner(jumped) {
+		const conversation = await getConversation();
+		const upgraded = !!(await conversation.getData()).workspace_upgraded;
+
+		const banner = document.createElement('div');
+		banner.className = BANNER_CLASS;
+		// Wraps on narrow screens: the text keeps a readable width, the buttons drop below it together.
+		Object.assign(banner.style, { marginBottom: '6px', border: '1px solid #2c84db', flexWrap: 'wrap' });
+		const text = document.createElement('div');
+		text.className = 'min-w-0';
+		text.style.flex = '1 1 220px';
+		text.textContent = localize(jumped ? 'nav.jump_view_text' : upgraded ? 'nav.continue_upgraded_text' : 'nav.continue_anyway_text');
+		banner.appendChild(text);
+
+		const buttons = document.createElement('div');
+		buttons.className = 'flex gap-2 ml-auto';
+		buttons.appendChild(upgraded
+			? bannerButton(localize('fork.fork_from_here'), 'primary', () => forkHere(conversation))
+			: bannerButton(localize('nav.continue_anyway_button'), 'primary', () => continueHere(conversation)));
+		if (jumped) buttons.appendChild(bannerButton(localize('nav.back_to_latest'), 'secondary', () => location.reload()));
+		banner.appendChild(buttons);
+		return banner;
+	}
+
+	// Next to claude.ai's banner (hand flips): inside its dock card, above it, so it goes away with it.
+	async function addFlipBanner(nativeBanner) {
+		const banner = await createVersionBanner(false);
+		if (nativeBanner.isConnected && !isJumped()) nativeBanner.before(banner);
+	}
+
+	// Alone above the composer for a jump, for as long as jump-view.js keeps the attribute.
+	let jumpBanner = null;
+	let jumpBannerPending = false;
+	async function placeJumpBanner() {
+		if (!isJumped()) {
+			jumpBanner?.remove();
+			jumpBanner = null;
+			return;
+		}
+		if (jumpBanner?.isConnected || jumpBannerPending) return;
+		const holder = document.querySelector('[data-composer-card-holder]');
+		if (!holder) return;
+		jumpBannerPending = true;
+		try {
+			jumpBanner ??= await createVersionBanner(true);
+			if (isJumped()) holder.before(jumpBanner);
+		} finally {
+			jumpBannerPending = false;
+		}
+	}
+
+	// While jumped: the input would send to the server's real leaf, and Retry / Edit would branch off
+	// the hidden one, so they're blocked here (and refused by jump-view.js should anything get past).
+	function blockSendingWhileJumped() {
+		document.addEventListener('keydown', (e) => {
+			if (!isJumped() || e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+			if (!e.target.closest?.('[data-testid="chat-input"]')) return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		}, true);
+		document.addEventListener('click', (e) => {
+			if (!isJumped() || !e.target.closest?.('[data-testid="chat-input-send"]')) return;
+			e.preventDefault();
+			e.stopImmediatePropagation();
+		}, true);
+		const style = document.createElement('style');
+		style.textContent = `
+			html[${JUMP_ACTIVE}] [data-testid="chat-input-send"] { opacity: 0.4; pointer-events: none; }
+			html[${JUMP_ACTIVE}] :is([data-testid="user-message-retry"], [data-testid="user-message-edit"], [data-testid="action-bar-retry"], .advanced-edit-button) { display: none !important; }
+			html[${JUMP_ACTIVE}] [data-cds-dock-card]:has(${EARLIER_VERSION}) { display: none; }
+		`;
+		document.head.appendChild(style);
+	}
+
+	// Coalesced on a short timer: the observer fires constantly while a reply streams. Not an animation
+	// frame: those don't run in a hidden desktop window.
+	function watchVersionBanners() {
 		let scheduled = false;
 		const check = () => {
 			scheduled = false;
+			document.documentElement.toggleAttribute(JUMP_ACTIVE, isJumped());
+			placeJumpBanner().catch(error => log.error('Jump banner failed:', error));
 			const nativeBanner = document.querySelector(EARLIER_VERSION)?.closest('[data-cds="Banner"]');
-			if (!nativeBanner || bannersSeen.has(nativeBanner)) return;
+			if (!nativeBanner || bannersSeen.has(nativeBanner) || isJumped()) return;
 			bannersSeen.add(nativeBanner);
-			addContinueBanner(nativeBanner).catch(error => log.error('Continue banner failed:', error));
+			addFlipBanner(nativeBanner).catch(error => log.error('Continue banner failed:', error));
 		};
-		new MutationObserver(() => {
+		const schedule = () => {
 			if (scheduled) return;
 			scheduled = true;
-			requestAnimationFrame(check);
-		}).observe(document.body, { childList: true, subtree: true });
+			setTimeout(check, 100);
+		};
+		new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+		new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: [JUMP_ATTRIBUTE] });
 	}
 	// #endregion
 
 	function initialize() {
 		injectTreeStyles();
-		watchEarlierVersionBanner();
+		watchVersionBanners();
+		blockSendingWhileJumped();
 		// Add navigation button to top right
 		ButtonBar.register({
 			buttonClass: 'navigation-button',

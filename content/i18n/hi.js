@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"nav.success_title": "सफल",
 	"nav.bookmark_added": "बुकमार्क जोड़ा गया!",
 	"nav.continue_anyway_text": "QoL: आप इस संस्करण को यहीं जारी रख सकते हैं।",
-	"nav.continue_anyway_button": "फिर भी जारी रखें",
+	"nav.continue_anyway_button": "यहाँ से जारी रखें",
 	"nav.continuing": "इस संस्करण पर जा रहे हैं...",
-	"nav.continue_upgraded_text": "QoL: यह चैट किसी पुराने संस्करण को जारी नहीं रख सकती, क्योंकि इसकी फ़ाइलें सभी संस्करणों में साझा होती हैं।",
+	"nav.continue_upgraded_text": "QoL: यह चैट किसी पुराने संस्करण को यहीं जारी नहीं रख सकती, क्योंकि इसकी फ़ाइलें सभी संस्करणों में साझा होती हैं। इसके बजाय आप उसे फ़ोर्क कर सकते हैं।",
+	"nav.jump_view_text": "QoL: आप इस चैट का एक पुराना संस्करण देख रहे हैं। यहाँ भेजना रुका हुआ है।",
+	"nav.back_to_latest": "नवीनतम पर वापस जाएँ",
 
 	// search
 	"search.branched_messages_ago": "{n} संदेश पहले शाखा बनी",

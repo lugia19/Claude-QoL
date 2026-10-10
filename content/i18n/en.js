@@ -36,9 +36,11 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"nav.success_title": "Success",
 	"nav.bookmark_added": "Bookmark added!",
 	"nav.continue_anyway_text": "QoL: you can continue this version here instead.",
-	"nav.continue_anyway_button": "Continue anyway",
+	"nav.continue_anyway_button": "Continue from here",
 	"nav.continuing": "Switching to this version...",
-	"nav.continue_upgraded_text": "QoL: this chat can't continue an earlier version, because its files are shared across versions.",
+	"nav.continue_upgraded_text": "QoL: this chat can't continue an earlier version in place, because its files are shared across versions. You can fork it instead.",
+	"nav.jump_view_text": "QoL: you're viewing an earlier version of this chat. Sending is paused here.",
+	"nav.back_to_latest": "Back to latest",
 
 	// search
 	"search.branched_messages_ago": "Branched {n} messages ago",
