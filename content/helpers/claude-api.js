@@ -335,8 +335,10 @@ class ClaudeConversation {
 				attachments: send.attachments,
 				inlineAttachments: send.inlineAttachments,
 			};
-			// No parent = continue from the root (a new conversation, or a new root branch).
-			if (send.parentMessageUuid && send.parentMessageUuid !== ROOT_MESSAGE_UUID) sendMessage.parentMessageId = send.parentMessageUuid;
+			// Always explicit: left out, the server continues its own current leaf. "" is a new root
+			// (what the root uuid meant to /completion), and also what a conversation's first send uses.
+			const toRoot = !send.parentMessageUuid || send.parentMessageUuid === ROOT_MESSAGE_UUID;
+			sendMessage.parentMessageId = toRoot ? '' : send.parentMessageUuid;
 			if (model) sendMessage.model = { identifier: model };
 			if (creating && createParams?.project_uuid) sendMessage.projectId = createParams.project_uuid;
 

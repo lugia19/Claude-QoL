@@ -82,7 +82,7 @@ desktop client (zip import) and Firefox Android (TTS dialogue analysis).
 - **We choose the ids:** `messageId` and `assistantMessageId`, and for a new chat the header's
   `conversationId`: the first send creates it. `send_message` has no name field (the server names
   the chat itself), so a `renameConversation { title }` follows.
-- **Fields used:** `text`, `parentMessageId` (left out for the root), `model { identifier }`,
+- **Fields used:** `text`, `parentMessageId` (always set: `""` for the root, on a new chat too; left out, the server continues its current leaf), `model { identifier }`,
   `projectId`, `timezone`, `locale`, `attachments` (`{ id, fileName, fileSize, mediaType }`) and
   `inlineAttachments` (`{ fileName, fileSize, fileType, extractedContent }`).
 - **Files:** ids from both the legacy `POST /api/<org>/upload` and the code-execution
