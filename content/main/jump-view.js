@@ -44,6 +44,7 @@
 	function end(why) {
 		if (!jump) return;
 		log(`jump view of ${jump.conversationId} ended: ${why}`);
+		QolFullLoad.release(jump.conversationId);
 		jump = null;
 		seen.clear();
 		root.removeAttribute('data-qol-jump-view');

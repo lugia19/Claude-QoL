@@ -18,7 +18,7 @@
 //
 // QolFullLoad.require(conversationId) loads a conversation whole even with the setting off, and starts
 // fetching its tree right away: jump-view.js calls it at document_start for a jump, whose branch can be
-// outside the loaded window.
+// outside the loaded window, and QolFullLoad.release(conversationId) when the jump ends.
 (function () {
 	'use strict';
 
@@ -70,6 +70,9 @@
 		require(conversationId) {
 			required.add(conversationId);
 			prefetch(conversationId);
+		},
+		release(conversationId) {
+			required.delete(conversationId);
 		},
 	};
 
