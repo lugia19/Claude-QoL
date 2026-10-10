@@ -51,6 +51,7 @@
 		if (project?.projectId !== projectId) {
 			project = new ClaudeProject(getOrgId(), projectId);
 			lookup = null;
+			settledUnknowns.clear();
 		}
 		if (!lookup || refresh) {
 			lookup = Promise.all([project.getDocs(), project.getFiles()]).then(([docs, files]) => {
