@@ -151,12 +151,15 @@
 	function addGalleries(update, ctx, reset) {
 		if (!ctx.conversationId || !galleryConfig().enabled) return false;
 		const state = stateFor(ctx.conversationId, reset);
+		const touched = new Set();
 		const ownGroups = (update.display_groups ?? []).filter(g => !isOurs(g.id));
 		for (const g of ownGroups) {
-			state.groups.set(g.id, { message_id: g.message_id, index: g.index ?? 0, run: g.run_anchor_group_id || g.id });
+			const entry = { message_id: g.message_id, index: g.index ?? 0, run: g.run_anchor_group_id || g.id };
+			// A run that already has a gallery and gains a group (or one moves) re-anchors it after its new end.
+			if (state.runs.has(entry.run) && state.groups.get(g.id)?.index !== entry.index) touched.add(entry.run);
+			state.groups.set(g.id, entry);
 		}
 
-		const touched = new Set();
 		for (const block of update.content_blocks ?? []) {
 			if (!block.result_images?.length || isOurs(block.id)) continue;
 			const group = state.groups.get(block.display_group_id);
