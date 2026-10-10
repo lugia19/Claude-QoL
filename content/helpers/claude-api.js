@@ -1536,6 +1536,18 @@ class ClaudeMessage {
 	}
 }
 
+// Save a blob as a download named filename.
+function saveBlob(blob, filename) {
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	URL.revokeObjectURL(url);
+}
+
 class ClaudeProject {
 	constructor(orgId, projectId) {
 		this.orgId = orgId;
@@ -1586,177 +1598,34 @@ class ClaudeProject {
 		return this.cachedFiles;
 	}
 
-	// Download attachment (doc) - content is already in the docs response
+	// A project file's original bytes. The asset URLs in /files are previews: images come back as a
+	// downscaled WebP, and only PDFs have their original as document_asset.
+	contentsUrl(file) {
+		return `/api/organizations/${this.orgId}/files/${file.file_uuid}/contents`;
+	}
+
+	// The name to save a doc (text knowledge, from /docs) under. Documents claude.ai converts to text on
+	// upload (Word, Excel, PowerPoint, OpenDocument, RTF, EPUB) keep only that text, so they get ".txt"
+	// added: their original name would promise a file the text isn't.
+	static docFileName(doc) {
+		const name = doc.file_name || 'document';
+		return /\.(docx?|xlsx?|pptx?|od[tsp]|rtf|epub)$/i.test(name) ? `${name}.txt` : name;
+	}
+
+	// Download a doc: its text is already in the /docs response.
 	async downloadAttachment(docId) {
-		// Read from cache if available
-		if (!this.cachedDocs) {
-			await this.getDocs();
-		}
-
-		const doc = this.cachedDocs.find(d => d.uuid === docId);
-
-		if (!doc) {
-			throw new Error(`Doc ${docId} not found`);
-		}
-
-		// Create blob from content
-		const blob = new Blob([doc.content], { type: 'text/plain' });
-
-		// Trigger download
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = doc.file_name;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
+		const doc = (this.cachedDocs ?? await this.getDocs()).find(d => d.uuid === docId);
+		if (!doc) throw new Error(`Doc ${docId} not found`);
+		saveBlob(new Blob([doc.content], { type: 'text/plain' }), ClaudeProject.docFileName(doc));
 	}
 
-	// Download file - needs to determine URL based on file type
+	// Download a file (from /files) as uploaded.
 	async downloadFile(fileId) {
-		// Read from cache if available
-		if (!this.cachedFiles) {
-			await this.getFiles();
-		}
-
-		const file = this.cachedFiles.find(f => f.file_uuid === fileId);
-
-		if (!file) {
-			throw new Error(`File ${fileId} not found`);
-		}
-
-		let downloadUrl;
-
-		// Determine download URL based on file type
-		if (file.file_kind === 'document' && file.document_asset) {
-			// PDF or document - use document_asset URL
-			downloadUrl = file.document_asset.url;
-		} else if (file.file_kind === 'image') {
-			// Image - prefer preview_url over thumbnail_url
-			downloadUrl = file.preview_url || file.thumbnail_url;
-
-			// Or look for original asset if available
-			if (file.preview_asset?.file_variant === 'original') {
-				downloadUrl = file.preview_asset.url;
-			} else if (file.thumbnail_asset?.file_variant === 'original') {
-				downloadUrl = file.thumbnail_asset.url;
-			}
-		} else {
-			// Fallback to preview_url if available
-			downloadUrl = file.preview_url || file.thumbnail_url;
-		}
-
-		if (!downloadUrl) {
-			throw new Error(`No download URL found for file ${fileId}`);
-		}
-
-		// Fetch the actual file content
-		const response = await fetch(downloadUrl);
-		if (!response.ok) {
-			throw new Error(`Failed to download file ${fileId}`);
-		}
-
-		const blob = await response.blob();
-
-		// Trigger download
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = file.file_name;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
-
-
-	// Download all files and attachments as a zip
-	async downloadAll() {
-
-		// Fetch project data and file lists
-		const [projectData, docs, files] = await Promise.all([
-			this.getData(),
-			this.getDocs(),
-			this.getFiles()
-		]);
-
-		const projectName = projectData.name || 'project';
-
-		// Create zip
-		const zip = new JSZip();
-
-		// Add docs (content is already available)
-		for (const doc of docs) {
-			// Add UUID to filename to avoid collisions
-			const filename = this._makeUniqueFilename(doc.file_name, doc.uuid);
-			await addToZip(zip, filename, doc.content);
-		}
-
-		// Fetch and add files
-		for (const file of files) {
-			let downloadUrl;
-
-			// Determine download URL based on file type
-			if (file.file_kind === 'document' && file.document_asset) {
-				downloadUrl = file.document_asset.url;
-			} else if (file.file_kind === 'image') {
-				downloadUrl = file.preview_url || file.thumbnail_url;
-
-				if (file.preview_asset?.file_variant === 'original') {
-					downloadUrl = file.preview_asset.url;
-				} else if (file.thumbnail_asset?.file_variant === 'original') {
-					downloadUrl = file.thumbnail_asset.url;
-				}
-			} else {
-				downloadUrl = file.preview_url || file.thumbnail_url;
-			}
-
-			if (!downloadUrl) {
-				continue;
-			}
-
-			try {
-				const response = await fetch(downloadUrl);
-				if (!response.ok) {
-					apiLog.error(`Failed to fetch ${file.file_name}`);
-					continue;
-				}
-				const blob = await response.blob();
-
-				// Add UUID to filename to avoid collisions
-				const filename = this._makeUniqueFilename(file.file_name, file.file_uuid);
-				await addToZip(zip, filename, blob);
-			} catch (error) {
-				apiLog.error(`Error downloading ${file.file_name}:`, error);
-			}
-		}
-
-		// Generate zip and trigger download
-		const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-		const url = URL.createObjectURL(zipBlob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `${projectName}.zip`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
-
-	// Helper to make unique filenames
-	_makeUniqueFilename(filename, uuid) {
-		// Split filename into name and extension
-		const lastDot = filename.lastIndexOf('.');
-		if (lastDot === -1) {
-			// No extension
-			return `${filename}-${uuid}`;
-		}
-
-		const name = filename.substring(0, lastDot);
-		const ext = filename.substring(lastDot);
-		return `${name}-${uuid}${ext}`;
+		const file = (this.cachedFiles ?? await this.getFiles()).find(f => f.file_uuid === fileId);
+		if (!file) throw new Error(`File ${fileId} not found`);
+		const response = await fetch(this.contentsUrl(file));
+		if (!response.ok) throw new Error(`Failed to download file ${fileId} (${response.status})`);
+		saveBlob(await response.blob(), file.file_name);
 	}
 }
 

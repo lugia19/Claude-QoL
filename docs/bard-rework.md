@@ -252,7 +252,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | TTS auto-speak | Watch `StreamTimeline` for the settle (status leaves busy for idle) | **Implemented** (feat/tts-autospeak): `tts-interceptor.js` observes; updates during a turn carry `STATUS_RUNNING` with `status_assistant_message_id` = the reply, and the settle is one update with `STATUS_IDLE` and that reply `is_complete` + `stop_reason`. Only a reply seen running, in the chat on screen, is spoken (snapshots and reconnect replays never are). Verified in Chrome (end to end), the desktop client and Firefox Android (trigger). |
 | TTS "Read aloud" hijack | Unchanged (WebSocket) | Retest. |
 | Export / chat search data | Legacy tree GET, unchanged (D1 revised) | Contingency if it fails: `ReadConversation` (full tree, JSON or proto) through an adapter. Text attachments are file URLs there (fetch the content), and tool input is summarised. |
-| Project file download | Project data is still legacy REST; buttons must move into the "Context" dialog (table behind "Show context") | |
+| Project file download | Project data is still legacy REST (`/docs`, `/files`, `/syncs`, fetched up front); buttons moved into the "Context" dialog: each file row, plus the preview pane | **Implemented** (feat/project-downloads). Files download from `/files/<id>/contents` (originals); the old asset URLs gave images as a downscaled WebP. Converted documents (.docx etc.) only exist as text: saved as `<name>.txt`. |
 | Model extras | `model` override on `send_message`; check the bootstrap/model-selector patching separately | |
 | Browser-side tools (new) | `client_tools` + `submit_client_tool_result` | New capability; nothing uses it yet. |
 

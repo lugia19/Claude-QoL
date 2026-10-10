@@ -1906,31 +1906,15 @@
 				}
 
 				for (const doc of docs) {
-					const filename = makeUniqueFilename(doc.file_name, doc.uuid);
+					const filename = makeUniqueFilename(ClaudeProject.docFileName(doc), doc.uuid);
 					await addToZip(masterZip, `project_files/${filename}`, doc.content);
 				}
 
 				for (const file of files) {
 					if (bulkExportCancelled) break;
 
-					let downloadUrl;
-					if (file.file_kind === 'document' && file.document_asset) {
-						downloadUrl = file.document_asset.url;
-					} else if (file.file_kind === 'image') {
-						downloadUrl = file.preview_url || file.thumbnail_url;
-						if (file.preview_asset?.file_variant === 'original') {
-							downloadUrl = file.preview_asset.url;
-						} else if (file.thumbnail_asset?.file_variant === 'original') {
-							downloadUrl = file.thumbnail_asset.url;
-						}
-					} else {
-						downloadUrl = file.preview_url || file.thumbnail_url;
-					}
-
-					if (!downloadUrl) continue;
-
 					try {
-						const response = await fetch(downloadUrl);
+						const response = await fetch(project.contentsUrl(file));
 						if (!response.ok) {
 							log.error(`Failed to fetch project file ${file.file_name}`);
 							continue;
