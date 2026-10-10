@@ -120,9 +120,11 @@
 		return { id: `img_${i + 1}`, url, thumbnail_url: url, title: localize('images.generated_image'), width: 3840, height, thumbnail_width: 3840, thumbnail_height: height };
 	}
 
-	// The gallery groups and blocks for one run, its images in order, split by the user's limit.
-	function buildRun(runId, run, anchor) {
-		const images = [...run.values()].flat().sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
+	// The gallery groups and blocks for one run, its images in order (by their group's current index,
+	// then their block's), split by the user's limit.
+	function buildRun(runId, run, anchor, knownGroups) {
+		const groupIndex = (image) => knownGroups.get(image.groupId)?.index ?? 0;
+		const images = [...run.values()].flat().sort((a, b) => groupIndex(a) - groupIndex(b) || a.blockIndex - b.blockIndex);
 		const limit = galleryLimit();
 		const groups = [], blocks = [];
 		for (let start = 0, n = 0; start < images.length; start += limit, n++) {
@@ -167,7 +169,7 @@
 			if (!state.runs.has(group.run)) state.runs.set(group.run, new Map());
 			state.runs.get(group.run).set(block.id, block.result_images.map(img => {
 				const url = absolute(img.url);
-				return { url, dims: dimsFor(url, block), order: [group.index, block.index ?? 0] };
+				return { url, dims: dimsFor(url, block), groupId: block.display_group_id, blockIndex: block.index ?? 0 };
 			}));
 			touched.add(group.run);
 		}
@@ -178,7 +180,7 @@
 		for (const runId of touched) {
 			// Shown after the run's last group (the highest index among its groups).
 			const anchor = [...state.groups.values()].filter(g => g.run === runId).reduce((a, b) => (b.index > a.index ? b : a));
-			const built = buildRun(runId, state.runs.get(runId), anchor);
+			const built = buildRun(runId, state.runs.get(runId), anchor, state.groups);
 			for (const g of built.groups) {
 				const at = groups.findIndex(x => x.id === g.id);
 				if (at >= 0) groups[at] = g; else groups.push(g);
