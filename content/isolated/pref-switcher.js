@@ -362,13 +362,15 @@
 	function initCodePrompt() {
 		const P = SETTINGS_KEYS.CODE_PROMPT;
 		// code-session-prompt.js (MAIN) reads this when a session is created: same origin, synchronous.
-		// Written on init and on every change of the setting (here or in another tab); removed when there's no prompt.
+		// Written on init and synchronously on every change of the setting (here or in another tab), from
+		// the values in hand: settingsRegistry.set() runs this tab's listeners before it resolves, so the
+		// mirror is current by the time an apply or a mode change completes. Removed when there's no prompt.
 		const MIRROR_KEY = 'claude_qol_code_prompt';
+		const mirror = { text: '', mode: P.MODE.default };
 
-		async function writeMirror() {
+		function writeMirror() {
 			try {
-				const [text, mode] = await Promise.all([settingsRegistry.get(P.TEXT), settingsRegistry.get(P.MODE)]);
-				if (text.trim()) localStorage.setItem(MIRROR_KEY, JSON.stringify({ text, mode }));
+				if (mirror.text.trim()) localStorage.setItem(MIRROR_KEY, JSON.stringify(mirror));
 				else localStorage.removeItem(MIRROR_KEY);
 			} catch (e) { /* storage unavailable: sessions start without the prompt */ }
 		}
@@ -427,9 +429,15 @@
 		});
 
 		// The one place the mirror and the button follow the setting: onChange fires in this tab too.
-		writeMirror();
-		settingsRegistry.onChange(P.TEXT, () => { writeMirror(); switcher.updateButtonAppearance(); });
-		settingsRegistry.onChange(P.MODE, () => writeMirror());
+		// A change that lands while the first read is in flight is newer than what that read returns.
+		const changed = new Set();
+		settingsRegistry.onChange(P.TEXT, (text) => { changed.add('text'); mirror.text = text; writeMirror(); switcher.updateButtonAppearance(); });
+		settingsRegistry.onChange(P.MODE, (mode) => { changed.add('mode'); mirror.mode = mode; writeMirror(); });
+		Promise.all([settingsRegistry.get(P.TEXT), settingsRegistry.get(P.MODE)]).then(([text, mode]) => {
+			if (!changed.has('text')) mirror.text = text;
+			if (!changed.has('mode')) mirror.mode = mode;
+			writeMirror();
+		});
 	}
 
 	setTimeout(() => {
