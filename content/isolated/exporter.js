@@ -792,17 +792,22 @@
 				// Already shown inline by the tool-result path above — don't embed it twice
 				// (and don't pay for the download again).
 				if (file.file_uuid && renderedImageUuids.has(file.file_uuid)) continue;
+				// The file's name as a pill: a download link with its data, or plain without.
+				const name = esc(file.file_name);
+				const pill = (href) => (href
+					? `<a class="file-pill" href="${href}" download="${name}">${name}</a>`
+					: `<span class="file-pill">${name}</span>`);
 				if (file instanceof ClaudeAttachment) {
 					const b64 = btoa(unescape(encodeURIComponent(file.extracted_content || '')));
 					const mimeType = mime.getType(file.file_name) || 'text/plain';
-					fileResults.push(`<a class="file-pill" href="data:${mimeType};base64,${b64}" download="${esc(file.file_name)}">${esc(file.file_name)}</a>`);
+					fileResults.push(pill(`data:${mimeType};base64,${b64}`));
 					continue;
 				}
 
 				// Images dominate an export's size and download time. With them off, keep the record
 				// of what was attached without paying for the bytes — or for the pacing delay.
 				if (!includeImages && file.file_kind === 'image') {
-					fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
+					fileResults.push(pill());
 					continue;
 				}
 
@@ -810,19 +815,19 @@
 					await paceDownload();
 					const blob = await file.download();
 					if (!blob) {
-						fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
+						fileResults.push(pill());
 						continue;
 					}
 
 					const dataUri = await blobToDataUri(blob);
 
 					if (file.file_kind === 'image') {
-						fileResults.push(`<img src="${dataUri}" alt="${esc(file.file_name)}">`);
+						fileResults.push(`<img src="${dataUri}" alt="${name}">`);
 					} else {
-						fileResults.push(`<a class="file-pill" href="${dataUri}" download="${esc(file.file_name)}">${esc(file.file_name)}</a>`);
+						fileResults.push(pill(dataUri));
 					}
 				} catch (e) {
-					fileResults.push(`<span class="file-pill">${esc(file.file_name)}</span>`);
+					fileResults.push(pill());
 				}
 			}
 
@@ -1942,16 +1947,9 @@
 			loadingModal.setContent(createLoadingContent(bulkExportCancelled ? localize('export.generating_partial_zip') : localize('export.generating_zip')));
 			const masterBlob = await masterZip.generateAsync({ type: 'blob' });
 
-			const url = URL.createObjectURL(masterBlob);
-			const link = document.createElement('a');
-			link.href = url;
-			if (projectId) {
-				link.download = `Claude_project_export_${projectName}_${projectId}.zip`;
-			} else {
-				link.download = `Claude_bulk_export_${new Date().toISOString().slice(0, 10)}.zip`;
-			}
-			link.click();
-			URL.revokeObjectURL(url);
+			saveBlob(masterBlob, projectId
+				? `Claude_project_export_${projectName}_${projectId}.zip`
+				: `Claude_bulk_export_${new Date().toISOString().slice(0, 10)}.zip`);
 
 			loadingModal.destroy();
 			modal.hide();
@@ -2141,12 +2139,7 @@
 							orgId, conversationId, format, extension, exportTree, exportOptions, loadingModal
 						);
 
-						const url = URL.createObjectURL(blob);
-						const link = document.createElement('a');
-						link.href = url;
-						link.download = filename;
-						link.click();
-						URL.revokeObjectURL(url);
+						saveBlob(blob, filename);
 
 						loadingModal.destroy();
 						modal.hide();

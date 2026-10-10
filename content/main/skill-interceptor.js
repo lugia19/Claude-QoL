@@ -59,7 +59,10 @@
 		const response = await originalFetch(...args);
 		if (!response.ok) return response;
 		try {
-			const data = await response.clone().json();
+			// Most library responses don't hold the key: only parse and walk the ones that mention it.
+			const text = await response.clone().text();
+			if (!text.includes(HIDDEN_SKILL_NAME) && !text.includes(HIDDEN_DESCRIPTION_MARKER)) return response;
+			const data = JSON.parse(text);
 			const dropped = dropKeySkills(data);
 			if (!dropped.length) return response;
 			uncountFacets(data, dropped);

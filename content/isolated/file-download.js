@@ -66,8 +66,8 @@
 				for (const doc of docs) add(doc.file_name, doc.created_at, { doc });
 				return entries;
 			}).catch((e) => {
+				// Kept until the dialog is opened again: forgetting it would refetch on every scan.
 				log.error('Could not list the project files:', e);
-				lookup = null;
 				return new Map();
 			});
 		}
@@ -112,16 +112,9 @@
 		seenDialogs.add(dialog);
 		let files = await projectFiles(fresh);
 		if (!files) return;
-		const unknown = () => rows.map(rowInfo).filter(info => info && !files.has(info.key) && !settledUnknowns.has(info.key));
-		if (fresh) {
-			unknown().forEach(info => settledUnknowns.add(info.key));
-		} else {
-			const fresher = unknown();
-			if (fresher.length) {
-				fresher.forEach(info => settledUnknowns.add(info.key));
-				files = await projectFiles(true);
-			}
-		}
+		const unknown = rows.map(rowInfo).filter(info => info && !files.has(info.key) && !settledUnknowns.has(info.key));
+		unknown.forEach(info => settledUnknowns.add(info.key));
+		if (!fresh && unknown.length) files = await projectFiles(true);
 
 		for (const row of rows) {
 			const info = rowInfo(row);
@@ -136,7 +129,6 @@
 			existing?.remove();
 			const button = downloadButton(menu, localize('download.download'), () => downloadProjectFile(info));
 			button.dataset.fileKey = info.key;
-			button.dataset.fileName = info.name;
 			menu.before(button);
 		}
 

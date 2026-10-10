@@ -181,7 +181,8 @@ let _revealInFlight = false;
 async function _waitForMessageList(timeoutMs = 20000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
-		if (getMessageScroller() && document.querySelector('[data-turn-key]')) return true;
+		// Rows, not the scroller: a chat that fits on screen has nothing to scroll (see getMessageScroller).
+		if (document.querySelector('[data-turn-key]')) return true;
 		await new Promise(resolve => setTimeout(resolve, 100));
 	}
 	return false;
@@ -262,9 +263,7 @@ async function jumpToMessage(conversation, uuid, loadingText) {
 		const leafId = conversation.findLongestLeaf(uuid).leafId;
 		sessionStorage.setItem('message_uuid_to_find', uuid);
 		if (leafId !== data.current_leaf_message_uuid) {
-			sessionStorage.setItem('claude_qol_jump_view', JSON.stringify({ conversationId: conversation.conversationId, leafId }));
-			sessionStorage.setItem('claude_qol_jump_reveal', '1'); // the reveal waits for the jump (chat-search.js)
-		}
+			sessionStorage.setItem('claude_qol_jump_view', JSON.stringify({ conversationId: conversation.conversationId, leafId }));		}
 		await bustReactQueryCache();
 		location.reload();
 	} catch (error) {
@@ -413,7 +412,7 @@ function highlightMessage(row) {
 	let bubble = null;
 	for (let el = row.querySelector('[data-testid="user-message"]'); el && el !== row; el = el.parentElement) {
 		const bg = getComputedStyle(el).backgroundColor;
-		if (bg && bg !== 'transparent' && !/^rgba\(0, 0, 0, 0\)$/.test(bg)) {
+		if (bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
 			bubble = el;
 			break;
 		}

@@ -14,8 +14,11 @@
 //
 // Setting: "Load whole conversations" (extension-settings.js), on by default, mirrored to
 // localStorage[claude_qol_full_load] ('0' = off) because settings live in the ISOLATED world and load
-// after the first snapshot. A change applies on the next page load. Jumped snapshots (jump-view.js)
-// are loaded whole even with the setting off: the jumped branch can be outside the loaded window.
+// after the first snapshot. A change applies on the next page load.
+//
+// QolFullLoad.require(conversationId) loads a conversation whole even with the setting off, and starts
+// fetching its tree right away: jump-view.js calls it at document_start for a jump, whose branch can be
+// outside the loaded window.
 (function () {
 	'use strict';
 
@@ -26,32 +29,49 @@
 
 	const log = createLogger('FullLoad');
 
-	const trees = new Map(); // conversationId -> { at, promise of the full ConversationUpdate or null }
+	const trees = new Map(); // conversationId -> { at, language, promise of the full ConversationUpdate or null }
+	const required = new Set(); // conversation ids loaded whole regardless of the setting
 
 	// The whole conversation, from ReadConversation. Shared by concurrent snapshots, reused for a few
-	// minutes: a reconnect's snapshot carries anything new itself (see fillSnapshot).
-	function fullTree(ctx) {
+	// minutes: a reconnect's snapshot carries anything new itself (see fillSnapshot). A tree fetched in
+	// another display language (a prefetch guesses it) is fetched again.
+	function fullTree(orgId, conversationId, language) {
 		// Drop expired trees, and keep at most a few: each one holds a whole decoded conversation.
 		for (const [id, entry] of trees) if (Date.now() - entry.at >= TREE_TTL_MS) trees.delete(id);
-		const cached = trees.get(ctx.conversationId);
-		if (cached) return cached.promise;
+		const cached = trees.get(conversationId);
+		if (cached?.language === language) return cached.promise;
+		trees.delete(conversationId);
 		while (trees.size >= MAX_TREES) trees.delete(trees.keys().next().value);
 		const net = ClaudeExtNet;
 		const startedAt = performance.now();
-		const body = net.encodeBard('ReadConversationRequest', { conversation_id: ctx.conversationId, display_language: ctx.displayLanguage || 'en-US' });
-		const promise = QolBardHost.rawFetch(...net.bardRpcRequest('ReadConversation', ctx.orgId, body)).then(async (response) => {
+		const body = net.encodeBard('ReadConversationRequest', { conversation_id: conversationId, display_language: language });
+		const promise = QolBardHost.rawFetch(...net.bardRpcRequest('ReadConversation', orgId, body)).then(async (response) => {
 			if (!response.ok) throw new Error(`ReadConversation ${response.status}`);
 			const bytes = new Uint8Array(await response.arrayBuffer());
 			const update = net.decodeBard('ReadConversationResponse', bytes, { keepUnknown: true }).update ?? null;
-			log(`full tree for ${ctx.conversationId}: ${update?.messages?.length ?? 0} messages, ${bytes.length} bytes, ${Math.round(performance.now() - startedAt)}ms`);
+			log(`full tree for ${conversationId}: ${update?.messages?.length ?? 0} messages, ${bytes.length} bytes, ${Math.round(performance.now() - startedAt)}ms`);
 			return update;
 		}).catch((e) => {
-			log.warn(`no full load for ${ctx.conversationId}, the page keeps paging:`, e);
+			log.warn(`no full load for ${conversationId}, the page keeps paging:`, e);
 			return null;
 		});
-		trees.set(ctx.conversationId, { at: Date.now(), promise });
+		trees.set(conversationId, { at: Date.now(), language, promise });
 		return promise;
 	}
+
+	// At document_start page.js hasn't loaded and no request has said the display language yet: the org
+	// is the cookie getActiveOrgId() reads, the language the page's <html lang>.
+	function prefetch(conversationId) {
+		const orgId = document.cookie.match(/(?:^|;\s*)lastActiveOrg=([^;]+)/)?.[1];
+		if (orgId) fullTree(orgId, conversationId, document.documentElement.lang || 'en-US');
+	}
+
+	globalThis.QolFullLoad = {
+		require(conversationId) {
+			required.add(conversationId);
+			prefetch(conversationId);
+		},
+	};
 
 	// items from the tree, each replaced by the snapshot's own copy when it has one (fresher), plus the
 	// snapshot's items the tree doesn't have yet.
@@ -75,11 +95,11 @@
 	// Registered first, so the other onSnapshot patches see the full snapshot.
 	QolBardHost.onSnapshot(async function fullLoad(update, ctx) {
 		if (!ctx.conversationId || !update.older_history_cursor) return false; // nothing more to load
-		if (!enabled && !globalThis.QolJumpView?.isJumped(ctx.conversationId)) return false;
+		if (!enabled && !required.has(ctx.conversationId)) return false;
 		// Past the host's wait budget the snapshot goes through as it came (the page pages as usual), and
 		// the tree still lands in the cache for the next snapshot. Most reconnects resume without one, so
 		// that may be the next load.
-		const result = await ctx.within(fullTree(ctx));
+		const result = await ctx.within(fullTree(ctx.orgId, ctx.conversationId, ctx.displayLanguage || 'en-US'));
 		if (!result) {
 			log.warn(`full tree for ${ctx.conversationId} took too long; this snapshot goes through windowed`);
 			return false;

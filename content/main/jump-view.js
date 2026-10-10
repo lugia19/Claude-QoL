@@ -4,13 +4,18 @@
 // jump leaves { conversationId, leafId } in sessionStorage and reloads; this reads and deletes it at
 // once (so a later reload is back to latest) and rewrites conversation.current_leaf_message_id in that
 // conversation's snapshots, which makes the page load on that branch. Upgraded chats can't move
-// their leaf at all, so this is the only way to show another branch there.
+// their leaf at all, so this is the only way to show another branch there. The jumped conversation is
+// loaded whole (QolFullLoad.require, which also starts fetching its tree now): the jumped branch can be
+// outside the window the page loads.
 //
 // A send from the jumped view would go to the server's real leaf (the page sends no parent), so while
 // jumped every send_message and warm_turn for the conversation is refused (QolBardHost.guardSend). The
-// banner, the input blocking and "Continue from here" / "Fork from here" are navigation.js's; it
-// watches <html data-qol-jump-view="<conversation id>">, set here while the view lasts, and acts only
-// while that conversation is open.
+// banner, the input blocking and "Continue from here" / "Fork from here" are navigation.js's.
+//
+// The state is on <html>, for both worlds (read it with qolJumpedLeaf / qolJumpSettled, claude-api.js):
+//   data-qol-jump-state  'pending' from document_start, then 'applied' once a snapshot carried the
+//                        jumped leaf, or 'ended' (the jump was dropped, or ended later)
+//   data-qol-jump-view   the jumped conversation's id, and data-qol-jump-leaf its leaf, while applied
 //
 // The view lasts for the page's life: leaving the chat and coming back restores the page's cached
 // state (still the jumped branch) without a new snapshot. It ends on a live update with a message we
@@ -20,8 +25,7 @@
 	'use strict';
 
 	const JUMP_KEY = 'claude_qol_jump_view';
-	const ATTRIBUTE = 'data-qol-jump-view';
-	const LEAF_ATTRIBUTE = 'data-qol-jump-leaf'; // for getRenderedMessages (claude-api.js)
+	const root = document.documentElement;
 	const log = createLogger('JumpView');
 
 	let jump = null; // { conversationId, leafId }
@@ -30,6 +34,10 @@
 		sessionStorage.removeItem(JUMP_KEY);
 	} catch (e) { /* storage unavailable or not JSON: no jump */ }
 	if (!jump?.conversationId || !jump?.leafId) jump = null;
+	if (jump) {
+		root.setAttribute('data-qol-jump-state', 'pending');
+		QolFullLoad.require(jump.conversationId);
+	}
 
 	const seen = new Set(); // message ids of the jumped conversation
 
@@ -38,14 +46,15 @@
 		log(`jump view of ${jump.conversationId} ended: ${why}`);
 		jump = null;
 		seen.clear();
-		document.documentElement.removeAttribute(ATTRIBUTE);
-		document.documentElement.removeAttribute(LEAF_ATTRIBUTE);
+		root.removeAttribute('data-qol-jump-view');
+		root.removeAttribute('data-qol-jump-leaf');
+		root.setAttribute('data-qol-jump-state', 'ended');
 	}
 
-	const isJumped = (ctx) => !!jump && ctx.conversationId === jump.conversationId;
+	const isJumped = (conversationId) => !!jump && conversationId === jump.conversationId;
 
 	QolBardHost.onSnapshot(function jumpView(update, ctx) {
-		if (!isJumped(ctx)) return false;
+		if (!isJumped(ctx.conversationId)) return false;
 		const messages = update.messages ?? [];
 		if (!update.conversation || !messages.some(m => m.id === jump.leafId)) {
 			end('the jumped leaf is not in the snapshot');
@@ -53,24 +62,21 @@
 		}
 		for (const m of messages) seen.add(m.id);
 		update.conversation.current_leaf_message_id = jump.leafId;
-		document.documentElement.setAttribute(ATTRIBUTE, jump.conversationId);
-		document.documentElement.setAttribute(LEAF_ATTRIBUTE, jump.leafId);
+		root.setAttribute('data-qol-jump-view', jump.conversationId);
+		root.setAttribute('data-qol-jump-leaf', jump.leafId);
+		root.setAttribute('data-qol-jump-state', 'applied');
 		return true;
 	}, { label: 'jump-view' });
 
 	QolBardHost.onHistoryPage(function jumpViewHistory(update, ctx) {
-		if (isJumped(ctx)) for (const m of update.messages ?? []) seen.add(m.id);
+		if (isJumped(ctx.conversationId)) for (const m of update.messages ?? []) seen.add(m.id);
 		return false;
 	}, { label: 'jump-view' });
 
 	QolBardHost.onLiveUpdate(function jumpViewLive(update, ctx) {
-		if (isJumped(ctx) && (update.messages ?? []).some(m => !seen.has(m.id))) end('a new message arrived');
+		if (isJumped(ctx.conversationId) && (update.messages ?? []).some(m => !seen.has(m.id))) end('a new message arrived');
 		return false;
 	}, { label: 'jump-view' });
 
-	QolBardHost.guardSend(ctx => (isJumped(ctx) ? 'QoL: sending is paused while viewing an earlier version.' : null), { label: 'jump-view' });
-
-	// full-load.js loads whole conversations for jumped snapshots even when its setting is off: the
-	// jumped branch can be outside the window the page loads.
-	globalThis.QolJumpView = { isJumped: conversationId => !!jump && conversationId === jump.conversationId };
+	QolBardHost.guardSend(ctx => (isJumped(ctx.conversationId) ? 'QoL: sending is paused while viewing an earlier version.' : null), { label: 'jump-view' });
 })();

@@ -580,15 +580,12 @@
 	// branches), so they fork it instead. In a jump, "Back to latest" just reloads. See docs/bard-rework.md
 	// (D7 and "Jumps").
 	const EARLIER_VERSION = '[data-testid="hub-earlier-version-back"]';
-	const JUMP_ATTRIBUTE = 'data-qol-jump-view';
+	const JUMP_ATTRIBUTE = 'data-qol-jump-view'; // watched for changes; read through qolJumpedLeaf
 	const JUMP_ACTIVE = 'data-qol-jump-active';
 	// claude.ai's banner look (its Banner classes), with our accent instead of its grey ring.
 	const BANNER_CLASS = 'flex items-center gap-xs py-md font-sans text-body font-normal px-md rounded-composer bg-surface-1 text-primary qol-version-banner';
 	const bannersSeen = new WeakSet();
-	const isJumped = () => {
-		const jumped = document.documentElement.getAttribute(JUMP_ATTRIBUTE);
-		return !!jumped && jumped === getConversationId();
-	};
+	const isJumped = () => !!qolJumpedLeaf(getConversationId());
 
 	// The leaf of the version on screen: the bottom row of the list once scrolled to the end. If it
 	// somehow has children, follow the newest one down, as claude.ai does when showing a version.

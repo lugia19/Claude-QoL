@@ -377,16 +377,10 @@
 		sessionStorage.removeItem('message_uuid_to_find');
 		sessionStorage.removeItem('highlight_previous_message'); // legacy key, no longer written
 
-		// A jump to another branch: wait until jump-view.js has applied it, or positions would come from
-		// the server's branch. claude.ai can draw its cached copy of the chat before the (possibly held)
-		// snapshot lands, so "the list is there" isn't enough. Past the host's snapshot budget (15 s)
-		// the jump was dropped; reveal anyway.
-		if (sessionStorage.getItem('claude_qol_jump_reveal')) {
-			sessionStorage.removeItem('claude_qol_jump_reveal');
-			for (let waited = 0; waited < 20000 && !document.documentElement.hasAttribute('data-qol-jump-leaf'); waited += 100) {
-				await new Promise(resolve => setTimeout(resolve, 100));
-			}
-		}
+		// A jump to another branch: wait until jump-view.js has applied (or dropped) it, or positions
+		// would come from the server's branch. claude.ai can draw its cached copy of the chat before the
+		// (possibly held) snapshot lands, so "the list is there" isn't enough.
+		await qolJumpSettled();
 
 		const revealed = await revealMessageByUuid(messageUuid);
 		if (!revealed) log('Could not reveal message', messageUuid);
