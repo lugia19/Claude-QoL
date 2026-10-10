@@ -37,11 +37,13 @@
 
 	// ======== Project files ========
 
-	// The project's files, by name. Fetched when a Context dialog opens, and again when a row names a
-	// file we don't know yet (an upload while the dialog is open).
+	// The project's files. Fetched when a Context dialog opens, and again when a row appears that we
+	// don't know (an upload while the dialog is open).
 	let project = null;
 	let lookup = null; // promise of Map(rowKey or file name -> { doc } | { file })
-	let fetchedAt = 0;
+	// Unknown rows we've already refetched for, or that were there when the list was fetched (a GitHub
+	// or Drive sync is never in it): each one costs at most one refetch, never a refetch loop.
+	const settledUnknowns = new Set();
 
 	function projectFiles(refresh) {
 		const projectId = getProjectId();
@@ -50,11 +52,10 @@
 			project = new ClaudeProject(getOrgId(), projectId);
 			lookup = null;
 		}
-		if (!lookup || (refresh && Date.now() - fetchedAt > 2000)) {
-			fetchedAt = Date.now();
+		if (!lookup || refresh) {
 			lookup = Promise.all([project.getDocs(), project.getFiles()]).then(([docs, files]) => {
 				// Keyed by name and time, and by name alone for a row without a time (the first file of
-				// that name wins there).
+				// that name wins there). A row with a time only ever matches its exact key.
 				const entries = new Map();
 				const add = (name, createdAt, entry) => {
 					entries.set(fileKey(name, createdAt), entry);
@@ -95,7 +96,8 @@
 		return { name, time, key: time ? fileKey(name, time) : name };
 	}
 
-	const findEntry = (entries, row) => entries?.get(row.key) ?? entries?.get(row.name);
+	// Exact: a timed row whose time matches no file (a sync sharing a file's name) gets no button.
+	const findEntry = (entries, row) => entries?.get(row.key);
 
 	const seenDialogs = new WeakSet();
 	const busyDialogs = new WeakSet(); // a pass is awaiting the file list: don't start another
@@ -117,8 +119,15 @@
 		seenDialogs.add(dialog);
 		let files = await projectFiles(fresh);
 		if (!files) return;
-		if (rows.some(row => rowInfo(row) && !row.querySelector(`.${MARK}`) && !files.has(rowInfo(row).key))) {
-			files = await projectFiles(true);
+		const unknown = () => rows.map(rowInfo).filter(info => info && !files.has(info.key) && !settledUnknowns.has(info.key));
+		if (fresh) {
+			unknown().forEach(info => settledUnknowns.add(info.key));
+		} else {
+			const fresher = unknown();
+			if (fresher.length) {
+				fresher.forEach(info => settledUnknowns.add(info.key));
+				files = await projectFiles(true);
+			}
 		}
 
 		for (const row of rows) {
