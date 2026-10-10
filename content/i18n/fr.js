@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"tts.model_label": "Modèle",
 	"tts.custom_model_hint": "Nom du modèle pour le point de terminaison personnalisé",
 	"tts.auto_speak": "Lecture auto des nouveaux messages",
-	"tts.auto_speak_note": "Fonctionne uniquement dans les chats normaux (pas cowork, pas code)",
+	"tts.auto_speak_note": "Fonctionne uniquement dans les chats normaux (pas code)",
 	"tts.per_chat_heading": "Paramètres par chat",
 	"tts.quotes_only": "Lire uniquement le texte entre guillemets",
 	"tts.quotes_only_tooltip": "Lecture rapide des dialogues seuls via regex (instantané, sans appel API)",

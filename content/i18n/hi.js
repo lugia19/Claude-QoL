@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"tts.model_label": "मॉडल",
 	"tts.custom_model_hint": "कस्टम एंडपॉइंट के लिए मॉडल का नाम",
 	"tts.auto_speak": "नए संदेश पर अपने-आप बोलें",
-	"tts.auto_speak_note": "केवल सामान्य चैट में काम करता है (cowork या code में नहीं)",
+	"tts.auto_speak_note": "केवल सामान्य चैट में काम करता है (code में नहीं)",
 	"tts.per_chat_heading": "प्रति-चैट सेटिंग्स",
 	"tts.quotes_only": "केवल उद्धरण वाला टेक्स्ट बोलें",
 	"tts.quotes_only_tooltip": "regex से केवल संवाद का तेज़ प्लेबैक (तुरंत, कोई API कॉल नहीं)",

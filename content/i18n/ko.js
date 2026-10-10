@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"tts.model_label": "모델",
 	"tts.custom_model_hint": "사용자 지정 엔드포인트의 모델 이름",
 	"tts.auto_speak": "새 메시지 자동 읽기",
-	"tts.auto_speak_note": "일반 채팅에서만 작동합니다(Cowork, Code 제외)",
+	"tts.auto_speak_note": "일반 채팅에서만 작동합니다(Code 제외)",
 	"tts.per_chat_heading": "채팅별 설정",
 	"tts.quotes_only": "따옴표 안의 텍스트만 읽기",
 	"tts.quotes_only_tooltip": "정규식을 이용한 빠른 대사 전용 재생(즉시, API 호출 없음)",

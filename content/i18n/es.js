@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"tts.model_label": "Modelo",
 	"tts.custom_model_hint": "Nombre del modelo para el endpoint personalizado",
 	"tts.auto_speak": "Leer en voz alta los mensajes nuevos",
-	"tts.auto_speak_note": "Solo funciona en chats normales (no en cowork ni en code)",
+	"tts.auto_speak_note": "Solo funciona en chats normales (no en code)",
 	"tts.per_chat_heading": "Configuración por chat",
 	"tts.quotes_only": "Leer solo el texto entre comillas",
 	"tts.quotes_only_tooltip": "Reproducción rápida solo de diálogos con regex (instantánea, sin llamada a la API)",

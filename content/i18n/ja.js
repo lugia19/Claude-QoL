@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"tts.model_label": "モデル",
 	"tts.custom_model_hint": "カスタムエンドポイントのモデル名",
 	"tts.auto_speak": "新しいメッセージを自動で読み上げ",
-	"tts.auto_speak_note": "通常のチャットでのみ動作します（CoworkやCodeでは動作しません）",
+	"tts.auto_speak_note": "通常のチャットでのみ動作します（Codeでは動作しません）",
 	"tts.per_chat_heading": "チャットごとの設定",
 	"tts.quotes_only": "引用符内のテキストのみ読み上げ",
 	"tts.quotes_only_tooltip": "正規表現でセリフのみをすばやく再生（即時、API呼び出しなし）",

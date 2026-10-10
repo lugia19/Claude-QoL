@@ -145,7 +145,7 @@
 			buttonClass: 'banner-watcher-button',
 			createFn: createBannerWatcherButton,
 			tooltip: localize('banner.tooltip'),
-			pages: ['chat', 'home', 'coworkHome', 'coworkChat'],
+			pages: ['chat', 'home'],
 			// Hidden with no active flags (see updateButton) - in the More menu too.
 			menuVisible: () => _activeFlags.length > 0,
 			onInjected: (btn) => {

@@ -7,7 +7,7 @@
 // Checked in order; first match() wins.
 // Page layouts for top-right ButtonBar injection only.
 // Each layout defines where the toolbox button container is anchored in the DOM.
-// Code and cowork layouts must be checked before chat/home to avoid false matches.
+// Code layouts must be checked before chat/home to avoid false matches.
 const pageLayouts = {
 	codeHome: {
 		group: 'codeHome',
@@ -33,30 +33,6 @@ const pageLayouts = {
 			// Insert before the share/actions container (last child of the row)
 			const actionsContainer = row.lastElementChild;
 			return { parent: row, referenceNode: actionsContainer, mode: 'inline' };
-		},
-	},
-	coworkHome: {
-		group: 'coworkHome',
-		match() {
-			return window.location.pathname === '/task/new'
-				&& !!document.querySelector('.dframe-pane-header');
-		},
-		getAnchor() {
-			const header = document.querySelector('.dframe-pane-header');
-			if (!header) return null;
-			const actionsSlot = header.querySelector('#dframe-header-actions-slot');
-			return { parent: header, referenceNode: actionsSlot || null, mode: 'inline' };
-		},
-	},
-	coworkChat: {
-		group: 'coworkChat',
-		// Match only cowork chat sessions: cloud (/cowork/cse_...) and desktop local
-		// (/cowork/local_...). Other /cowork/ paths (e.g. /cowork/project/...) must not match.
-		match() { return /^\/cowork\/(cse_|local_)/.test(window.location.pathname); },
-		getAnchor() {
-			const actionsSlot = document.querySelector('#dframe-header-actions-slot');
-			if (!actionsSlot) return null;
-			return { parent: actionsSlot.parentElement, referenceNode: actionsSlot, mode: 'inline', fitToHeader: true };
 		},
 	},
 	chatActions: {
@@ -241,7 +217,7 @@ const ButtonBar = {
 		if (!this._container) return;
 
 		// What overflowed belongs to one header on one page type. Going straight from one fitted
-		// header to another (a narrow chat to a narrow cowork chat) keeps us in fit mode throughout,
+		// header to another (two page types with narrow headers) keeps us in fit mode throughout,
 		// so nothing else would clear it, and the next page would start with the last page's buttons
 		// hidden - some of which it doesn't even have.
 		const fitScope = this._container.parentElement;

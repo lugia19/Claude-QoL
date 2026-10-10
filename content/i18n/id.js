@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"tts.model_label": "Model",
 	"tts.custom_model_hint": "Nama model untuk endpoint kustom",
 	"tts.auto_speak": "Bacakan otomatis pesan baru",
-	"tts.auto_speak_note": "Hanya berfungsi di chat biasa (bukan Cowork, bukan Code)",
+	"tts.auto_speak_note": "Hanya berfungsi di chat biasa (bukan Code)",
 	"tts.per_chat_heading": "Pengaturan Per Chat",
 	"tts.quotes_only": "Hanya bacakan teks dalam tanda kutip",
 	"tts.quotes_only_tooltip": "Pemutaran cepat khusus dialog menggunakan regex (instan, tanpa panggilan API)",

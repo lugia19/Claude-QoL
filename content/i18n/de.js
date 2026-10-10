@@ -199,7 +199,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"tts.model_label": "Modell",
 	"tts.custom_model_hint": "Modellname für den benutzerdefinierten Endpunkt",
 	"tts.auto_speak": "Neue Nachrichten automatisch vorlesen",
-	"tts.auto_speak_note": "Funktioniert nur in normalen Chats (nicht in Cowork oder Code)",
+	"tts.auto_speak_note": "Funktioniert nur in normalen Chats (nicht in Code)",
 	"tts.per_chat_heading": "Chat-spezifische Einstellungen",
 	"tts.quotes_only": "Nur Text in Anführungszeichen vorlesen",
 	"tts.quotes_only_tooltip": "Schnelle Wiedergabe nur der Dialoge per Regex (sofort, kein API-Aufruf)",
