@@ -350,10 +350,6 @@ class ClaudeConversation {
 			if (creating) {
 				this.created = true;
 				this._pendingCreateParams = null;
-				if (createParams?.name) {
-					await this._performAction({ renameConversation: { title: createParams.name } })
-						.catch(e => apiLog.warn('Could not name the new conversation:', e));
-				}
 			}
 
 			// The reply is done once the tree has it with a stop reason. A rejected send is only
@@ -378,6 +374,13 @@ class ClaudeConversation {
 				if (reply?.stop_reason) {
 					this.conversationData = data;
 					this._syncAccountFeatureSettings();
+					// Named now that the conversation surely exists. A missing name isn't worth failing
+					// the send over, so a failed rename is only logged.
+					if (creating && createParams?.name && data.name !== createParams.name) {
+						const renamed = await this._performAction({ renameConversation: { title: createParams.name } }).catch(e => e);
+						if (!renamed?.ok) apiLog.warn('Could not name the new conversation:', renamed?.status ?? renamed);
+						else this.conversationData.name = createParams.name;
+					}
 					return ClaudeMessage.fromHistoryJSON(this, reply);
 				}
 			}
