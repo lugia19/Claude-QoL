@@ -556,9 +556,14 @@ class ClaudeConversation {
 
 	// The current branch as the UI renders it: phantom (forked-in) history first, then the
 	// real messages. Anything that has to line up with what's on screen — locating a row,
-	// counting positions — needs this rather than getMessages().
+	// counting positions — needs this rather than getMessages(). During a jump (jump-view.js) the
+	// page shows the jumped branch, so that's the one built.
 	async getRenderedMessages(forceRefresh = false) {
 		const data = await this.getData(forceRefresh);
+		const root = document.documentElement;
+		const leafId = root.getAttribute('data-qol-jump-view') === this.conversationId
+			? root.getAttribute('data-qol-jump-leaf') || data.current_leaf_message_uuid
+			: data.current_leaf_message_uuid;
 
 		let phantoms = null;
 		try {
@@ -566,11 +571,11 @@ class ClaudeConversation {
 		} catch (error) {
 			apiLog.error('Failed to load phantom messages:', error);
 		}
-		if (!phantoms?.length) return this._trunkFrom(data);
+		if (!phantoms?.length) return this._trunkFrom(data, leafId);
 
 		// With the ids the page shows them under, so rows and positions line up. `data` stays
 		// phantom-free (it's cached), so getMessages() keeps returning the real branch.
-		return this._trunkFrom(stitchPhantomMessages(data, pagePhantoms(phantoms)));
+		return this._trunkFrom(stitchPhantomMessages(data, pagePhantoms(phantoms)), leafId);
 	}
 
 	// Find longest leaf from a message ID

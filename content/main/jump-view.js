@@ -21,6 +21,7 @@
 
 	const JUMP_KEY = 'claude_qol_jump_view';
 	const ATTRIBUTE = 'data-qol-jump-view';
+	const LEAF_ATTRIBUTE = 'data-qol-jump-leaf'; // for getRenderedMessages (claude-api.js)
 	const log = createLogger('JumpView');
 
 	let jump = null; // { conversationId, leafId }
@@ -38,6 +39,7 @@
 		jump = null;
 		seen.clear();
 		document.documentElement.removeAttribute(ATTRIBUTE);
+		document.documentElement.removeAttribute(LEAF_ATTRIBUTE);
 	}
 
 	const isJumped = (ctx) => !!jump && ctx.conversationId === jump.conversationId;
@@ -52,6 +54,7 @@
 		for (const m of messages) seen.add(m.id);
 		update.conversation.current_leaf_message_id = jump.leafId;
 		document.documentElement.setAttribute(ATTRIBUTE, jump.conversationId);
+		document.documentElement.setAttribute(LEAF_ATTRIBUTE, jump.leafId);
 		return true;
 	}, { label: 'jump-view' });
 
