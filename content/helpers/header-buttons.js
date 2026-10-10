@@ -19,15 +19,18 @@ function codeTitlebarAnchor() {
 	return { parent: end.parentElement, referenceNode: end.nextSibling, mode: 'inline', fitToHeader: true };
 }
 
+// The path segment after /code or /epitaxy: '' on the start page, session_... / local_... in a session.
+const codeSubpage = () => location.pathname.split('/')[2] ?? '';
+
 const pageLayouts = {
 	codeHome: {
 		group: 'codeHome',
-		match() { return /^\/(code|epitaxy)\/?$/.test(location.pathname); },
+		match() { return isCodePage() && codeSubpage() === ''; },
 		getAnchor: codeTitlebarAnchor,
 	},
 	codeChat: {
 		group: 'codeChat',
-		match() { return /^\/(code|epitaxy)\/(session|local)_/.test(location.pathname); }, // cloud and desktop-local sessions
+		match() { return isCodePage() && /^(session|local)_/.test(codeSubpage()); }, // cloud and desktop-local sessions
 		getAnchor: codeTitlebarAnchor,
 	},
 	chatActions: {
