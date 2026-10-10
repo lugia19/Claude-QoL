@@ -100,19 +100,11 @@
 	const findEntry = (entries, row) => entries?.get(row.key);
 
 	const seenDialogs = new WeakSet();
-	const busyDialogs = new WeakSet(); // a pass is awaiting the file list: don't start another
 
+	// Passes may overlap (each scan starts one, whatever is in flight), so every row present at some scan
+	// gets looked at. Overlapping passes share the list fetch, and each adds its buttons in one synchronous
+	// loop that skips rows already done, so they can't duplicate a button or a refetch.
 	async function decorateContextDialog(dialog) {
-		if (busyDialogs.has(dialog)) return;
-		busyDialogs.add(dialog);
-		try {
-			await decorateRows(dialog);
-		} finally {
-			busyDialogs.delete(dialog);
-		}
-	}
-
-	async function decorateRows(dialog) {
 		const rows = [...dialog.querySelectorAll('tr')].filter(row => row.querySelector('[data-cds="TableRowActions"]'));
 		if (!rows.length) return;
 		const fresh = !seenDialogs.has(dialog);
