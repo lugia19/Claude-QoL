@@ -383,4 +383,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code の指示を置き換える",
 	"code_prompt.mode_append": "Claude Code の指示に追加する",
 	"code_prompt.replace_warning": "置き換えると、コード作業に関する Claude Code の組み込みガイダンスがなくなり、コーディングの品質が大きく下がることがあります。",
+	"code_prompt.launch_empty": "空のセッションを開始",
+	"code_prompt.launching": "セッションを開始しています...",
+	"code_prompt.launch_failed": "セッションを開始できませんでした。もう一度お試しください。",
 });

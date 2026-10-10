@@ -383,4 +383,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"code_prompt.mode_replace": "Anweisungen von Claude Code ersetzen",
 	"code_prompt.mode_append": "Zu den Anweisungen von Claude Code hinzufügen",
 	"code_prompt.replace_warning": "Beim Ersetzen entfallen die eingebauten Hinweise von Claude Code zur Arbeit an Code, was es bei Programmieraufgaben deutlich schlechter machen kann.",
+	"code_prompt.launch_empty": "Leere Sitzung starten",
+	"code_prompt.launching": "Sitzung wird gestartet...",
+	"code_prompt.launch_failed": "Die Sitzung konnte nicht gestartet werden. Bitte versuche es erneut.",
 });

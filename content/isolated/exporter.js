@@ -1715,7 +1715,36 @@
 		}
 	}
 
-	async function handleReplacePhantom(replaceButton) {
+	const REPLACE_PHANTOM_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 16 16">
+        <path d="M2.5 8a5.5 5.5 0 0 1 9.4-3.9L13.5 5.7"/><path d="M13.5 2.5v3.2h-3.2"/>
+        <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9L2.5 10.3"/><path d="M2.5 13.5v-3.2h3.2"/>
+    </svg>`;
+
+	// Replacing a conversation's phantom messages (the "fake" history shown above it): its own modal, so
+	// the explanation and the warning come before the file picker.
+	function showReplacePhantomModal() {
+		const content = document.createElement('div');
+		content.className = 'space-y-3';
+
+		const replaceNote = document.createElement('p');
+		replaceNote.className = CLAUDE_CLASSES.TEXT_SM + ' text-text-400';
+		replaceNote.textContent = localize('export.replace_note');
+		content.appendChild(replaceNote);
+
+		const warningNote = document.createElement('p');
+		warningNote.className = CLAUDE_CLASSES.TEXT_SM;
+		warningNote.style.color = '#de2929';
+		warningNote.innerHTML = '⚠️ ' + localize('export.replace_warning');
+		content.appendChild(warningNote);
+
+		const modal = new ClaudeModal(localize('export.replace_label'), content);
+		modal.addCancel();
+		// Not awaited: the modal closes as the file picker opens (in the click, so it keeps the gesture).
+		modal.addConfirm(localize('export.replace_button'), () => { handleReplacePhantom(); });
+		modal.show();
+	}
+
+	async function handleReplacePhantom() {
 		const conversationId = getConversationId();
 		if (!conversationId) {
 			showClaudeAlert(localize('export.replace_error_title'), localize('export.not_in_conversation'));
@@ -1971,8 +2000,11 @@
 		// Get last used format from localStorage (default to zip for full fidelity)
 		const lastFormat = localStorage.getItem('lastExportFormat') || 'html_html';
 
-		// Build the modal content: export on the left, import (and phantom replacement) on the right.
+		// Build the modal content: export on the left, import on the right, each column's action buttons
+		// at its bottom (as in the fork modal), level with each other.
 		const { container: content, left: exportPanel, right: importPanel } = createModalColumns();
+		exportPanel.classList.add('flex', 'flex-col');
+		importPanel.classList.add('flex', 'flex-col');
 
 		// Variables to hold references (may not be created)
 		let formatSelect, toggleInput, thinkingToggleInput, attachmentsToggleInput, imagesToggleInput, dateInput;
@@ -1985,8 +2017,9 @@
 			formatLabel.textContent = localize('export.format_label');
 			exportPanel.appendChild(formatLabel);
 
-			const exportContainer = document.createElement('div');
-			exportContainer.className = 'mb-4 flex gap-2';
+			// Copy and Export, at the bottom of the column (added after the options below).
+			const exportActions = document.createElement('div');
+			exportActions.className = 'mt-auto pt-2 flex gap-2 justify-end';
 
 			// Format descriptors. `copyable` marks whether the format produces a plain
 			// string that can go to the clipboard (zip is binary/Blob, so it cannot).
@@ -2009,14 +2042,13 @@
 				EXPORT_FORMATS.map(f => ({ value: f.value, label: f.label })),
 				selectedFormat
 			);
-			formatSelect.style.flex = '1';
-			exportContainer.appendChild(formatSelect);
+			formatSelect.classList.add('mb-4');
+			exportPanel.appendChild(formatSelect);
 
 			// Export button - label depends on context
 			const exportLabel = isInConversation ? localize('export.export_button') : (isOnProjectPage ? localize('export.export_project') : localize('export.export_all'));
 			const exportButton = createClaudeButton(exportLabel, 'primary');
 			exportButton.style.minWidth = '80px';
-			exportContainer.appendChild(exportButton);
 
 			// Copy button - single conversation only (bulk/project always produces a zip)
 			let copyButton;
@@ -2030,10 +2062,9 @@
 			if (isInConversation) {
 				copyButton = createClaudeButton(localize('export.copy'), 'secondary');
 				copyButton.style.minWidth = '64px';
-				exportContainer.appendChild(copyButton);
+				exportActions.appendChild(copyButton);
 			}
-
-			exportPanel.appendChild(exportContainer);
+			exportActions.appendChild(exportButton);
 
 			// Tree option container
 			const treeOption = document.createElement('div');
@@ -2092,6 +2123,7 @@
 			dateInput = createClaudeInput({ type: 'date' });
 			dateOption.appendChild(dateInput);
 			exportPanel.appendChild(dateOption);
+			exportPanel.appendChild(exportActions);
 
 			// Show/hide options based on initial value
 			const initialFormat = selectedFormat.split('_')[0];
@@ -2206,21 +2238,11 @@
 		modelLabel.textContent = localize('export.import_model_label');
 		importPanel.appendChild(modelLabel);
 
-		const importContainer = document.createElement('div');
-		importContainer.className = 'mb-2 flex gap-2';
-
 		// Model select
 		const modelList = CLAUDE_MODELS;
 		const modelSelect = createClaudeSelect(modelList, modelList[0].value);
-		modelSelect.style.flex = '1';
-		importContainer.appendChild(modelSelect);
-
-		// Import button
-		const importButton = createClaudeButton(localize('export.import_button'), 'primary');
-		importButton.style.minWidth = '80px';
-		importContainer.appendChild(importButton);
-
-		importPanel.appendChild(importContainer);
+		modelSelect.classList.add('mb-2');
+		importPanel.appendChild(modelSelect);
 
 		// Add toggles
 		const importFilesToggle = createClaudeToggle(localize('export.toggle_import_files'), true);
@@ -2237,7 +2259,14 @@
 		note.textContent = localize('export.import_note');
 		importPanel.appendChild(note);
 
-		// Import button handler
+		// Import button, at the bottom of the column
+		const importActions = document.createElement('div');
+		importActions.className = 'mt-auto pt-2 flex gap-2 justify-end';
+		const importButton = createClaudeButton(localize('export.import_button'), 'primary');
+		importButton.style.minWidth = '80px';
+		importActions.appendChild(importButton);
+		importPanel.appendChild(importActions);
+
 		importButton.onclick = () =>
 			handleImport(
 				modelSelect.value,
@@ -2246,44 +2275,25 @@
 			);
 		//#endregion
 
-		//#region Replace phantom section (only if in conversation)
-		if (isInConversation) {
-			// Divider
-			const divider2 = document.createElement('hr');
-			divider2.className = 'my-4 border-border-300';
-			importPanel.appendChild(divider2);
-
-			// Replace phantom messages section
-			const replaceLabel = document.createElement('label');
-			replaceLabel.className = CLAUDE_CLASSES.LABEL;
-			replaceLabel.textContent = localize('export.replace_label');
-			importPanel.appendChild(replaceLabel);
-
-			const replaceNote = document.createElement('p');
-			replaceNote.className = CLAUDE_CLASSES.TEXT_SM + ' text-text-400';
-			replaceNote.textContent = localize('export.replace_note');
-			importPanel.appendChild(replaceNote);
-
-			const replaceButton = createClaudeButton(localize('export.replace_button'), 'secondary');
-			replaceButton.className += ' mb-2';
-			importPanel.appendChild(replaceButton);
-			replaceButton.onclick = () => handleReplacePhantom(replaceButton);
-
-			// Warning note
-			const warningNote = document.createElement('p');
-			warningNote.className = CLAUDE_CLASSES.TEXT_SM;
-			warningNote.style.color = '#de2929';
-			warningNote.innerHTML = '⚠️ ' + localize('export.replace_warning');
-			warningNote.className += ' mb-3';
-			importPanel.appendChild(warningNote);
-		}
-		//#endregion
-
 		// Create modal with appropriate title
 		const modalTitle = localize('export.modal_title');
 		const modal = new ClaudeModal(modalTitle, content);
 
 		widenModal(modal);
+
+		// Replacing phantom messages is for the few who need it: a small icon in the corner (only in a
+		// conversation) opens its own modal with the explanation.
+		if (isInConversation) {
+			const replaceIcon = createClaudeButton(REPLACE_PHANTOM_ICON, 'icon', () => {
+				modal.destroy();
+				showReplacePhantomModal();
+			});
+			// Inline: claude.ai's stylesheet doesn't have every positioning utility.
+			Object.assign(replaceIcon.style, { position: 'absolute', top: '1rem', right: '1rem' });
+			createClaudeTooltip(replaceIcon, localize('export.replace_label'));
+			modal.modal.style.position = 'relative';
+			modal.modal.appendChild(replaceIcon);
+		}
 
 		modal.show();
 	}

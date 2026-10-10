@@ -14,7 +14,8 @@
 
 	// A target: { buttonClass, icon, pages, forceDisplayOnMobile, presetsKey, getActive(), apply(text) -> ok,
 	//   strings: { tooltip, title, info, applying, unsavedTitle, unsavedConfirm, unsavedRow, placeholder,
-	//   updateFailed }, extraContent?() -> element shown under the list }.
+	//   updateFailed }, extraContent?() -> element shown under the list, listActions?: [{ label, onClick }]
+	//   (buttons next to "+ New Preset" that close the list first) }.
 	function createPresetSwitcher(target) {
 		const { strings } = target;
 
@@ -147,11 +148,20 @@
 				await renderList();
 				loadingModal.destroy();
 
-				// "+ New Preset" button
+				// "+ New Preset", and the target's own actions beside it
+				let modal;
+				const actionRow = document.createElement('div');
+				actionRow.className = 'mt-3 flex flex-wrap gap-2';
 				const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
-				newBtn.classList.add('mt-3');
 				newBtn.onclick = () => showEditPresetModal(null, null, renderList);
-				contentContainer.appendChild(newBtn);
+				actionRow.appendChild(newBtn);
+				for (const { label, onClick } of target.listActions ?? []) {
+					actionRow.appendChild(createClaudeButton(label, 'secondary', () => {
+						modal?.destroy();
+						onClick();
+					}));
+				}
+				contentContainer.appendChild(actionRow);
 
 				if (target.extraContent) contentContainer.appendChild(await target.extraContent());
 
@@ -161,7 +171,7 @@
 				infoText.textContent = strings.info;
 				contentContainer.appendChild(infoText);
 
-				const modal = new ClaudeModal(strings.title, contentContainer);
+				modal = new ClaudeModal(strings.title, contentContainer);
 				modal.modal.classList.remove('max-w-md');
 				modal.modal.classList.add('max-w-lg');
 				modal.addCancel(localize('common.close'));
@@ -415,6 +425,11 @@
 				}
 			},
 			extraContent: modeSelect,
+			// The UI only starts a session with a first message; code-session-prompt.js (MAIN) makes one without.
+			listActions: [{
+				label: localize('code_prompt.launch_empty'),
+				onClick: () => window.postMessage({ type: 'qol-empty-code-session' }, window.location.origin),
+			}],
 			strings: {
 				tooltip: (name) => localize('code_prompt.tooltip', { name }),
 				title: localize('code_prompt.title'),

@@ -383,4 +383,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"code_prompt.mode_replace": "Ganti instruksi Claude Code",
 	"code_prompt.mode_append": "Tambahkan ke instruksi Claude Code",
 	"code_prompt.replace_warning": "Mengganti akan menghapus panduan bawaan Claude Code tentang cara mengerjakan kode, yang bisa membuatnya jauh lebih buruk dalam tugas pemrograman.",
+	"code_prompt.launch_empty": "Mulai sesi kosong",
+	"code_prompt.launching": "Memulai sesi...",
+	"code_prompt.launch_failed": "Sesi tidak dapat dimulai. Silakan coba lagi.",
 });

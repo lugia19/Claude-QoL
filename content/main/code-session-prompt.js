@@ -54,4 +54,49 @@
 			return originalFetch(...args);
 		}
 	};
+
+	// ======== Empty sessions ========
+	// claude.ai's UI only creates a session together with its first message; the API takes none. Asked
+	// for by the Code prompt button (pref-switcher.js): a cloud session with no repo and no message, in
+	// the org's default cloud environment, then opened. Created through window.fetch, so the wrapper
+	// above adds the active prompt like for any other session. Left untitled: the first message titles
+	// it, as it does for the UI's own.
+	const ccrHeaders = (org) => ({ 'anthropic-version': '2023-06-01', 'anthropic-beta': 'ccr-byoc-2025-07-29', 'anthropic-client-feature': 'ccr', 'x-organization-uuid': org });
+
+	async function createEmptySession() {
+		const org = getActiveOrgId();
+		if (!org) throw new Error('no active organization');
+		const envResponse = await fetch(`/v1/environment_providers/private/organizations/${org}/environments?limit=1000`, { headers: ccrHeaders(org) });
+		if (!envResponse.ok) throw new Error(`environments: HTTP ${envResponse.status}`);
+		const clouds = ((await envResponse.json()).environments ?? []).filter(e => e.kind === 'anthropic_cloud');
+		const environment = clouds.find(e => e.is_ccr_default) ?? clouds[0];
+		if (!environment) throw new Error('no cloud environment');
+		const response = await fetch('/v1/code/sessions', {
+			method: 'POST',
+			headers: { ...ccrHeaders(org), 'content-type': 'application/json' },
+			body: JSON.stringify({ environment_id: environment.environment_id, config: { sources: [], outcomes: [] }, events: [] }),
+		});
+		if (!response.ok) throw new Error(`create: HTTP ${response.status}`);
+		const id = (await response.json()).session?.id;
+		if (!id) throw new Error('no session id');
+		return id;
+	}
+
+	window.addEventListener('message', async (event) => {
+		if (event.source !== window || event.origin !== window.location.origin) return;
+		if (event.data?.type !== 'qol-empty-code-session') return;
+		const loading = createLoadingModal(localize('code_prompt.launching'));
+		loading.show();
+		try {
+			const id = await createEmptySession();
+			log('Created an empty session', id);
+			// The desktop client's Code pages live under /epitaxy; session pages use session_ for cse_.
+			const base = location.pathname.startsWith('/epitaxy') ? '/epitaxy' : '/code';
+			location.assign(`${base}/session_${id.replace(/^cse_/, '')}`);
+		} catch (error) {
+			log.error('Could not create an empty session:', error);
+			loading.destroy();
+			showClaudeAlert(localize('common.error'), localize('code_prompt.launch_failed'));
+		}
+	});
 })();

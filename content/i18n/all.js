@@ -387,6 +387,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"code_prompt.mode_replace": "Replace Claude Code's instructions",
 	"code_prompt.mode_append": "Add to Claude Code's instructions",
 	"code_prompt.replace_warning": "Replacing drops Claude Code's built-in guidance on how to work on code, which can make it noticeably worse at coding tasks.",
+	"code_prompt.launch_empty": "Launch empty session",
+	"code_prompt.launching": "Starting session...",
+	"code_prompt.launch_failed": "Couldn't start the session. Please try again.",
 });
 
 // ---- de.js ----
@@ -775,6 +778,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"code_prompt.mode_replace": "Anweisungen von Claude Code ersetzen",
 	"code_prompt.mode_append": "Zu den Anweisungen von Claude Code hinzufügen",
 	"code_prompt.replace_warning": "Beim Ersetzen entfallen die eingebauten Hinweise von Claude Code zur Arbeit an Code, was es bei Programmieraufgaben deutlich schlechter machen kann.",
+	"code_prompt.launch_empty": "Leere Sitzung starten",
+	"code_prompt.launching": "Sitzung wird gestartet...",
+	"code_prompt.launch_failed": "Die Sitzung konnte nicht gestartet werden. Bitte versuche es erneut.",
 });
 
 // ---- es.js ----
@@ -1163,6 +1169,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"code_prompt.mode_replace": "Reemplazar las instrucciones de Claude Code",
 	"code_prompt.mode_append": "Añadir a las instrucciones de Claude Code",
 	"code_prompt.replace_warning": "Al reemplazarlas se pierden las pautas integradas de Claude Code sobre cómo trabajar con código, lo que puede empeorar bastante su rendimiento en tareas de programación.",
+	"code_prompt.launch_empty": "Iniciar sesión vacía",
+	"code_prompt.launching": "Iniciando la sesión...",
+	"code_prompt.launch_failed": "No se pudo iniciar la sesión. Inténtalo de nuevo.",
 });
 
 // ---- fr.js ----
@@ -1551,6 +1560,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"code_prompt.mode_replace": "Remplacer les instructions de Claude Code",
 	"code_prompt.mode_append": "Ajouter aux instructions de Claude Code",
 	"code_prompt.replace_warning": "Le remplacement supprime les consignes intégrées de Claude Code sur la façon de travailler sur du code, ce qui peut nettement dégrader ses résultats en programmation.",
+	"code_prompt.launch_empty": "Lancer une session vide",
+	"code_prompt.launching": "Démarrage de la session...",
+	"code_prompt.launch_failed": "Impossible de démarrer la session. Veuillez réessayer.",
 });
 
 // ---- hi.js ----
@@ -1939,6 +1951,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code के निर्देशों को बदलें",
 	"code_prompt.mode_append": "Claude Code के निर्देशों में जोड़ें",
 	"code_prompt.replace_warning": "बदलने पर Claude Code के कोड पर काम करने के अंतर्निहित निर्देश हट जाते हैं, जिससे कोडिंग कार्यों में उसका प्रदर्शन काफ़ी खराब हो सकता है।",
+	"code_prompt.launch_empty": "खाली सेशन शुरू करें",
+	"code_prompt.launching": "सेशन शुरू हो रहा है...",
+	"code_prompt.launch_failed": "सेशन शुरू नहीं हो सका। कृपया फिर से कोशिश करें।",
 });
 
 // ---- id.js ----
@@ -2327,6 +2342,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"code_prompt.mode_replace": "Ganti instruksi Claude Code",
 	"code_prompt.mode_append": "Tambahkan ke instruksi Claude Code",
 	"code_prompt.replace_warning": "Mengganti akan menghapus panduan bawaan Claude Code tentang cara mengerjakan kode, yang bisa membuatnya jauh lebih buruk dalam tugas pemrograman.",
+	"code_prompt.launch_empty": "Mulai sesi kosong",
+	"code_prompt.launching": "Memulai sesi...",
+	"code_prompt.launch_failed": "Sesi tidak dapat dimulai. Silakan coba lagi.",
 });
 
 // ---- it.js ----
@@ -2715,6 +2733,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"code_prompt.mode_replace": "Sostituisci le istruzioni di Claude Code",
 	"code_prompt.mode_append": "Aggiungi alle istruzioni di Claude Code",
 	"code_prompt.replace_warning": "Sostituendole si perdono le indicazioni integrate di Claude Code su come lavorare sul codice, e questo può peggiorare sensibilmente i risultati nella programmazione.",
+	"code_prompt.launch_empty": "Avvia sessione vuota",
+	"code_prompt.launching": "Avvio della sessione...",
+	"code_prompt.launch_failed": "Impossibile avviare la sessione. Riprova.",
 });
 
 // ---- ja.js ----
@@ -3103,6 +3124,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code の指示を置き換える",
 	"code_prompt.mode_append": "Claude Code の指示に追加する",
 	"code_prompt.replace_warning": "置き換えると、コード作業に関する Claude Code の組み込みガイダンスがなくなり、コーディングの品質が大きく下がることがあります。",
+	"code_prompt.launch_empty": "空のセッションを開始",
+	"code_prompt.launching": "セッションを開始しています...",
+	"code_prompt.launch_failed": "セッションを開始できませんでした。もう一度お試しください。",
 });
 
 // ---- ko.js ----
@@ -3491,6 +3515,9 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code의 지침 대체",
 	"code_prompt.mode_append": "Claude Code의 지침에 추가",
 	"code_prompt.replace_warning": "대체하면 코드 작업에 관한 Claude Code의 기본 지침이 사라져 코딩 작업 품질이 크게 떨어질 수 있습니다.",
+	"code_prompt.launch_empty": "빈 세션 시작",
+	"code_prompt.launching": "세션을 시작하는 중...",
+	"code_prompt.launch_failed": "세션을 시작하지 못했습니다. 다시 시도해 주세요.",
 });
 
 // ---- pt-BR.js ----
@@ -3879,4 +3906,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"code_prompt.mode_replace": "Substituir as instruções do Claude Code",
 	"code_prompt.mode_append": "Adicionar às instruções do Claude Code",
 	"code_prompt.replace_warning": "Substituir remove as orientações embutidas do Claude Code sobre como trabalhar com código, o que pode piorar bastante o desempenho em tarefas de programação.",
+	"code_prompt.launch_empty": "Iniciar sessão vazia",
+	"code_prompt.launching": "Iniciando a sessão...",
+	"code_prompt.launch_failed": "Não foi possível iniciar a sessão. Tente novamente.",
 });

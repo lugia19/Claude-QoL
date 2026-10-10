@@ -383,4 +383,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code के निर्देशों को बदलें",
 	"code_prompt.mode_append": "Claude Code के निर्देशों में जोड़ें",
 	"code_prompt.replace_warning": "बदलने पर Claude Code के कोड पर काम करने के अंतर्निहित निर्देश हट जाते हैं, जिससे कोडिंग कार्यों में उसका प्रदर्शन काफ़ी खराब हो सकता है।",
+	"code_prompt.launch_empty": "खाली सेशन शुरू करें",
+	"code_prompt.launching": "सेशन शुरू हो रहा है...",
+	"code_prompt.launch_failed": "सेशन शुरू नहीं हो सका। कृपया फिर से कोशिश करें।",
 });

@@ -383,4 +383,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"code_prompt.mode_replace": "Claude Code의 지침 대체",
 	"code_prompt.mode_append": "Claude Code의 지침에 추가",
 	"code_prompt.replace_warning": "대체하면 코드 작업에 관한 Claude Code의 기본 지침이 사라져 코딩 작업 품질이 크게 떨어질 수 있습니다.",
+	"code_prompt.launch_empty": "빈 세션 시작",
+	"code_prompt.launching": "세션을 시작하는 중...",
+	"code_prompt.launch_failed": "세션을 시작하지 못했습니다. 다시 시도해 주세요.",
 });
