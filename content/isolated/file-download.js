@@ -148,14 +148,21 @@
 		}
 
 		// The preview pane: its header is the h3 title's row, its close button the last icon button there.
+		// Shown only while the previewed (active) row is a project file: a sync's preview gets none.
 		const header = dialog.querySelector('h3')?.parentElement;
 		const close = header && [...header.querySelectorAll('button[data-cds-icon-only]')].filter(b => !b.classList.contains(MARK)).at(-1);
-		if (close && !header.querySelector(`.${MARK}`)) {
-			close.before(downloadButton(close, localize('download.download_file'), () => {
+		if (!close) return;
+		let previewButton = header.querySelector(`.${MARK}`);
+		if (!previewButton) {
+			previewButton = downloadButton(close, localize('download.download_file'), () => {
 				const info = rowInfo(dialog.querySelector('tr[data-active="true"]'));
 				if (info) downloadProjectFile(info);
-			}));
+			});
+			close.before(previewButton);
 		}
+		const active = rowInfo(dialog.querySelector('tr[data-active="true"]'));
+		// style, not the hidden attribute: the copied classes set display and would win over it.
+		previewButton.style.display = active && findEntry(files, active) ? '' : 'none';
 	}
 
 	// ======== Chat text-attachment preview ========
