@@ -111,13 +111,17 @@
 		return conversations.get(conversationId);
 	}
 
+	// i18n-core.js loads after this file: a snapshot can't, in practice, arrive before it does, but
+	// fall back to English rather than throw (and lose the snapshot's galleries) if one ever did.
+	const text = (key, english) => (typeof localize === 'function' ? localize(key) : english);
+
 	const absolute = (url) => new URL(url, location.origin).href;
 	const isOurs = (id) => typeof id === 'string' && id.includes('_qolgallery_');
 
 	// One image_gallery item. Width scaled to 3840 (as the legacy injection did), so it's drawn full width.
 	function galleryImage(url, dims, i) {
 		const height = Math.round(dims.height * 3840 / dims.width);
-		return { id: `img_${i + 1}`, url, thumbnail_url: url, title: localize('images.generated_image'), width: 3840, height, thumbnail_width: 3840, thumbnail_height: height };
+		return { id: `img_${i + 1}`, url, thumbnail_url: url, title: text('images.generated_image', 'Generated image'), width: 3840, height, thumbnail_width: 3840, thumbnail_height: height };
 	}
 
 	// The gallery groups and blocks for one run, its images in order (by their group's current index,
@@ -131,7 +135,7 @@
 			const chunk = images.slice(start, start + limit);
 			const suffix = `${runId.replace(/^dgrp_/, '')}_${n}`;
 			const groupId = `dgrp_qolgallery_${suffix}`;
-			const label = localize(chunk.length > 1 ? 'images.generated_images' : 'images.generated_image');
+			const label = chunk.length > 1 ? text('images.generated_images', 'Generated images') : text('images.generated_image', 'Generated image');
 			if (n > 0) {
 				groups.push({ id: `dgrp_qolgallery_break_${suffix}`, message_id: anchor.message_id, index: anchor.index, style: 'GROUP_STYLE_INLINE', is_complete: true });
 				blocks.push({ id: `cblk_qolgallery_break_${suffix}`, display_group_id: `dgrp_qolgallery_break_${suffix}`, is_complete: true, text: ZERO_WIDTH_SPACE, text_format: { style: 'STYLE_MARKDOWN' } });
