@@ -732,6 +732,7 @@
 		};
 		new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
 		new MutationObserver(schedule).observe(document.documentElement, { attributes: true, attributeFilter: [JUMP_ATTRIBUTE] });
+		schedule(); // the jump (and the composer) can already be there when this loads, at document_idle
 	}
 	// #endregion
 
