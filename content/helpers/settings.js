@@ -54,7 +54,7 @@ const SETTINGS_KEYS = {
 		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },
 		LIMIT: { key: 'image_gallery_limit', default: 3, type: 'number' },
 	},
-	// Mirrored to localStorage[claude_qol_code_prompt] by code-prompt.js for content/main/code-session-prompt.js.
+	// Mirrored to localStorage[claude_qol_code_prompt] by pref-switcher.js for content/main/code-session-prompt.js.
 	CODE_PROMPT: {
 		PRESETS: { key: 'code_system_prompt_presets', default: {}, type: 'object' }, // own list, same shape as PREF_SWITCHER.PRESETS
 		TEXT: { key: 'code_system_prompt', default: '', type: 'string' }, // the active prompt

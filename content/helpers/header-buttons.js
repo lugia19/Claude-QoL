@@ -389,56 +389,40 @@ const ButtonBar = {
 		// Check if existing container is still in the DOM
 		if (this._container && this._container.isConnected) {
 			// Verify it's still in the right parent
-			if (anchor.mode === 'self-container') {
-				if (this._container.parentElement === anchor.parent) return;
-			} else {
-				if (this._container.parentElement === anchor.parent) return;
-			}
+			if (this._container.parentElement === anchor.parent) return;
 			// Wrong parent — discard
 			this._container.remove();
 			this._container = null;
 		}
 
-		if (anchor.mode === 'self-container') {
-			// Desktop homepage: container is a direct child of parent with special classes
-			let container = anchor.parent.querySelector('.toolbox-buttons-home');
-			if (!container) {
-				container = document.createElement('div');
-				container.className = 'toolbox-buttons-home toolbox-buttons absolute right-3 flex items-center gap-3.5';
-				container.style.top = '0.625rem';
+		let container = anchor.parent.querySelector(':scope > .toolbox-buttons');
+		if (!container) {
+			container = document.createElement('div');
+			const isMobileChat = this._currentGroup === 'chat' && isMobileLayout();
+			if (anchor.mode === 'wiggle') {
+				if (isMobileChat) {
+					container.className = 'toolbox-buttons flex items-center gap-1 pointer-events-auto self-end px-3 z-20 bg-bg-100 rounded-bl-lg';
+					container.style.height = '2.25rem';
+					container.style.marginTop = '-4px';
+				} else {
+					container.className = 'toolbox-buttons absolute top-0 z-20 flex items-center gap-1';
+					container.style.height = '3rem';
+				}
+			} else {
+				if (isMobileChat) {
+					container.className = 'toolbox-buttons absolute top-full right-0 flex items-center gap-1 px-3 z-20 bg-bg-100 rounded-bl-lg';
+					container.style.height = '2.25rem';
+				} else {
+					container.className = 'toolbox-buttons flex items-center justify-end gap-1';
+				}
+			}
+			if (anchor.referenceNode) {
+				anchor.parent.insertBefore(container, anchor.referenceNode);
+			} else {
 				anchor.parent.appendChild(container);
 			}
-			this._container = container;
-		} else {
-			let container = anchor.parent.querySelector(':scope > .toolbox-buttons');
-			if (!container) {
-				container = document.createElement('div');
-				const isMobileChat = this._currentGroup === 'chat' && isMobileLayout();
-				if (anchor.mode === 'wiggle') {
-					if (isMobileChat) {
-						container.className = 'toolbox-buttons flex items-center gap-1 pointer-events-auto self-end px-3 z-20 bg-bg-100 rounded-bl-lg';
-						container.style.height = '2.25rem';
-						container.style.marginTop = '-4px';
-					} else {
-						container.className = 'toolbox-buttons absolute top-0 z-20 flex items-center gap-1';
-						container.style.height = '3rem';
-					}
-				} else {
-					if (isMobileChat) {
-						container.className = 'toolbox-buttons absolute top-full right-0 flex items-center gap-1 px-3 z-20 bg-bg-100 rounded-bl-lg';
-						container.style.height = '2.25rem';
-					} else {
-						container.className = 'toolbox-buttons flex items-center justify-end gap-1';
-					}
-				}
-				if (anchor.referenceNode) {
-					anchor.parent.insertBefore(container, anchor.referenceNode);
-				} else {
-					anchor.parent.appendChild(container);
-				}
-			}
-			this._container = container;
 		}
+		this._container = container;
 	},
 
 	_syncButtons(group) {

@@ -37,20 +37,15 @@
 
 		// The active preset is the one whose content is the active text: 'none' when there's no text,
 		// 'unsaved' when the text matches no preset.
-		async function getCurrentPresetId(active) {
-			active ??= await target.getActive();
-			const presets = await getStoredPresets();
+		function getCurrentPresetId(active, presets) {
 			for (const [id, preset] of Object.entries(presets)) {
 				if (preset.content.trim() === active.trim()) return id;
 			}
 			return active.trim() ? 'unsaved' : 'none';
 		}
 
-		async function apply(content) {
-			const ok = await target.apply(content);
-			if (ok) updateButtonAppearance();
-			return ok;
-		}
+		// Each target refreshes the button itself once its active text changes (see the targets below).
+		const apply = (content) => target.apply(content);
 
 		// ======== HEADER BUTTON ========
 		function createButton() {
@@ -61,13 +56,13 @@
 		}
 
 		async function updateButtonAppearance() {
-			const activeId = await getCurrentPresetId();
+			const [active, presets] = await Promise.all([target.getActive(), getStoredPresets()]);
+			const activeId = getCurrentPresetId(active, presets);
 			let label = localize('prefs.none');
 			if (activeId === 'unsaved') {
 				label = localize('prefs.unsaved');
 			} else if (activeId !== 'none') {
-				const presets = await getStoredPresets();
-				if (presets[activeId]) label = presets[activeId].name;
+				label = presets[activeId].name;
 			}
 			ButtonBar.updateTooltip(target.buttonClass, strings.tooltip(label));
 			const button = document.querySelector('.' + target.buttonClass);
@@ -102,14 +97,13 @@
 					activeId !== 'unsaved' || await showClaudeConfirm(strings.unsavedTitle, strings.unsavedConfirm);
 
 				async function renderList() {
-					const presets = await getStoredPresets();
-					const active = await target.getActive();
-					const nowActiveId = await getCurrentPresetId(active);
+					const [active, presets] = await Promise.all([target.getActive(), getStoredPresets()]);
+					const nowActiveId = getCurrentPresetId(active, presets);
 					list.innerHTML = '';
 
 					// "None" row — always first
 					list.appendChild(createPresetRow({
-						id: 'none', name: localize('prefs.none'), isActive: nowActiveId === 'none',
+						name: localize('prefs.none'), isActive: nowActiveId === 'none',
 						onApply: async () => {
 							if (!await confirmLeavingUnsaved(nowActiveId)) return;
 							await applyPreset('');
@@ -119,7 +113,7 @@
 					// "Unsaved" row
 					if (nowActiveId === 'unsaved') {
 						list.appendChild(createPresetRow({
-							id: 'unsaved', name: strings.unsavedRow, isActive: true, isUnsaved: true,
+							name: strings.unsavedRow, isActive: true, isUnsaved: true,
 							onEdit: () => showEditPresetModal(null, active, renderList),
 						}));
 					}
@@ -127,7 +121,7 @@
 					// Stored presets
 					for (const [id, preset] of Object.entries(presets)) {
 						list.appendChild(createPresetRow({
-							id, name: preset.name, isActive: nowActiveId === id,
+							name: preset.name, isActive: nowActiveId === id,
 							onApply: async () => {
 								if (!await confirmLeavingUnsaved(nowActiveId)) return;
 								await applyPreset(preset.content);
@@ -326,7 +320,10 @@
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ conversation_preferences: preferencesText })
 				});
-				if (response.ok) channel.postMessage({ type: 'preferences-changed' });
+				if (response.ok) {
+					channel.postMessage({ type: 'preferences-changed' }); // doesn't echo to this tab
+					switcher.updateButtonAppearance();
+				}
 				return response.ok;
 			} catch (error) {
 				log.error('Failed to set preferences:', error);
@@ -365,7 +362,7 @@
 	function initCodePrompt() {
 		const P = SETTINGS_KEYS.CODE_PROMPT;
 		// code-session-prompt.js (MAIN) reads this when a session is created: same origin, synchronous.
-		// Kept current on init, on cross-tab changes and on apply; removed when there's no prompt.
+		// Written on init and on every change of the setting (here or in another tab); removed when there's no prompt.
 		const MIRROR_KEY = 'claude_qol_code_prompt';
 
 		async function writeMirror() {
@@ -393,7 +390,6 @@
 			], await settingsRegistry.get(P.MODE), async () => {
 				warning.hidden = select.value !== 'replace';
 				await settingsRegistry.set(P.MODE, select.value);
-				await writeMirror();
 			});
 			warning.hidden = select.value !== 'replace';
 			section.appendChild(select);
@@ -404,13 +400,12 @@
 		const switcher = createPresetSwitcher({
 			buttonClass: 'code-prompt-button',
 			icon: PROMPT_ICON_SVG,
-			pages: ['codeHome', 'codeChat'],
+			pages: ['codeHome'], // a prompt only applies to new sessions, so not in a session
 			presetsKey: P.PRESETS,
 			getActive: () => settingsRegistry.get(P.TEXT),
 			apply: async (text) => {
 				try {
 					await settingsRegistry.set(P.TEXT, text.trim() ? text : '');
-					await writeMirror();
 					return true;
 				} catch (e) {
 					log.error('Failed to save the Claude Code system prompt:', e);
@@ -431,8 +426,10 @@
 			},
 		});
 
+		// The one place the mirror and the button follow the setting: onChange fires in this tab too.
 		writeMirror();
-		[P.TEXT, P.MODE].forEach(k => settingsRegistry.onChange(k, () => { writeMirror(); switcher.updateButtonAppearance(); }));
+		settingsRegistry.onChange(P.TEXT, () => { writeMirror(); switcher.updateButtonAppearance(); });
+		settingsRegistry.onChange(P.MODE, () => writeMirror());
 	}
 
 	setTimeout(() => {
