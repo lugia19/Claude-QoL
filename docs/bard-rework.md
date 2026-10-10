@@ -71,6 +71,26 @@ the body (`origin_nonce` is not a body checksum).
 - A normal send carries **no** `parent_message_id` (the server continues its own leaf). The client *does* set it when sending from a branch that `set_current_leaf` just moved to.
 - Untested: `settings_update`, `answer_now`, `work_mode_override`, `chat_memory_mode`, `safety_controls`, `project_id`/`is_temporary`, Retry with an arbitrary parent, cross-chat attachment ids. Deliberately not probed: `eval_params_json` (looks internal).
 
+## Sending our own messages
+
+`ClaudeConversation.sendMessageAndWaitForResponse` (`claude-api.js`) sends through `PerformAction`
+`send_message` with Connect's JSON codec (camelCase), from either world (`_performAction`, shared
+with `setCurrentLeaf`; Firefox content scripts use `content.fetch` for the Origin check). Verified
+2026-10-10 in Chrome (fork verbatim and summarized, summary rewrite, TTS dialogue analysis), the
+desktop client (zip import) and Firefox Android (TTS dialogue analysis).
+
+- **We choose the ids:** `messageId` and `assistantMessageId`, and for a new chat the header's
+  `conversationId`: the first send creates it. `send_message` has no name field (the server names
+  the chat itself), so a `renameConversation { title }` follows.
+- **Fields used:** `text`, `parentMessageId` (left out for the root), `model { identifier }`,
+  `projectId`, `timezone`, `locale`, `attachments` (`{ id, fileName, fileSize, mediaType }`) and
+  `inlineAttachments` (`{ fileName, fileSize, fileType, extractedContent }`).
+- **Files:** ids from both the legacy `POST /api/<org>/upload` and the code-execution
+  `wiggle/upload-file` work as attachments, on a chat that doesn't exist yet too. Neither upgrades it.
+- **The reply:** read from the legacy tree GET once the known assistant id has a `stop_reason`. A
+  rejected send is only reported on the stream, so it surfaces as a timeout (3 min).
+- claude.ai's own first send is preceded by a `warm_turn (15) { intended_send }` action; we skip it.
+
 ## Native fork
 
 `PerformAction` `continue_branch_as_new_chat (37) { source_conversation_id, through_message_id }`,
@@ -234,7 +254,7 @@ The one place QoL intercepts the RPCs. **Features never wrap them themselves**; 
 - **How to recognise one:** RPC endpoints return 403 "This feature is not included in your current plan". Tabs say "New chat" (merged: "New session").
 - **Frontend:** the same shell ("Message N of M" rows, `message-actions`, `chat-input-send`, the IndexedDB cache), but it loads through the legacy tree GET and `/completion`.
   - Rows come from a different component with **no `data-turn-key` and no ids** in the DOM.
-- Calling `/completion` directly still works on merged chats, but ignores the merged chat's model (it replied with Opus 5.5 on a Haiku chat). Irrelevant under D1, but useful to know.
+- Calling `/completion` directly still works on merged chats, but ignores the merged chat's model (it replied with Opus 5.5 on a Haiku chat). **Upgraded chats refuse it**: 409 `conversation_upgraded` ("Reopen it there to keep going"; send, edit and regenerate unavailable). The legacy tree GET flags those chats with `workspace_upgraded: true`. QoL no longer uses `/completion` (see [Sending our own messages](#sending-our-own-messages)).
 
 ## Feature map (starting point for the drill-down)
 
@@ -244,7 +264,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | --- | --- | --- |
 | Phantom messages | Splice into snapshot and history pages; rewrite phantom `parent_message_id` to `""` on root edits | **Implemented** (feat/phantoms), see [Phantom messages](#phantom-messages-implemented). | Retry and non-root edits need nothing. |
 | Forking, summaryless | QoL's own fork (D8) | Unchanged: works on merged accounts (verified 2026-10-09), phantoms display. Upgraded chats: warning in the dialog. |
-| Forking, summary / compaction | QoL's own fork (D8) | Unchanged: summaries through `/completion` in a throwaway chat, now on Haiku 5.5 (`FAST_MODEL`), verified end to end 2026-10-09. Porting `/completion` sends to `PerformAction` is a separate, later item (also TTS dialogue analysis and import). |
+| Forking, summary / compaction | QoL's own fork (D8) | Unchanged flow: summaries in a throwaway chat, on Haiku 5.5 (`FAST_MODEL`). Every send (fork, summary, rewrite, TTS dialogue analysis, import) now goes through `PerformAction` `send_message`, see [Sending our own messages](#sending-our-own-messages). |
 | Advanced edit (files) | Rewrite the edit's `send_message` (`onSend`) | **Implemented** (feat/advanced-edit). claude.ai's own edit sends the original files in full in `attachments`; the patch replaces `text`, `attachments` (minimal `{ id, file_name, file_kind }` is enough) and `inline_attachments` from the modal, so removal is just leaving a file out. Verified: removed a PDF, added a text file and an uploaded image; the model saw exactly those. |
 | Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + `set_current_leaf` | Implemented (feat/navigation). Upgraded chats, other-branch targets: to be implemented. |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |

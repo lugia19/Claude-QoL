@@ -203,8 +203,8 @@ class ClaudeConversation {
 		this._pendingCreateParams = null;
 	}
 
-	// Prepare a new conversation locally. No server call — actual creation
-	// happens on the first sendMessageAndWaitForResponse via create_conversation_params.
+	// Prepare a new conversation locally. No server call: the first sendMessageAndWaitForResponse
+	// creates it (with this id, model and project), then names it.
 	prepareNew(name, model = null, projectUuid = null, accountFeatureSettings = null) {
 		if (this.conversationId) {
 			throw new Error('Conversation already exists');
@@ -213,11 +213,7 @@ class ClaudeConversation {
 		this.conversationId = this.generateUuid();
 		this.accountFeatureSettings = accountFeatureSettings;
 
-		this._pendingCreateParams = {
-			include_conversation_preferences: true,
-			is_temporary: false,
-			name: name || '',
-		};
+		this._pendingCreateParams = { name: name || '' };
 		if (model) this._pendingCreateParams.model = model;
 		if (projectUuid) this._pendingCreateParams.project_uuid = projectUuid;
 
@@ -232,76 +228,46 @@ class ClaudeConversation {
 		return this.conversationId;
 	}
 
+	// Send a message and wait for Claude's reply; returns the reply as a ClaudeMessage. A string is a
+	// plain prompt (options: model, parentMessageUuid); a ClaudeMessage brings its own files.
 	async sendMessageAndWaitForResponse(promptOrMessage, options = {}) {
-		// String path: plain prompts carry no files, no splitting needed.
 		if (!(promptOrMessage instanceof ClaudeMessage)) {
-			const {
-				model = null,
-				parentMessageUuid = '00000000-0000-4000-8000-000000000000',
-				attachments = [],
-				files = [],
-				syncSources = [],
-			} = options;
-
-			const requestBody = {
-				prompt: promptOrMessage,
-				parent_message_uuid: parentMessageUuid,
-				attachments,
-				files,
-				sync_sources: syncSources,
-				rendering_mode: "messages"
-			};
-
-			if (model !== null) {
-				requestBody.model = model;
-			}
-
-			return this._postCompletionAndAwaitAssistant(requestBody);
+			const { model = null, parentMessageUuid = ROOT_MESSAGE_UUID } = options;
+			return this._sendAndAwaitAssistant({
+				text: promptOrMessage,
+				parentMessageUuid,
+				model,
+				timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+				locale: accountLocale(),
+				attachments: [],
+				inlineAttachments: [],
+			});
 		}
 
 		const msg = promptOrMessage;
-		const completionFiles = msg._getCompletionFiles();
+		const send = msg.toSendMessage();
+		if (options.model) send.model = options.model;
+		if (send.attachments.length <= MAX_FILES_PER_MESSAGE) return this._sendAndAwaitAssistant(send);
 
-		// Non-split path: file count within the per-message cap.
-		if (completionFiles.length <= MAX_FILES_PER_MESSAGE) {
-			const requestBody = msg.toCompletionJSON();
-			if (options.model) requestBody.model = options.model;
-			return this._postCompletionAndAwaitAssistant(requestBody);
-		}
-
-		// Split path: chunk files across N sends. Intermediate "filler" sends
-		// carry only files + placeholder text; the final send carries the real
-		// prompt, attachments, styles, sync_sources, and the last file chunk.
+		// Too many files for one message: intermediate "filler" sends carry only a file chunk and a
+		// placeholder text; the final send carries the real text, the inline attachments and the
+		// last chunk.
 		const chunks = [];
-		for (let i = 0; i < completionFiles.length; i += MAX_FILES_PER_MESSAGE) {
-			chunks.push(completionFiles.slice(i, i + MAX_FILES_PER_MESSAGE));
+		for (let i = 0; i < send.attachments.length; i += MAX_FILES_PER_MESSAGE) {
+			chunks.push(send.attachments.slice(i, i + MAX_FILES_PER_MESSAGE));
 		}
-		const fillerChunks = chunks.slice(0, -1);
-		const lastChunk = chunks[chunks.length - 1];
-
-		let parentUuid = msg.parent_message_uuid;
-		for (let i = 0; i < fillerChunks.length; i++) {
-			const fillerBody = {
-				prompt: `[Forking chat in progress -> Uploading file batch ${i + 1}/${chunks.length} — please reply with "ok" so the next batch can be sent. Context will be in the last batch.]`,
-				parent_message_uuid: parentUuid,
-				timezone: msg.timezone,
-				locale: msg.locale,
-				model: options.model ?? msg.model,
-				tools: msg.tools,
-				attachments: [],
-				files: fillerChunks[i].map(f => f.file_uuid),
-				sync_sources: [],
-				rendering_mode: msg.rendering_mode
-			};
-			const fillerAsst = await this._postCompletionAndAwaitAssistant(fillerBody);
+		let parentUuid = send.parentMessageUuid;
+		for (let i = 0; i < chunks.length - 1; i++) {
+			const fillerAsst = await this._sendAndAwaitAssistant({
+				...send,
+				text: `[Forking chat in progress -> Uploading file batch ${i + 1}/${chunks.length} — please reply with "ok" so the next batch can be sent. Context will be in the last batch.]`,
+				parentMessageUuid: parentUuid,
+				attachments: chunks[i],
+				inlineAttachments: [],
+			});
 			parentUuid = fillerAsst.uuid;
 		}
-
-		const finalBody = msg.toCompletionJSON();
-		finalBody.parent_message_uuid = parentUuid;
-		finalBody.files = lastChunk.map(f => f.file_uuid);
-		if (options.model) finalBody.model = options.model;
-		return this._postCompletionAndAwaitAssistant(finalBody);
+		return this._sendAndAwaitAssistant({ ...send, parentMessageUuid: parentUuid, attachments: chunks[chunks.length - 1] });
 	}
 
 	async _patchAccountSettingsIfNeeded() {
@@ -328,75 +294,85 @@ class ClaudeConversation {
 		};
 	}
 
-	async _postCompletionAndAwaitAssistant(requestBody) {
-		let settingsToRestore = null;
+	// One merged-experience action on this conversation (Connect's JSON codec, so it works from either
+	// world without the protobuf schema). A 200 only means accepted: success or failure arrives on the
+	// StreamTimeline as a mutation ack. The RPCs check Origin: a Firefox content script's own fetch
+	// sends the extension's, so it uses the page's (content.fetch); elsewhere plain fetch already
+	// sends claude.ai's.
+	async _performAction(action) {
+		const pageFetch = globalThis.content?.fetch?.bind(globalThis.content) ?? fetch;
+		return pageFetch(...ClaudeExtNet.bardRpcRequest('PerformAction', this.orgId, JSON.stringify({
+			header: {
+				conversationId: this.conversationId,
+				mutationId: { sessionId: `sess_qol${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, version: '1' },
+			},
+			...action,
+		})));
+	}
 
-		if (!this.created) {
-			if (this._pendingCreateParams) {
-				requestBody.create_conversation_params = { ...this._pendingCreateParams };
-			}
-			settingsToRestore = await this._patchAccountSettingsIfNeeded();
-		}
+	// Sends one message through PerformAction's send_message (the legacy /completion endpoint refuses
+	// upgraded chats with 409 conversation_upgraded), then waits for the reply in the conversation
+	// tree. We choose both message ids, so the reply is known before it exists. On a new conversation
+	// the send creates it (the header's conversation id is the one prepareNew chose); send_message
+	// has no name, so the name is set after. `send` is { text, parentMessageUuid, model, timezone,
+	// locale, attachments: [{ id, fileName, fileSize, mediaType }], inlineAttachments: [{ fileName,
+	// fileSize, fileType, extractedContent }] }.
+	async _sendAndAwaitAssistant(send) {
+		const creating = !this.created;
+		const createParams = this._pendingCreateParams;
+		const settingsToRestore = creating ? await this._patchAccountSettingsIfNeeded() : null;
 
 		try {
-			const requestSentTime = new Date().toISOString();
+			const messageId = this.generateUuid();
+			const assistantId = this.generateUuid();
+			const model = send.model ?? createParams?.model ?? null;
+			const sendMessage = {
+				messageId,
+				assistantMessageId: assistantId,
+				text: send.text,
+				timezone: send.timezone,
+				locale: send.locale,
+				attachments: send.attachments,
+				inlineAttachments: send.inlineAttachments,
+			};
+			// No parent = continue from the root (a new conversation, or a new root branch).
+			if (send.parentMessageUuid && send.parentMessageUuid !== ROOT_MESSAGE_UUID) sendMessage.parentMessageId = send.parentMessageUuid;
+			if (model) sendMessage.model = { identifier: model };
+			if (creating && createParams?.project_uuid) sendMessage.projectId = createParams.project_uuid;
 
-			const response = await fetch(`/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}/completion`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(requestBody)
-			});
-
+			const response = await this._performAction({ sendMessage });
 			if (!response.ok) {
-				apiLog.error(await response.json());
+				apiLog.error('send_message rejected:', response.status, await response.text().catch(() => ''));
 				throw new Error('Failed to send message');
 			}
-
-			if (!this.created) {
+			if (creating) {
 				this.created = true;
 				this._pendingCreateParams = null;
+				if (createParams?.name) {
+					await this._performAction({ renameConversation: { title: createParams.name } })
+						.catch(e => apiLog.warn('Could not name the new conversation:', e));
+				}
 			}
 
-			// Consume the stream, extracting the response UUID from the message_start event
-			let responseUuid = null;
-			await ClaudeExtNet.readSseEvents(response, (event) => {
-				if (!responseUuid && event.raw.includes('"message_start"')) {
-					responseUuid = event.data?.message?.uuid ?? null;
-					apiLog('Got response UUID from message_start:', responseUuid);
+			// The reply is done once the tree has it with a stop reason. A rejected send (it's only
+			// reported on the stream) never shows up, so give up after a while.
+			// Polled with a plain fetch, not getData(): no conversation-cache write per poll, and a
+			// brand-new conversation can 404 for a moment.
+			const treeUrl = `/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}?tree=true&rendering_mode=messages&render_all_tools=true&consistency=strong`;
+			const deadline = Date.now() + 180_000;
+			while (Date.now() < deadline) {
+				await new Promise(r => setTimeout(r, 1500));
+				const tree = await fetch(treeUrl);
+				if (!tree.ok) continue;
+				const data = await tree.json();
+				const reply = data.chat_messages?.find(m => m.uuid === assistantId);
+				if (reply?.stop_reason) {
+					this.conversationData = data;
+					this._syncAccountFeatureSettings();
+					return ClaudeMessage.fromHistoryJSON(this, reply);
 				}
-				if (event.event === 'message_stop' || event.raw.includes('"type":"message_stop"')) return false;
-			});
-
-			// Find the assistant response by UUID (or fall back to timestamp)
-			let assistantMessage;
-			let attempts = 0;
-			let messages;
-			const maxAttempts = 30;
-
-			while (!assistantMessage && attempts < maxAttempts) {
-				if (attempts > 0) {
-					apiLog(`Assistant message not found, waiting 3 seconds and retrying (attempt ${attempts}/${maxAttempts})...`);
-					await new Promise(r => setTimeout(r, 3000));
-				}
-				messages = await this.getMessages(false, true);
-				if (responseUuid) {
-					assistantMessage = messages.find(msg => msg.uuid === responseUuid);
-				} else {
-					assistantMessage = messages.find(msg =>
-						msg.sender === 'assistant' &&
-						msg.created_at > requestSentTime
-					);
-				}
-				attempts++;
 			}
-
-			if (!assistantMessage) {
-				apiLog.error('Messages after retry:', messages.map(m => `${m.sender}:${m.uuid}`));
-				apiLog.error('Response UUID:', responseUuid, 'requestSentTime:', requestSentTime);
-				throw new Error('Completion finished but no assistant message found after retry');
-			}
-
-			return assistantMessage;
+			throw new Error('Sent the message, but no reply arrived');
 		} finally {
 			if (settingsToRestore) {
 				await updateAccountSettings(settingsToRestore);
@@ -622,18 +598,9 @@ class ClaudeConversation {
 	// Navigate to a specific leaf (it must have no children), then reload onto it.
 	// Through the merged experience's set_current_leaf: the legacy PUT also moves the leaf, but the
 	// StreamTimeline snapshot can keep serving the old one for a while after it, so the reload landed
-	// on the wrong branch. Connect's JSON codec, so it works from either world without the protobuf
-	// schema. The RPCs check Origin: a Firefox content script's own fetch sends the extension's, so it
-	// uses the page's (content.fetch); elsewhere plain fetch already sends claude.ai's.
+	// on the wrong branch.
 	async setCurrentLeaf(leafId) {
-		const pageFetch = globalThis.content?.fetch?.bind(globalThis.content) ?? fetch;
-		const response = await pageFetch(...ClaudeExtNet.bardRpcRequest('PerformAction', this.orgId, JSON.stringify({
-			header: {
-				conversationId: this.conversationId,
-				mutationId: { sessionId: `sess_qol${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`, version: '1' },
-			},
-			setCurrentLeaf: { currentLeafMessageId: leafId },
-		})));
+		const response = await this._performAction({ setCurrentLeaf: { currentLeafMessageId: leafId } });
 
 		if (!response.ok) {
 			throw new Error(`Failed to set current leaf (${response.status})`);
@@ -1185,13 +1152,11 @@ class ClaudeMessage {
 		this.sync_sources = [];
 		this.truncated = false;
 
-		// Completion-specific (defaults)
+		// Sending (defaults)
 		this.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		this.locale = accountLocale();
 
 		this.model = null;
-		this.tools = [];
-		this.rendering_mode = 'messages';
 
 		if (historyJson) {
 			this._parseFromHistory(historyJson);
@@ -1382,26 +1347,11 @@ class ClaudeMessage {
 		);
 	}
 
-	// Returns only files that will land in files_completion (subject to the
-	// per-message limit). Mirrors the classification in _getFilesJSON so the
-	// two cannot drift.
-	_getCompletionFiles() {
-		const ATTACHMENT_CHAR_LIMIT = 15000;
-		return this._files.filter(f => {
-			if (f instanceof ClaudeAttachment) return false;
-			if (f instanceof ClaudeCodeExecutionFile) {
-				const inlined = f.extracted_content !== null &&
-					(f.force_attachment_mode || f.extracted_content.length <= ATTACHMENT_CHAR_LIMIT);
-				return !inlined;
-			}
-			return true; // ClaudeFile
-		});
-	}
-
+	// files_send: the file objects sent as attachments (the rest go inline, in `attachments`).
 	_getFilesJSON() {
 		const ATTACHMENT_CHAR_LIMIT = 15000;
 		const files_v2 = [];
-		const files_completion = [];
+		const files_send = [];
 		const files_history = [];
 		const attachments = [];
 
@@ -1429,7 +1379,7 @@ class ClaudeMessage {
 					// Large files or non-text: include in files array
 					const apiFormat = f.toApiFormat();
 					files_v2.push(apiFormat);
-					files_completion.push(f.file_uuid);
+					files_send.push(f);
 
 					// Images go in files_history
 					if (f.file_kind === 'image') {
@@ -1440,7 +1390,7 @@ class ClaudeMessage {
 				// ClaudeFile
 				const apiFormat = f.toApiFormat();
 				files_v2.push(apiFormat);
-				files_completion.push(f.file_uuid);
+				files_send.push(f);
 
 				// Only images go in files_history
 				if (f.file_kind === 'image') {
@@ -1449,7 +1399,7 @@ class ClaudeMessage {
 			}
 		}
 
-		return { files_v2, files_completion, files_history, attachments };
+		return { files_v2, files_send, files_history, attachments };
 	}
 
 	// toHistoryJSON - use files_history
@@ -1473,34 +1423,41 @@ class ClaudeMessage {
 		};
 	}
 
-	toCompletionJSON() {
-		// Validate: can only send human messages
+	// This message as a send for ClaudeConversation._sendAndAwaitAssistant: uploaded files become
+	// attachments (by file id), text files inline attachments.
+	toSendMessage() {
 		if (this.sender !== 'human') {
-			throw new Error('Cannot send non-human message as completion');
+			throw new Error('Cannot send a non-human message');
 		}
 
-		// Extract prompt from content
 		const textBlocks = this.content.filter(c => c.type === 'text');
 		if (textBlocks.length === 0) {
 			throw new Error('Message has no text content');
 		}
 		if (textBlocks.length > 1) {
-			throw new Error('Cannot send message with multiple text blocks as completion');
+			throw new Error('Cannot send a message with multiple text blocks');
 		}
 
-		const { files_completion, attachments } = this._getFilesJSON();
+		const { files_send, attachments } = this._getFilesJSON();
 
 		return {
-			prompt: textBlocks[0].text,
-			parent_message_uuid: this.parent_message_uuid,
+			text: textBlocks[0].text,
+			parentMessageUuid: this.parent_message_uuid,
 			timezone: this.timezone,
 			locale: this.locale,
 			model: this.model,
-			tools: this.tools,
-			attachments,
-			files: files_completion,
-			sync_sources: this.sync_sources,
-			rendering_mode: this.rendering_mode
+			attachments: files_send.map(f => ({
+				id: f.file_uuid,
+				fileName: f.file_name,
+				fileSize: String(f.size_bytes ?? f.raw_data?.size_bytes ?? 0),
+				mediaType: mime.getType(f.file_name) || 'application/octet-stream',
+			})),
+			inlineAttachments: attachments.map(a => ({
+				fileName: a.file_name,
+				fileSize: String(a.file_size ?? a.extracted_content.length),
+				fileType: a.file_type || 'text/plain',
+				extractedContent: a.extracted_content,
+			})),
 		};
 	}
 
