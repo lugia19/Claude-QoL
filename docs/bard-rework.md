@@ -88,7 +88,8 @@ desktop client (zip import) and Firefox Android (TTS dialogue analysis).
 - **Files:** ids from both the legacy `POST /api/<org>/upload` and the code-execution
   `wiggle/upload-file` work as attachments, on a chat that doesn't exist yet too. Neither upgrades it.
 - **The reply:** read from the legacy tree GET once the known assistant id has a `stop_reason`. A
-  rejected send is only reported on the stream, so it surfaces as a timeout (3 min).
+  rejected send is only reported on the stream: our message showing up in the tree means accepted
+  (then no practical limit, polled with back-off); never showing up within a minute means rejected.
 - claude.ai's own first send is preceded by a `warm_turn (15) { intended_send }` action; we skip it.
 
 ## Native fork

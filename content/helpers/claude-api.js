@@ -356,17 +356,24 @@ class ClaudeConversation {
 				}
 			}
 
-			// The reply is done once the tree has it with a stop reason. A rejected send (it's only
-			// reported on the stream) never shows up, so give up after a while.
-			// Polled with a plain fetch, not getData(): no conversation-cache write per poll, and a
-			// brand-new conversation can 404 for a moment.
+			// The reply is done once the tree has it with a stop reason. A rejected send is only
+			// reported on the stream, so: our message showing up in the tree means accepted, and then
+			// the reply gets as long as it needs (a big-model summary of a long chat can take minutes;
+			// the cap only stops a turn that died from hanging forever). Never showing up within a
+			// minute means rejected. Polled with a plain fetch, not getData() (no conversation-cache
+			// write per poll; a brand-new conversation can 404 for a moment), backing off so a long
+			// turn doesn't re-download the tree every second.
 			const treeUrl = `/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}?tree=true&rendering_mode=messages&render_all_tools=true&consistency=strong`;
-			const deadline = Date.now() + 180_000;
-			while (Date.now() < deadline) {
-				await new Promise(r => setTimeout(r, 1500));
+			const started = Date.now();
+			let accepted = false;
+			let interval = 1500;
+			while (Date.now() - started < (accepted ? 20 * 60_000 : 60_000)) {
+				await new Promise(r => setTimeout(r, interval));
+				interval = Math.min(interval * 1.5, 8000);
 				const tree = await fetch(treeUrl);
 				if (!tree.ok) continue;
 				const data = await tree.json();
+				accepted ||= data.chat_messages?.some(m => m.uuid === messageId) ?? false;
 				const reply = data.chat_messages?.find(m => m.uuid === assistantId);
 				if (reply?.stop_reason) {
 					this.conversationData = data;
@@ -374,7 +381,7 @@ class ClaudeConversation {
 					return ClaudeMessage.fromHistoryJSON(this, reply);
 				}
 			}
-			throw new Error('Sent the message, but no reply arrived');
+			throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
 		} finally {
 			if (settingsToRestore) {
 				await updateAccountSettings(settingsToRestore);
