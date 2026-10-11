@@ -15,7 +15,7 @@
 	// A target: { buttonClass, icon, pages, forceDisplayOnMobile, presetsKey, getActive(), apply(text) -> ok,
 	//   strings: { tooltip, title, info, applying, unsavedTitle, unsavedConfirm, unsavedRow, placeholder,
 	//   updateFailed }, extraContent?() -> element shown under the list, listActions?: [{ label, onClick }]
-	//   (primary buttons in the footer, right of Close, that close the list) }.
+	//   (footer buttons that close the list: Close moves to the far left, these go far right, all gray) }.
 	function createPresetSwitcher(target) {
 		const { strings } = target;
 
@@ -166,8 +166,11 @@
 				modal.modal.classList.remove('max-w-md');
 				modal.modal.classList.add('max-w-lg');
 				modal.addCancel(localize('common.close'));
-				// The target's own actions, right of Close (Close/Cancel left, actions right, as in every modal).
-				for (const { label, onClick } of target.listActions ?? []) modal.addConfirm(label, () => { onClick(); });
+				// The target's own actions: Close alone at the far left, these at the far right. Gray, like
+				// Close: optional extras, not the modal's point.
+				const listActions = target.listActions ?? [];
+				for (const { label, onClick } of listActions) modal.addButton(label, 'secondary', () => { onClick(); });
+				if (listActions.length) modal.buttonContainer.classList.replace('justify-end', 'justify-between');
 				modal.show();
 			} catch (error) {
 				log.error('Error loading presets:', error);
@@ -419,7 +422,7 @@
 			},
 			extraContent: modeSelect,
 			// The UI only starts a session with a first message; code-session-prompt.js (MAIN) makes one without.
-			// In the footer, right of Close.
+			// In the footer, far right (Close is far left).
 			listActions: [{
 				label: localize('code_prompt.launch_empty'),
 				onClick: () => window.postMessage({ type: 'qol-empty-code-session' }, window.location.origin),
