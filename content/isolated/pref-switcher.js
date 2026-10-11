@@ -15,7 +15,7 @@
 	// A target: { buttonClass, icon, pages, forceDisplayOnMobile, presetsKey, getActive(), apply(text) -> ok,
 	//   strings: { tooltip, title, info, applying, unsavedTitle, unsavedConfirm, unsavedRow, placeholder,
 	//   updateFailed }, extraContent?() -> element shown under the list, listActions?: [{ label, onClick }]
-	//   (buttons next to "+ New Preset" that close the list first) }.
+	//   (primary buttons in the footer, right of Close, that close the list) }.
 	function createPresetSwitcher(target) {
 		const { strings } = target;
 
@@ -148,20 +148,11 @@
 				await renderList();
 				loadingModal.destroy();
 
-				// "+ New Preset", and the target's own actions beside it
-				let modal;
-				const actionRow = document.createElement('div');
-				actionRow.className = 'mt-3 flex flex-wrap gap-2';
+				// "+ New Preset" button
 				const newBtn = createClaudeButton(localize('prefs.new_preset_button'), 'secondary');
+				newBtn.classList.add('mt-3');
 				newBtn.onclick = () => showEditPresetModal(null, null, renderList);
-				actionRow.appendChild(newBtn);
-				for (const { label, onClick } of target.listActions ?? []) {
-					actionRow.appendChild(createClaudeButton(label, 'secondary', () => {
-						modal?.destroy();
-						onClick();
-					}));
-				}
-				contentContainer.appendChild(actionRow);
+				contentContainer.appendChild(newBtn);
 
 				if (target.extraContent) contentContainer.appendChild(await target.extraContent());
 
@@ -171,10 +162,12 @@
 				infoText.textContent = strings.info;
 				contentContainer.appendChild(infoText);
 
-				modal = new ClaudeModal(strings.title, contentContainer);
+				const modal = new ClaudeModal(strings.title, contentContainer);
 				modal.modal.classList.remove('max-w-md');
 				modal.modal.classList.add('max-w-lg');
 				modal.addCancel(localize('common.close'));
+				// The target's own actions, right of Close (Close/Cancel left, actions right, as in every modal).
+				for (const { label, onClick } of target.listActions ?? []) modal.addConfirm(label, () => { onClick(); });
 				modal.show();
 			} catch (error) {
 				log.error('Error loading presets:', error);
@@ -426,6 +419,7 @@
 			},
 			extraContent: modeSelect,
 			// The UI only starts a session with a first message; code-session-prompt.js (MAIN) makes one without.
+			// In the footer, right of Close.
 			listActions: [{
 				label: localize('code_prompt.launch_empty'),
 				onClick: () => window.postMessage({ type: 'qol-empty-code-session' }, window.location.origin),
