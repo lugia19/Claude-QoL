@@ -77,7 +77,7 @@ const SETTINGS_KEYS = {
 		RATE_REMINDER_SHOWN: { key: 'qolRateReminderShown', default: false, type: 'boolean', local: true, global: true },
 	},
 	EXPORT: {
-		LAST_FORMAT: { key: 'export_last_format', default: 'html_html', type: 'string' }, // the format select's last choice
+		LAST_FORMAT: { key: 'export_last_format', default: null, type: 'string' }, // the format select's last choice; null: none yet (exporter.js falls back)
 	},
 	PREF_SWITCHER: {
 		PRESETS: { key: 'preference_presets', default: {}, type: 'object' },

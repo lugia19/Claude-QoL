@@ -1997,8 +1997,10 @@
 		const isInConversation = Boolean(conversationId);
 		const isOnProjectPage = Boolean(projectId);
 
-		// Last used format (default: HTML)
-		const lastFormat = await settingsRegistry.get(SETTINGS_KEYS.EXPORT.LAST_FORMAT);
+		// Last used format: this account's, else the one older versions kept for every account in
+		// localStorage (left in place, like the other old shared copies), else HTML.
+		const lastFormat = await settingsRegistry.get(SETTINGS_KEYS.EXPORT.LAST_FORMAT)
+			?? localStorage.getItem('lastExportFormat') ?? 'html_html';
 
 		// Build the modal content: export on the left, import on the right, each column's action buttons
 		// at its bottom (as in the fork modal), level with each other.
