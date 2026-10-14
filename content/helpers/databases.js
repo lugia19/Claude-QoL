@@ -272,14 +272,20 @@
 			if (!(await Dexie.exists(LEGACY_PHANTOM_DB))) return;
 			const legacy = await new Dexie(LEGACY_PHANTOM_DB).open(); // dynamic mode: whatever schema it has
 			const table = legacy.table('phantomMessages');
-			const mine = (await table.toArray()).filter(r => !isEncrypted(r.encryptedData) || r.encryptedData.keyHash === org.keyHash);
+			// Take them out in one transaction, so two orgs initializing at once can't both take the same
+			// plaintext rows. A crash before they're stored below loses them; the page rebuilds phantoms
+			// from the fork's chatlog.txt.
+			const mine = await legacy.transaction('rw', table, async () => {
+				const rows = (await table.toArray()).filter(r => !isEncrypted(r.encryptedData) || r.encryptedData.keyHash === org.keyHash);
+				await table.bulkDelete(rows.map(r => r.conversationId));
+				return rows;
+			});
 			if (mine.length) {
 				const moved = await Promise.all(mine.map(async ({ conversationId, encryptedData }) => ({
 					conversationId,
 					encryptedData: isEncrypted(encryptedData) ? encryptedData : await encryptData(encryptedData, org),
 				})));
 				await phantomTable(org).bulkPut(moved);
-				await table.bulkDelete(mine.map(r => r.conversationId));
 				log(`Moved ${moved.length} phantom conversations into this org's database`);
 			}
 			const left = await table.count();
