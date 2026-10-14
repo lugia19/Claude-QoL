@@ -14,21 +14,6 @@ If this is a writing or creative discussion, include sections for characters, pl
 		summaryPrompt: defaultSummaryPrompt,
 		useSelectedModelForSummary: false
 	};
-	// Summaries come back through a client tool instead of as the reply, so a preamble or sign-off
-	// ("Here's a summary...") never ends up in the new chat. A model that answers without calling it
-	// still works: its reply is the summary, as before.
-	const SUMMARY_TOOL = {
-		name: 'submit_summary',
-		description: 'Submit the complete summary.',
-		schema: { type: 'object', properties: { summary: { type: 'string', description: 'The complete summary, exactly as it should appear in the new chat.' } }, required: ['summary'] },
-	};
-
-	function summaryFrom(result) {
-		if (result instanceof ClaudeMessage) return ClaudeConversation.extractMessageText(result);
-		if (typeof result.input?.summary !== 'string') throw new Error('submit_summary was called without a summary');
-		return result.input.summary;
-	}
-
 	const LAST_CHUNK_SIZE = 15000;     // Reserved for end (guaranteed recency bias)
 	const MAIN_TARGET_CHUNK = 30000;   // Target for front chunks
 	// Implicit MAX = 1.5x MAIN_TARGET due to rounding in chunking
@@ -653,7 +638,6 @@ If this is a writing or creative discussion, include sections for characters, pl
 			fullPrompt += "\n\nFiles will NOT be forwarded, so include summaries of relevant file contents in your summary.";
 		}
 
-		fullPrompt += '\n\nWhen done, call the submit_summary tool with the complete summary as its only argument, instead of writing the summary as a reply.';
 		return fullPrompt;
 	}
 
@@ -803,7 +787,9 @@ If this is a writing or creative discussion, include sections for characters, pl
 		}
 
 		// Get summary using the passed conversation
-		return summaryFrom(await tempConversation.sendMessageAndWaitForResponse(summaryMessage, { tool: SUMMARY_TOOL }));
+		const assistantMessage = await tempConversation.sendMessageAndWaitForResponse(summaryMessage);
+
+		return ClaudeConversation.extractMessageText(assistantMessage);
 	}
 
 	// Splits oversized attachments into multiple attachments
@@ -1291,7 +1277,7 @@ The above is the summary to rewrite. Please make the following changes:
 ${editPrompt}
 \`\`\`
 
-Submit the complete rewritten summary with the submit_summary tool.`;
+Provide the complete rewritten summary.`;
 					rewriteMessage.sender = 'human';
 					rewriteMessage.model = pendingFork.useSelectedModelForSummary ? pendingFork.model : FAST_MODEL;
 					// Add previous summary attachments (conversation metadata - force inline)
@@ -1317,7 +1303,9 @@ Submit the complete rewritten summary with the submit_summary tool.`;
 						}
 					}
 
-					const newSummary = summaryFrom(await tempConversation.sendMessageAndWaitForResponse(rewriteMessage, { tool: SUMMARY_TOOL }));
+					const assistantMessage = await tempConversation.sendMessageAndWaitForResponse(rewriteMessage);
+
+					const newSummary = ClaudeConversation.extractMessageText(assistantMessage);
 					textareas[currentIndex].value = newSummary;
 
 					loadingModal.destroy();

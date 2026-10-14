@@ -97,7 +97,7 @@ desktop client (zip import) and Firefox Android (TTS dialogue analysis).
 `send_message` takes `clientTools: [{ name, description, inputSchemaJson }]` (`SendMessage.client_tools`,
 `ClientToolDeclaration`): tools the page itself runs. QoL uses one to get structured output from
 Claude: `sendMessageAndWaitForResponse(prompt, { tool })` and `structuredCall(prompt, tool)` in
-`claude-api.js` (TTS actor mode's segments, fork summaries). Found 2026-10-14 in Chrome:
+`claude-api.js` (TTS actor mode's segments). Found 2026-10-14 in Chrome:
 
 - **The call pauses the turn:** the conversation goes `STATUS_WAITING_FOR_INPUT`, with a content
   block `display_content.client_tool { tool_name, tool_use_id }` in
@@ -111,7 +111,9 @@ Claude: `sendMessageAndWaitForResponse(prompt, { tool })` and `structuredCall(pr
   after reading the arguments, measured until the next send in the same chat was done:
   `stopGeneration { stoppingMessageId }` ~1.2 s and no more output; `respondToElicitation` declined
   ~3.5 s, and approved plus `submitClientToolResult` ~2.3 s, both queued the next send and had Claude
-  write a sentence about the call first. QoL stops the turn.
+  write a sentence about the call first. QoL doesn't reuse such a chat: each tool call gets a
+  throwaway chat, deleted right after (a paused chat deletes fine without a stop). Fork summaries
+  stayed plain replies, since they reuse one temp chat and reuse would need the stop, confirmed.
 - **StreamTimeline** speaks Connect's JSON codec too (`application/connect+json`, one framed JSON
   request; camelCase fields, enum names as strings), so the wait needs no protobuf schema in either
   world. The server ends the stream every ~15 s (`Stream-Close-Reason: cadence`); QoL reopens it.
@@ -302,7 +304,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 | --- | --- | --- |
 | Phantom messages | Splice into snapshot and history pages; rewrite phantom `parent_message_id` to `""` on root edits | **Implemented** (feat/phantoms), see [Phantom messages](#phantom-messages-implemented). | Retry and non-root edits need nothing. |
 | Forking, summaryless | QoL's own fork (D8) | Unchanged: works on merged accounts (verified 2026-10-09), phantoms display. Upgraded chats: warning in the dialog. |
-| Forking, summary / compaction | QoL's own fork (D8) | Unchanged flow: summaries in a throwaway chat, on Haiku 5.5 (`FAST_MODEL`). Every send (fork, summary, rewrite, TTS dialogue analysis, import) now goes through `PerformAction` `send_message`, see [Sending our own messages](#sending-our-own-messages). Summaries, rewrites and TTS dialogue analysis come back through a client tool, see [Client tools](#client-tools-structured-output). |
+| Forking, summary / compaction | QoL's own fork (D8) | Unchanged flow: summaries in a throwaway chat, on Haiku 5.5 (`FAST_MODEL`). Every send (fork, summary, rewrite, TTS dialogue analysis, import) now goes through `PerformAction` `send_message`, see [Sending our own messages](#sending-our-own-messages). TTS dialogue analysis comes back through a client tool, see [Client tools](#client-tools-structured-output). |
 | Advanced edit (files) | Rewrite the edit's `send_message` (`onSend`) | **Implemented** (feat/advanced-edit). claude.ai's own edit sends the original files in full in `attachments`; the patch replaces `text`, `attachments` (minimal `{ id, file_name, file_kind }` is enough) and `inline_attachments` from the modal, so removal is just leaving a file out. Verified: removed a PDF, added a text file and an uploaded image; the model saw exactly those. |
 | Navigation / bookmarks / chat search jumps | Full load + `data-turn-key` identity + a one-load snapshot leaf rewrite | Implemented (feat/navigation, feat/jump-view): jumps are a view, in upgraded chats too; continuing is `set_current_leaf` (normal) or a fork (upgraded). |
 | Branch arrows | Splice `siblings_viewable` on snapshots, history pages and live updates | Implemented, plus the D7 banner. |

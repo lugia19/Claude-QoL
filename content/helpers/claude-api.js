@@ -219,7 +219,6 @@ class ClaudeConversation {
 		this.lastGetDataFromCache = false;
 		this.accountFeatureSettings = null;
 		this._pendingCreateParams = null;
-		this._stopping = null; // the stop of a paused tool call's turn, see _awaitToolCall
 	}
 
 	// Prepare a new conversation locally. No server call: the first sendMessageAndWaitForResponse
@@ -250,8 +249,9 @@ class ClaudeConversation {
 	// Send a message and wait for Claude's reply; returns the reply as a ClaudeMessage. A string is a
 	// plain prompt (options: model, parentMessageUuid); a ClaudeMessage brings its own files.
 	// options.tool ({ name, description, schema }) asks for structured output instead: the send offers
-	// Claude that one client tool, and the result is { input } (the tool's arguments) when Claude called
-	// it, or the reply as above when it answered without it. See _awaitToolCall.
+	// Claude that one client tool, the result is the arguments Claude called it with (parsed), and it
+	// throws when Claude answers without calling it. The call leaves the conversation paused, so it
+	// can't take another send: use a throwaway one (structuredCall). See _awaitToolCall.
 	async sendMessageAndWaitForResponse(promptOrMessage, options = {}) {
 		const tool = options.tool;
 		if (!(promptOrMessage instanceof ClaudeMessage)) {
@@ -330,9 +330,8 @@ class ClaudeConversation {
 	// locale, attachments: [{ id, fileName, fileSize, mediaType }], inlineAttachments: [{ fileName,
 	// fileSize, fileType, extractedContent }] }; timezone, locale and the attachment lists default to
 	// the browser's zone, the account locale and none. With a tool (see sendMessageAndWaitForResponse)
-	// the send offers it as a client tool, and the result is { input } or the reply.
+	// the send offers it as a client tool, and the result is the tool's arguments.
 	async _sendAndAwaitAssistant(send, tool) {
-		await this._stopping; // a paused tool call's turn must be over, or this send would queue behind it
 		const creating = !this.created;
 		const createParams = this._pendingCreateParams;
 		const settingsToRestore = creating ? await this._patchAccountSettingsIfNeeded() : null;
@@ -370,10 +369,8 @@ class ClaudeConversation {
 
 			if (tool) {
 				const input = await this._awaitToolCall(messageId, assistantId, tool.name);
-				if (input !== undefined) {
-					if (creating) await this._nameNew(createParams);
-					return { input };
-				}
+				if (creating) await this._nameNew(createParams);
+				return input;
 			}
 
 			const { data, reply } = await this._awaitTreeReply(messageId, assistantId);
@@ -415,40 +412,28 @@ class ClaudeConversation {
 
 	// Client tools: a turn that calls one pauses for the page to run it (the conversation waits for
 	// input) and never shows up in the tree. The call's arguments come on the StreamTimeline, as the
-	// pending elicitation that asks to run the tool. We only want the arguments, so the turn is stopped
-	// right away: that frees the chat for its next send at once and with no more output (rejecting or
-	// answering the call has Claude write about it first). Returns the parsed arguments, or undefined
-	// when the turn ended without calling the tool (its reply is then read from the tree). The same
+	// pending elicitation that asks to run the tool. We only want the arguments: the turn is left
+	// paused, and the conversation can't take another send (it would queue behind the call), which is
+	// why tool sends go to throwaway conversations (structuredCall); deleting one needs no stop.
+	// Returns the parsed arguments; throws when the turn ended without calling the tool. The same
 	// limits as the tree wait: a minute to be accepted, then 20. See docs/bard-rework.md, "Client tools".
 	async _awaitToolCall(messageId, assistantId, toolName) {
 		const started = Date.now();
 		let accepted = false;
 		let replied = false;
 		const turnOver = new Set(['STATUS_IDLE', 'STATUS_COMPLETED', 'STATUS_ERROR']);
-		// Only this turn's call counts, never an earlier turn's still-pending one: an elicitation is
-		// matched by its toolUseId to a tool block in one of our reply's display groups.
-		const ourGroups = new Set();
-		const ourToolUses = new Set();
 		const outcome = await this._watchTimeline((update) => {
 			for (const m of update.messages ?? []) {
 				if (m.id === messageId) accepted = true;
 				if (m.id === assistantId) replied = true;
 			}
-			for (const g of update.displayGroups ?? []) if (g.messageId === assistantId) ourGroups.add(g.id);
-			for (const b of update.contentBlocks ?? []) if (b.toolUseId && ourGroups.has(b.displayGroupId)) ourToolUses.add(b.toolUseId);
-			const call = update.elicitations?.find(e => e.request?.status === 'STATUS_PENDING' && ourToolUses.has(e.request.toolUseId) && e.request.reportedAction?.toolName === toolName);
+			const call = update.elicitations?.find(e => e.request?.status === 'STATUS_PENDING' && e.request.reportedAction?.toolName === toolName);
 			if (call) return { toolInput: call.request.reportedAction.toolInput };
 			if (replied && turnOver.has(update.conversation?.status)) return { ended: true };
 		}, () => started + (accepted ? 20 * 60_000 : 60_000));
 
 		if (!outcome) throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
-		if (outcome.ended) return undefined;
-		// Not waited for here: the next send in this chat waits for it instead (see _sendAndAwaitAssistant),
-		// and fails if it failed: a send into a turn still paused would only queue behind it.
-		this._stopping = this._performAction({ stopGeneration: { stoppingMessageId: assistantId } }).then(r => {
-			if (!r.ok) throw new Error(`Could not stop the paused turn: ${r.status}`);
-		});
-		this._stopping.catch(() => { }); // reported by whoever awaits it, not as an unhandled rejection
+		if (outcome.ended) throw new Error(`Claude answered without calling ${toolName}`);
 		return JSON.parse(outcome.toolInput);
 	}
 
@@ -746,7 +731,6 @@ class ClaudeConversation {
 
 	// Delete conversation
 	async delete() {
-		await this._stopping?.catch(() => { }); // after a paused tool call's turn is stopped, not racing it; deleted either way
 		const response = await pageFetch(`/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}`, {
 			method: 'DELETE'
 		});
@@ -1832,14 +1816,12 @@ function getOrgId() {
 // { name, description, schema } (a JSON schema for its input), and Claude's arguments to that tool
 // come back parsed. Throws when Claude answers without calling it. Not validated against the
 // schema: callers check what they use. Built for speed: the conversation isn't named, and it's
-// deleted (after its turn is stopped) in the background, which saves 1.5-2 s per call.
+// deleted in the background, which saves 1.5-2 s per call.
 async function structuredCall(prompt, tool) {
 	const conversation = new ClaudeConversation(getOrgId());
 	conversation.prepareNew('', FAST_MODEL);
 	try {
-		const result = await conversation.sendMessageAndWaitForResponse(prompt, { tool });
-		if (result instanceof ClaudeMessage) throw new Error(`Claude answered without calling ${tool.name}`);
-		return result.input;
+		return await conversation.sendMessageAndWaitForResponse(prompt, { tool });
 	} finally {
 		if (conversation.created) {
 			conversation.delete().catch(e => apiLog.warn('Could not delete the structured call\'s conversation:', e));

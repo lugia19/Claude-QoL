@@ -133,14 +133,27 @@ ${text}`;
 		async synthesize(text, voice, model, apiKey, extra, signal, onChunk) {
 			throw new Error('synthesize must be implemented by provider');
 		}
+
+		// Whether `text` has anything to say on `model`; actor mode skips segments that don't.
+		isSpeakable(text, model) {
+			return !!text.trim();
+		}
 	}
 	//#endregion
 
 	//#region ElevenLabs Provider
+	// Eleven v3 and v4 (eleven_v3, eleven_v4, eleven_v4_turbo) take audio tags.
+	const takesAudioTags = (model) => /(^|_)v[34]($|_)/i.test(model || '');
+
 	class ElevenLabsProvider extends Provider {
 		constructor(onStateChange = null) {
 			super(onStateChange);
 			this.modelCharLimits = {};
+		}
+
+		// A lone audio tag ("[sighs]") says nothing, and ElevenLabs refuses it (400).
+		isSpeakable(text, model) {
+			return !!(takesAudioTags(model) ? text.replace(/\[[^\]]*\]/g, '') : text).trim();
 		}
 
 		async fetchModelCharLimits(apiKey) {
@@ -257,10 +270,8 @@ ${text}`;
 		}
 
 		async attributeDialogueToCharacters(text, characters, model) {
-			// Eleven v3 and v4 (eleven_v3, eleven_v4, eleven_v4_turbo) take audio tags. The rules are
-			// adapted from ElevenLabs' own "Enhance" prompt (docs: Text to Speech best practices,
-			// "Enhancing input"), minus its output format, which the tool replaces.
-			const takesAudioTags = /(^|_)v[34]($|_)/i.test(model || '');
+			// Audio tags on v3/v4. The rules are adapted from ElevenLabs' own "Enhance" prompt (docs: Text
+			// to Speech best practices, "Enhancing input"), minus its output format, which the tool replaces.
 			const audioTagRules = `
 AUDIO TAGS: add audio tags to each segment's "text" to make it more expressive when spoken, while STRICTLY preserving the original words and meaning.
 - Start every character's segment with a tone tag for how the line as a whole is delivered, e.g. "[sad] I can't believe it." Narration only gets one where its tone stands out.
@@ -277,7 +288,7 @@ Example segments:
 {"character": "Alice", "text": "[appalled] Are you serious? [sighs] I can't believe you did that!"}
 {"character": "Bob", "text": "[resigned] I guess you're right. [sighs] It's just... [muttering] difficult."}
 `;
-			return this.splitIntoSegments(text, characters, { rules: takesAudioTags ? audioTagRules : '' }); // tags stay in the text
+			return this.splitIntoSegments(text, characters, { rules: takesAudioTags(model) ? audioTagRules : '' }); // tags stay in the text
 		}
 
 		async streamText(text, voiceId, modelId, apiKey, signal) {

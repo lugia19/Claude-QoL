@@ -136,8 +136,7 @@
 			if (entry.cancelled || signal.aborted) return;
 			const voice = voiceMap[segment.character];
 			if (!voice) continue; // character mapped to no voice -> skip
-			// Nothing left to say once audio tags are out (a lone "[sighs]"): providers refuse that (ElevenLabs: 400).
-			if (!segment.text.replace(/\[[^\]]*\]/g, '').trim()) continue;
+			if (!provider.isSpeakable(segment.text, settings.model)) continue; // e.g. a lone audio tag
 			await provider.synthesize(segment.text, voice, settings.model, settings.apiKey, { ...segment.extra, baseUrl }, signal, onChunk);
 		}
 	}
