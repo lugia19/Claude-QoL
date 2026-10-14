@@ -7,14 +7,10 @@
 
 	const FULL_LOAD = SETTINGS_KEYS.FULL_LOAD.ENABLED;
 	// full-load.js (MAIN) acts on the first snapshot, long before this document_idle script exists, so
-	// it reads a localStorage mirror ('0' = off), kept current here on every page, on cross-tab changes
+	// it reads the org's mirror (org-mirror.js), kept current here on every page, on cross-tab changes
 	// and on save. Same pattern as image-gallery.js.
-	const FULL_LOAD_MIRROR_KEY = 'claude_qol_full_load';
-
 	async function writeFullLoadMirror(value) {
-		try {
-			localStorage.setItem(FULL_LOAD_MIRROR_KEY, (value ?? await settingsRegistry.get(FULL_LOAD)) ? '1' : '0');
-		} catch (e) { /* storage unavailable: full-load.js falls back to its default (on) */ }
+		writeOrgMirror('full_load', !!(value ?? await settingsRegistry.get(FULL_LOAD)));
 	}
 
 	const GEAR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

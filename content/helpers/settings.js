@@ -14,20 +14,28 @@
 // rewrite e.g. openai_tts_base_url redirects the next TTS call — taking the API key with it. So
 // anything that *directs where a secret is sent* is treated as a secret too.
 //
+// ACCOUNT SCOPING
+// Every setting belongs to the claude.ai org the page is acting as (getActiveOrgId(), the
+// lastActiveOrg cookie), so several accounts in one browser - Firefox containers, or switching orgs
+// in one profile - each keep their own. Stored under `<orgId>:<key>` in either backend. An org with
+// no value of its own inherits the unscoped one older versions wrote, so existing setups carry over to
+// every account. Keys flagged `global: true` describe the extension install, not an account, and stay
+// unscoped.
+//
 // Settings are stored plaintext. The encryption helpers in databases.js are deliberately not reused:
-// _initEncryptionKey() wipes all encrypted data when the key skill is missing, so binding settings
-// to that key would mean deleting one skill nukes every setting.
+// an org whose key skill is missing gets its encrypted data wiped, so binding settings to that key
+// would mean deleting one skill nukes that account's settings.
 
 // ======== SETTINGS KEY DEFINITIONS ========
 // Central manifest of all settings keys, grouped by feature.
 // Each entry: { key: 'storage_key', default: defaultValue, type: 'boolean'|'string'|'object' }
 // Optional `local: true` — keep in chrome.storage.local instead of IndexedDB (see above).
+// Optional `global: true` — see ACCOUNT SCOPING above.
 
 const settingsLog = createLogger('Settings');
 
 const SETTINGS_KEYS = {
 	TTS: {
-		ENABLED: { key: 'tts_enabled', default: false, type: 'boolean', local: true }, // legacy; migrated to PROVIDER='claude'
 		PROVIDER: { key: 'tts_provider', default: 'claude', type: 'string' }, // 'claude' = native passthrough (no hijack)
 		API_KEY: { key: 'tts_apiKey', default: '', type: 'string', local: true }, // secret
 		VOICE: { key: 'tts_voice', default: '', type: 'string' },
@@ -37,10 +45,10 @@ const SETTINGS_KEYS = {
 	},
 	// Per-chat settings: each stores { conversationId: value, ... }
 	TTS_PERCHAT: {
-		VOICE: { key: 'tts_chatVoice', default: {}, type: 'object', oldKeyPrefix: 'chatVoice_' },
-		ACTOR_MODE: { key: 'tts_chatActorMode', default: {}, type: 'object', oldKeyPrefix: 'chatActorMode_' },
-		CHARACTERS: { key: 'tts_chatCharacters', default: {}, type: 'object', oldKeyPrefix: 'chatCharacters_' },
-		QUOTES_ONLY: { key: 'tts_chatQuotesOnly', default: {}, type: 'object', oldKeyPrefix: 'chatQuotesOnly_' },
+		VOICE: { key: 'tts_chatVoice', default: {}, type: 'object' },
+		ACTOR_MODE: { key: 'tts_chatActorMode', default: {}, type: 'object' },
+		CHARACTERS: { key: 'tts_chatCharacters', default: {}, type: 'object' },
+		QUOTES_ONLY: { key: 'tts_chatQuotesOnly', default: {}, type: 'object' },
 	},
 	NAVIGATION: {
 		BOOKMARKS: { key: 'navigation_bookmarks', default: {}, type: 'object' },
@@ -63,16 +71,20 @@ const SETTINGS_KEYS = {
 	// Extension lifecycle state, not user data — must not survive a reinstall, or the
 	// first-install branch of checkForVersionUpdate() is skipped and a spurious update card shows.
 	NOTIFICATIONS: {
-		PREVIOUS_VERSION: { key: 'qolPreviousVersion', default: null, type: 'string', local: true },
-		RATE_REMINDER_TIME: { key: 'qolRateReminderTime', default: null, type: 'number', local: true },
-		RATE_REMINDER_SHOWN: { key: 'qolRateReminderShown', default: false, type: 'boolean', local: true },
+		PREVIOUS_VERSION: { key: 'qolPreviousVersion', default: null, type: 'string', local: true, global: true },
+		RATE_REMINDER_TIME: { key: 'qolRateReminderTime', default: null, type: 'number', local: true, global: true },
+		RATE_REMINDER_SHOWN: { key: 'qolRateReminderShown', default: false, type: 'boolean', local: true, global: true },
+	},
+	EXPORT: {
+		LAST_FORMAT: { key: 'export_last_format', default: null, type: 'string' }, // the format select's last choice; null: none yet (exporter.js falls back)
 	},
 	PREF_SWITCHER: {
 		PRESETS: { key: 'preference_presets', default: {}, type: 'object' },
 	},
 	BANNER_WATCHER: {
 		// Cache of org flags, refetched from /api/organizations on every poll — nothing to preserve.
-		STORED_FLAGS: { key: 'banner_stored_flags', default: {}, type: 'object', local: true },
+		// (Was 'banner_stored_flags', shared by every account: renamed so no account inherits it.)
+		STORED_FLAGS: { key: 'banner_flags', default: {}, type: 'object', local: true },
 	},
 };
 
@@ -118,6 +130,26 @@ function _resolveDefault(keyOrDef) {
 function _isLocalKey(keyOrDef) {
 	const def = _resolveDef(keyOrDef);
 	return !!(def && def.local);
+}
+
+function _isGlobalKey(keyOrDef) {
+	const def = _resolveDef(keyOrDef);
+	return !!(def && def.global);
+}
+
+// Where a key is stored: the bare key for global ones, else `<orgId>:<key>` for the current org, or
+// null when there's no org (logged out).
+function _storedKey(keyOrDef) {
+	const key = _resolveKey(keyOrDef);
+	if (_isGlobalKey(keyOrDef)) return key;
+	const orgId = getActiveOrgId();
+	return orgId ? `${orgId}:${key}` : null;
+}
+
+// The other way round, for change events: { orgId, key }, orgId null for an unscoped key.
+function _unscopeKey(storedKey) {
+	const i = storedKey.indexOf(':');
+	return i < 0 ? { orgId: null, key: storedKey } : { orgId: storedKey.slice(0, i), key: storedKey.slice(i + 1) };
 }
 
 const settingsRegistry = {
@@ -167,83 +199,37 @@ if (navigator.storage?.persist) {
 		.catch(() => { });
 }
 
-// ======== One-time migration off chrome.storage.local ========
-const _SETTINGS_MIGRATION_MARKER = 'qol_settings_idb_migrated';
-
-async function _migrateFromChromeStorage() {
-	try {
-		const all = await chrome.storage.local.get(null);
-		if (all[_SETTINGS_MIGRATION_MARKER]) return;
-
-		const pending = {};   // storage key -> value destined for IndexedDB
-		const toRemove = [];
-
-		// Pass 1: declared non-local keys.
-		for (const def of Object.values(_settingsDefinitions)) {
-			if (def.local) continue;
-			if (all[def.key] === undefined) continue;
-			pending[def.key] = all[def.key];
-			toRemove.push(def.key);
-		}
-
-		// Pass 2: legacy per-chat keys (chatVoice_<id>) fold into their object-valued key.
-		// Runs after pass 1 so the merged object isn't overwritten by the raw stored one.
-		// Doing this here retires the lazy per-read migration getPerChat used to carry.
-		for (const def of Object.values(_settingsDefinitions)) {
-			if (def.local || !def.oldKeyPrefix) continue;
-			for (const [storageKey, value] of Object.entries(all)) {
-				if (!storageKey.startsWith(def.oldKeyPrefix)) continue;
-				const conversationId = storageKey.slice(def.oldKeyPrefix.length);
-				const obj = pending[def.key] || (pending[def.key] = {});
-				if (obj[conversationId] === undefined) obj[conversationId] = value;
-				toRemove.push(storageKey);
-			}
-		}
-
-		// Never overwrite what IndexedDB already holds. Guards a reinstall or downgrade from
-		// letting a stale chrome.storage value clobber good data.
-		let migrated = 0;
-		for (const [key, value] of Object.entries(pending)) {
-			if (await _settingsDB.settings.get(key) !== undefined) continue;
-			await _settingsDB.settings.put({ key, value });
-			migrated++;
-		}
-
-		// Remove only after the writes land — a crash midway just leaves work for the next run.
-		if (toRemove.length) await chrome.storage.local.remove(toRemove);
-		await chrome.storage.local.set({ [_SETTINGS_MIGRATION_MARKER]: true });
-		if (migrated) settingsLog(`Migrated ${migrated} setting(s) to IndexedDB`);
-	} catch (e) {
-		// Leave the marker unset so the next page load retries.
-		settingsLog.warn('Migration to IndexedDB failed:', e.message);
+// Reads several stored keys of one setting in a single call: their values in order, undefined for unset.
+async function _readRaw(keyOrDef, storedKeys) {
+	if (_isLocalKey(keyOrDef)) {
+		const result = await chrome.storage.local.get(storedKeys);
+		return storedKeys.map(k => result[k]);
 	}
+	// Copy: rows belong to the page's compartment, and callers mutate what they get back.
+	return (await _settingsDB.settings.bulkGet(storedKeys)).map(row => row ? _deepCopy(row.value) : undefined);
 }
 
-// Every read and write awaits this, so no consumer can observe a half-migrated store.
-const _settingsReady = _migrateFromChromeStorage();
-
 settingsRegistry.get = async function (keyOrDef) {
-	await _settingsReady;
+	const storedKey = _storedKey(keyOrDef);
+	if (!storedKey) return _resolveDefault(keyOrDef); // logged out: no account to read for
 	const key = _resolveKey(keyOrDef);
-	if (_isLocalKey(keyOrDef)) {
-		const result = await chrome.storage.local.get(key);
-		if (result[key] !== undefined) return result[key];
-	} else {
-		const row = await _settingsDB.settings.get(key);
-		// Copy: the row belongs to the page's compartment, and callers mutate what they get back.
-		if (row && row.value !== undefined) return _deepCopy(row.value);
-	}
-	return _resolveDefault(keyOrDef);
+	// Not set for this account yet: inherit what the unscoped (pre-scoping) setting held.
+	const [own, inherited] = await _readRaw(keyOrDef, storedKey === key ? [key] : [storedKey, key]);
+	const value = own !== undefined ? own : inherited;
+	return value !== undefined ? value : _resolveDefault(keyOrDef);
 };
 
 settingsRegistry.set = async function (keyOrDef, value) {
-	await _settingsReady;
-	const key = _resolveKey(keyOrDef);
+	const storedKey = _storedKey(keyOrDef);
+	if (!storedKey) {
+		settingsLog.warn(`Not saving ${_resolveKey(keyOrDef)}: no active org (logged out?)`);
+		return;
+	}
 	if (_isLocalKey(keyOrDef)) {
-		await chrome.storage.local.set({ [key]: value });  // chrome.storage.onChanged notifies
+		await chrome.storage.local.set({ [storedKey]: value });  // chrome.storage.onChanged notifies
 	} else {
-		await _settingsDB.settings.put({ key, value });
-		_notifyChange(key, value);
+		await _settingsDB.settings.put({ key: storedKey, value });
+		_notifyChange(storedKey, value);
 	}
 };
 
@@ -252,7 +238,11 @@ settingsRegistry.set = async function (keyOrDef, value) {
 // fires cross-tab for free; IndexedDB has no such event, so writes are announced manually.
 const _changeListeners = {}; // key -> Set<callback>
 
-function _fireListeners(key, newValue, oldValue) {
+// Fires for the current org's keys and global ones only: another org's change doesn't concern this
+// page, and nothing writes unscoped keys any more.
+function _fireListeners(storedKey, newValue, oldValue) {
+	const { orgId, key } = _unscopeKey(storedKey);
+	if (orgId ? orgId !== getActiveOrgId() : !_isGlobalKey(key)) return;
 	const listeners = _changeListeners[key];
 	if (!listeners) return;
 	for (const cb of listeners) cb(newValue, oldValue);
@@ -286,7 +276,7 @@ settingsRegistry.onChange = function (keyOrDef, callback) {
 };
 
 // ======== Per-chat helpers ========
-// Thin wrappers over get/set — those handle the ready gate, backend routing and defaults.
+// Thin wrappers over get/set — those handle backend routing and defaults.
 
 settingsRegistry.getPerChat = async function (def, conversationId) {
 	const obj = await settingsRegistry.get(def) || {};

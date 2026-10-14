@@ -7,9 +7,8 @@
 
 	// The MAIN-world patch runs on the first StreamTimeline snapshot, long before this
 	// (document_idle) script exists, so it can't ask us for settings in time. We mirror the
-	// relevant settings into localStorage (same origin, readable synchronously from MAIN) and
-	// keep the mirror current on init, on cross-tab changes, and on save.
-	const CONFIG_MIRROR_KEY = 'claude_qol_image_gallery';
+	// relevant settings into the org's localStorage mirror (org-mirror.js, readable synchronously from
+	// MAIN) and keep it current on init, on cross-tab changes, and on save.
 
 	//#region SVG Icons
 	const GALLERY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 16 16">
@@ -38,9 +37,7 @@
 	}
 
 	async function writeConfigMirror() {
-		try {
-			localStorage.setItem(CONFIG_MIRROR_KEY, JSON.stringify(await loadSettings()));
-		} catch (e) { /* quota or serialization issue — MAIN falls back to defaults */ }
+		writeOrgMirror('image_gallery', await loadSettings());
 	}
 	//#endregion
 

@@ -988,7 +988,7 @@
 	}
 	//#endregion
 
-	//#region Config sync + Migration
+	//#region Config sync
 	// Gate: hijack the native TTS socket only when a premium provider is fully configured.
 	async function computeHijack() {
 		const [provider, apiKey, voice] = await Promise.all([
@@ -1003,18 +1003,6 @@
 		window.postMessage({ type: 'TTS_HIJACK_CONFIG', hijack: await computeHijack() }, window.location.origin);
 	}
 
-	// One-time migration from the old enable-toggle to the provider-as-gate model.
-	async function migrateEnabledSetting() {
-		const raw = await chrome.storage.local.get(T.ENABLED.key);
-		if (!(T.ENABLED.key in raw)) return; // never set, or already migrated
-		const legacyEnabled = raw[T.ENABLED.key];
-		const provider = await settingsRegistry.get(T.PROVIDER);
-		// Disabled users, and Browser-provider users (Browser dropped), fall back to native TTS.
-		if (legacyEnabled === false || provider === 'browser') {
-			await settingsRegistry.set(T.PROVIDER, 'claude');
-		}
-		await chrome.storage.local.remove(T.ENABLED.key); // absence marks migration complete
-	}
 	//#endregion
 
 	//#region Initialization
@@ -1033,7 +1021,6 @@
 
 	async function initialize() {
 		addTTSStyles();
-		await migrateEnabledSetting();
 		ButtonBar.register({
 			buttonClass: 'tts-settings-button',
 			createFn: createSettingsButton,

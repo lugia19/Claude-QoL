@@ -41,16 +41,6 @@ async function storePhantomMessages(conversationId, messages) {
 // Phantom messages as history JSON (ClaudeMessage.toHistoryJSON); null when none are stored, and
 // (MAIN only) undefined when the database couldn't be asked.
 async function getPhantomMessages(conversationId) {
-	// Very old forks kept them in the page's localStorage: move them to IndexedDB on first read.
-	for (const key of legacyPhantomKeys(conversationId)) {
-		const legacy = localStorage.getItem(key);
-		if (!legacy) continue;
-		const messages = JSON.parse(legacy);
-		await storePhantomMessages(conversationId, messages);
-		legacyPhantomKeys(conversationId).forEach(k => localStorage.removeItem(k));
-		return messages;
-	}
-
 	const get = window.ClaudeSearchShared?.getPhantomMessages;
 	if (get) return await get(conversationId);
 
@@ -67,12 +57,6 @@ const PHANTOM_ID_PREFIX = 'fffffffe-';
 const phantomMessageId = (uuid) => PHANTOM_ID_PREFIX + uuid.slice(PHANTOM_ID_PREFIX.length);
 // Also true for a phantom row's "<id>-hub-reply" turn key.
 const isPhantomId = (id) => typeof id === 'string' && id.startsWith(PHANTOM_ID_PREFIX);
-
-// Where phantoms live besides IndexedDB: the ids of conversations that have some, mirrored to the
-// page's localStorage by databases.js (phantom-messages.js reads it synchronously), and the keys very
-// old forks stored the phantoms themselves under.
-const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
-const legacyPhantomKeys = (conversationId) => [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`];
 
 const PHANTOM_ACK_TEXT = 'Acknowledged - end of previous conversation.';
 

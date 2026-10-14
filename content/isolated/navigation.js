@@ -6,34 +6,12 @@
 	const _NAV_KEY = SETTINGS_KEYS.NAVIGATION.BOOKMARKS;
 
 	// #region  STORAGE MANAGEMENT
-	// One-time migration from localStorage
-	let _navMigrationDone = false;
-	async function _migrateLocalStorageBookmarks() {
-		if (_navMigrationDone) return;
-		_navMigrationDone = true;
-		const legacy = localStorage.getItem('navigation_bookmarks');
-		if (!legacy) return;
-		try {
-			const parsed = JSON.parse(legacy);
-			const current = await settingsRegistry.get(_NAV_KEY);
-			// Only migrate if registry is empty (default)
-			if (Object.keys(current).length === 0 && Object.keys(parsed).length > 0) {
-				await settingsRegistry.set(_NAV_KEY, parsed);
-			}
-			localStorage.removeItem('navigation_bookmarks');
-		} catch (e) {
-			log.error('Failed to migrate bookmarks from localStorage:', e);
-		}
-	}
-
 	async function getBookmarks(conversationId) {
-		await _migrateLocalStorageBookmarks();
 		const allBookmarks = await settingsRegistry.get(_NAV_KEY);
 		return allBookmarks[conversationId] || {};
 	}
 
 	async function saveBookmarks(conversationId, bookmarks) {
-		await _migrateLocalStorageBookmarks();
 		const allBookmarks = await settingsRegistry.get(_NAV_KEY);
 		allBookmarks[conversationId] = bookmarks;
 		await settingsRegistry.set(_NAV_KEY, allBookmarks);
