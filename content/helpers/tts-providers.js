@@ -263,7 +263,8 @@ ${text}`;
 			const takesAudioTags = /(^|_)v[34]($|_)/i.test(model || '');
 			const audioTagRules = `
 AUDIO TAGS: add audio tags to each segment's "text" to make it more expressive when spoken, while STRICTLY preserving the original words and meaning.
-- Tags go in square brackets, typically right before the part they modify or right after it, e.g. "[annoyed] This is hard." or "This is hard. [sighs]".
+- Start every character's segment with a tone tag for how the line as a whole is delivered, e.g. "[sad] I can't believe it." Narration only gets one where its tone stands out.
+- Further tags go in square brackets right before the part they modify or right after it, e.g. "[annoyed] This is hard." or "This is hard. [sighs]".
 - Tags MUST describe something auditory, and only for the voice: no music or sound effects, and no tags like [standing], [grinning], [pacing], [music].
 - Make them contextually appropriate, matching the emotion and subtext of each line, and vary them across the dialogue (energetic, relaxed, casual, surprised, thoughtful...).
 - DO NOT alter, add or remove any words of the original text, narration included, and never put original text inside brackets.
@@ -274,7 +275,7 @@ Directions (non-exhaustive, similar ones are fine): [happy], [sad], [excited], [
 Non-verbal (non-exhaustive, similar ones are fine): [laughing], [chuckles], [sighs], [clears throat], [short pause], [long pause], [exhales sharply], [inhales deeply]
 Example segments:
 {"character": "Alice", "text": "[appalled] Are you serious? [sighs] I can't believe you did that!"}
-{"character": "Bob", "text": "I guess you're right. [sighs] It's just... [muttering] difficult."}
+{"character": "Bob", "text": "[resigned] I guess you're right. [sighs] It's just... [muttering] difficult."}
 `;
 			return this.splitIntoSegments(text, characters, { rules: takesAudioTags ? audioTagRules : '' }); // tags stay in the text
 		}

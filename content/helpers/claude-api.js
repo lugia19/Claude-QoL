@@ -425,22 +425,30 @@ class ClaudeConversation {
 		let accepted = false;
 		let replied = false;
 		const turnOver = new Set(['STATUS_IDLE', 'STATUS_COMPLETED', 'STATUS_ERROR']);
+		// Only this turn's call counts, never an earlier turn's still-pending one: an elicitation is
+		// matched by its toolUseId to a tool block in one of our reply's display groups.
+		const ourGroups = new Set();
+		const ourToolUses = new Set();
 		const outcome = await this._watchTimeline((update) => {
 			for (const m of update.messages ?? []) {
 				if (m.id === messageId) accepted = true;
 				if (m.id === assistantId) replied = true;
 			}
-			const call = update.elicitations?.find(e => e.request?.status === 'STATUS_PENDING' && e.request.reportedAction?.toolName === toolName);
+			for (const g of update.displayGroups ?? []) if (g.messageId === assistantId) ourGroups.add(g.id);
+			for (const b of update.contentBlocks ?? []) if (b.toolUseId && ourGroups.has(b.displayGroupId)) ourToolUses.add(b.toolUseId);
+			const call = update.elicitations?.find(e => e.request?.status === 'STATUS_PENDING' && ourToolUses.has(e.request.toolUseId) && e.request.reportedAction?.toolName === toolName);
 			if (call) return { toolInput: call.request.reportedAction.toolInput };
 			if (replied && turnOver.has(update.conversation?.status)) return { ended: true };
 		}, () => started + (accepted ? 20 * 60_000 : 60_000));
 
 		if (!outcome) throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
 		if (outcome.ended) return undefined;
-		// Not waited for here: the next send in this chat waits for it instead (see _sendAndAwaitAssistant).
-		this._stopping = this._performAction({ stopGeneration: { stoppingMessageId: assistantId } })
-			.then(r => { if (!r.ok) apiLog.warn('Could not stop the paused turn:', r.status); })
-			.catch(e => apiLog.warn('Could not stop the paused turn:', e));
+		// Not waited for here: the next send in this chat waits for it instead (see _sendAndAwaitAssistant),
+		// and fails if it failed: a send into a turn still paused would only queue behind it.
+		this._stopping = this._performAction({ stopGeneration: { stoppingMessageId: assistantId } }).then(r => {
+			if (!r.ok) throw new Error(`Could not stop the paused turn: ${r.status}`);
+		});
+		this._stopping.catch(() => { }); // reported by whoever awaits it, not as an unhandled rejection
 		return JSON.parse(outcome.toolInput);
 	}
 
@@ -738,7 +746,7 @@ class ClaudeConversation {
 
 	// Delete conversation
 	async delete() {
-		await this._stopping; // after a paused tool call's turn is stopped, not racing it
+		await this._stopping?.catch(() => { }); // after a paused tool call's turn is stopped, not racing it; deleted either way
 		const response = await pageFetch(`/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}`, {
 			method: 'DELETE'
 		});
