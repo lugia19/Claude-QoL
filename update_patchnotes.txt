@@ -1,4 +1,4 @@
-Support for claude.ai's new merged chat experience.
-Jumping to bookmarks and search results no longer moves the chat.
-New: Claude Code system prompt presets.
-A lot of bugfixes.
+Support for several Claude accounts in one browser (Firefox and Brave containers): each account keeps its own settings and data.
+TTS actor mode: expressive audio tags for ElevenLabs v3 and v4, and Eleven v4 support.
+TTS actor mode: narration and "she said" no longer read in the characters' voices.
+Bugfixes.
