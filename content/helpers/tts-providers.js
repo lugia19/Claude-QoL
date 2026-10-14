@@ -89,6 +89,45 @@
 			throw new Error('attributeDialogueToCharacters must be implemented by provider');
 		}
 
+		// Actor mode: Claude (FAST_MODEL) splits `text` into segments, each with the character whose voice
+		// reads it, and submits them through a client tool (structuredCall), so there's no JSON to dig
+		// out of a text reply. `rules` adds provider-specific instructions to the prompt, `extraFields`
+		// per-segment string fields to the tool's schema. Returns [{ character (lowercased), text, extra }],
+		// extra holding the extraFields.
+		async splitIntoSegments(text, characters, { rules = '', extraFields = {} } = {}) {
+			const narratorChar = characters.find(c => c.name.toLowerCase() === 'narrator');
+			const includeNarration = narratorChar && narratorChar.voice;
+			const availableCharacters = includeNarration
+				? characters.map(c => c.name)
+				: characters.filter(c => c.name.toLowerCase() !== 'narrator').map(c => c.name);
+
+			const prompt = `Split the text below into segments for reading aloud, in order, and submit them with the submit_segments tool.
+Available characters: ${availableCharacters.join(', ')}
+
+${includeNarration ? 'Include narration as "narrator".' : 'Only include quoted dialogue, skip narration.'}
+A character's segments hold only their spoken words, without quotation marks: dialogue tags like "she said" and any other narration ${includeNarration ? 'go to the narrator' : 'are skipped'}.
+${rules}
+Text:
+${text}`;
+
+			const segment = { type: 'object', properties: { character: { type: 'string' }, text: { type: 'string' }, ...extraFields }, required: ['character', 'text'] };
+			const input = await structuredCall(prompt, {
+				name: 'submit_segments',
+				description: 'Submit the text split into segments, in reading order, each with the character who speaks it.',
+				schema: { type: 'object', properties: { segments: { type: 'array', items: segment } }, required: ['segments'] },
+			});
+
+			const segments = input?.segments;
+			if (!Array.isArray(segments) || !segments.every(s => typeof s?.character === 'string' && typeof s.text === 'string')) {
+				throw new Error('Dialogue analysis returned malformed segments');
+			}
+			return segments.map(s => ({
+				character: s.character.toLowerCase(),
+				text: s.text,
+				extra: Object.fromEntries(Object.keys(extraFields).map(k => [k, typeof s[k] === 'string' ? s[k] : ''])),
+			}));
+		}
+
 		// Produce 16kHz mono s16le PCM for `text`, invoking onChunk(ArrayBuffer) as audio is generated.
 		// `signal` (AbortSignal) cancels in-flight generation.
 		async synthesize(text, voice, model, apiKey, extra, signal, onChunk) {
@@ -218,90 +257,26 @@
 		}
 
 		async attributeDialogueToCharacters(text, characters, model) {
-			const narratorChar = characters.find(c => c.name.toLowerCase() === 'narrator');
-			const includeNarration = narratorChar && narratorChar.voice;
-			const availableCharacters = includeNarration
-				? characters.map(c => c.name)
-				: characters.filter(c => c.name.toLowerCase() !== 'narrator').map(c => c.name);
-
-			// Check if we're using v3 model for emotion tags
-			const isV3 = model && model.toLowerCase().includes('v3');
-
-			let prompt;
-			if (isV3) {
-				prompt = `Output ONLY a JSON array where each element has "character" and "text" fields.
-Available characters: ${availableCharacters.join(', ')}
-
-${includeNarration ? 'Include narration as "narrator".' : 'Only include quoted dialogue, skip narration.'}
-
-IMPORTANT: Prefix each text segment with an expression tag in square brackets. Examples: [neutral], [happy], [shouting], [angry] and so on. Simple words.
-
-Example: {"character": "Alice", "text": "[sad]I can't believe this happened."}
-
-Analyze this text and output ONLY the JSON array:
-${text}
-
-JSON array:`;
-			} else {
-				// Basic prompt without emotion tags
-				prompt = `Output ONLY a JSON array where each element has "character" and "text" fields.
-Available characters: ${availableCharacters.join(', ')}
-
-${includeNarration ? 'Include narration as "narrator".' : 'Only include quoted dialogue, skip narration.'}
-
-Analyze this text and output ONLY the JSON array:
-${text}
-
-JSON array:`;
-			}
-
-			return new Promise((resolve, reject) => {
-				const requestId = Math.random().toString(36).substr(2, 9);
-
-				const listener = (event) => {
-					if (event.source !== window || event.origin !== window.location.origin) return;
-					if (event.data?.type === 'tts-analyze-dialogue-response' &&
-						event.data.requestId === requestId) {
-						window.removeEventListener('message', listener);
-
-						if (event.data.success) {
-							try {
-								const jsonMatch = event.data.data.match(/\[[\s\S]*\]/);
-								if (!jsonMatch) {
-									throw new Error('No JSON array found in response');
-								}
-
-								const parsed = JSON.parse(jsonMatch[0]);
-								const segments = parsed.map(s => ({
-									character: s.character.toLowerCase(),
-									text: s.text, // Keep emotion tags in text
-									extra: {}
-								}));
-
-								resolve(segments);
-							} catch (error) {
-								log.error('Failed to parse attribution response:', error);
-								reject(error);
-							}
-						} else {
-							reject(new Error(event.data.error));
-						}
-					}
-				};
-
-				window.addEventListener('message', listener);
-
-				window.postMessage({
-					type: 'tts-analyze-dialogue-request',
-					prompt: prompt,
-					requestId: requestId
-				}, window.location.origin);
-
-				setTimeout(() => {
-					window.removeEventListener('message', listener);
-					reject(new Error('Dialogue analysis timed out'));
-				}, 30000);
-			});
+			// Eleven v3 and v4 (eleven_v3, eleven_v4, eleven_v4_turbo) take audio tags. The rules are
+			// adapted from ElevenLabs' own "Enhance" prompt (docs: Text to Speech best practices,
+			// "Enhancing input"), minus its output format, which the tool replaces.
+			const takesAudioTags = /(^|_)v[34]($|_)/i.test(model || '');
+			const audioTagRules = `
+AUDIO TAGS: add audio tags to each segment's "text" to make it more expressive when spoken, while STRICTLY preserving the original words and meaning.
+- Tags go in square brackets, typically right before the part they modify or right after it, e.g. "[annoyed] This is hard." or "This is hard. [sighs]".
+- Tags MUST describe something auditory, and only for the voice: no music or sound effects, and no tags like [standing], [grinning], [pacing], [music].
+- Make them contextually appropriate, matching the emotion and subtext of each line, and vary them across the dialogue (energetic, relaxed, casual, surprised, thoughtful...).
+- DO NOT alter, add or remove any words of the original text, narration included, and never put original text inside brackets.
+- DO NOT turn existing narrative descriptions into tags: if the text says "He laughed loudly", keep it and add a tag only if it fits, e.g. "He laughed loudly [chuckles]".
+- DO NOT pick tags that contradict or change the meaning or intent of a line.
+- You may add emphasis without changing the words: capitalize some words, or add a question mark, an exclamation mark or ellipses where it makes sense.
+Directions (non-exhaustive, similar ones are fine): [happy], [sad], [excited], [angry], [whisper], [annoyed], [appalled], [thoughtful], [surprised]
+Non-verbal (non-exhaustive, similar ones are fine): [laughing], [chuckles], [sighs], [clears throat], [short pause], [long pause], [exhales sharply], [inhales deeply]
+Example segments:
+{"character": "Alice", "text": "[appalled] Are you serious? [sighs] I can't believe you did that!"}
+{"character": "Bob", "text": "I guess you're right. [sighs] It's just... [muttering] difficult."}
+`;
+			return this.splitIntoSegments(text, characters, { rules: takesAudioTags ? audioTagRules : '' }); // tags stay in the text
 		}
 
 		async streamText(text, voiceId, modelId, apiKey, signal) {
@@ -430,72 +405,9 @@ JSON array:`;
 		}
 
 		async attributeDialogueToCharacters(text, characters) {
-			// Build OpenAI-specific prompt
-			const narratorChar = characters.find(c => c.name.toLowerCase() === 'narrator');
-			const includeNarration = narratorChar && narratorChar.voice;
-			const availableCharacters = includeNarration
-				? characters.map(c => c.name)
-				: characters.filter(c => c.name.toLowerCase() !== 'narrator').map(c => c.name);
-
-			const prompt = `Output ONLY a JSON array where each element has:
-- "character": one of [${availableCharacters.join(', ')}]
-- "text": the dialogue or narration text
-- "instructions": brief voice instruction (e.g., "speak sadly", "whisper excitedly", "calm and measured")
-
-${includeNarration ? 'Include narration as "narrator".' : 'Only include quoted dialogue, skip narration.'}
-
-Analyze this text and output ONLY the JSON array:
-${text}
-
-JSON array:`;
-
-			return new Promise((resolve, reject) => {
-				const requestId = Math.random().toString(36).substr(2, 9);
-
-				const listener = (event) => {
-					if (event.source !== window || event.origin !== window.location.origin) return;
-					if (event.data?.type === 'tts-analyze-dialogue-response' &&
-						event.data.requestId === requestId) {
-						window.removeEventListener('message', listener);
-
-						if (event.data.success) {
-							try {
-								// Parse JSON from response
-								const jsonMatch = event.data.data.match(/\[[\s\S]*\]/);
-								if (!jsonMatch) {
-									throw new Error('No JSON array found in response');
-								}
-
-								const parsed = JSON.parse(jsonMatch[0]);
-								const segments = parsed.map(s => ({
-									character: s.character.toLowerCase(),
-									text: s.text,
-									extra: { instructions: s.instructions || '' }
-								}));
-
-								resolve(segments);
-							} catch (error) {
-								log.error('Failed to parse attribution response:', error);
-								reject(error);
-							}
-						} else {
-							reject(new Error(event.data.error));
-						}
-					}
-				};
-
-				window.addEventListener('message', listener);
-
-				window.postMessage({
-					type: 'tts-analyze-dialogue-request',
-					prompt: prompt,
-					requestId: requestId
-				}, window.location.origin);
-
-				setTimeout(() => {
-					window.removeEventListener('message', listener);
-					reject(new Error('Dialogue analysis timed out'));
-				}, 30000);
+			return this.splitIntoSegments(text, characters, {
+				rules: 'Give every segment a brief voice instruction in "instructions" (e.g. "speak sadly", "whisper excitedly", "calm and measured").\n',
+				extraFields: { instructions: { type: 'string', description: 'Brief voice instruction for the segment.' } },
 			});
 		}
 
