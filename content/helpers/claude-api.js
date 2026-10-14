@@ -4,6 +4,13 @@ const apiLog = createLogger('API');
 
 const MAX_FILES_PER_MESSAGE = 18;
 
+// fetch with claude.ai's Origin, from either world. claude.ai checks Origin on writes, and a Firefox
+// content script's own fetch sends the extension's, so it uses the page's (content.fetch); elsewhere
+// plain fetch already sends claude.ai's.
+function pageFetch(...args) {
+	return (globalThis.content?.fetch?.bind(globalThis.content) ?? fetch)(...args);
+}
+
 // ======== DB accessors (auto-detect isolated vs MAIN world) ========
 // ISOLATED uses databases.js directly; MAIN asks it over ClaudeExtBridge (served by db-serve.js).
 // A failed or unanswered call resolves undefined, while a handler's own "nothing stored" is null:
@@ -241,16 +248,21 @@ class ClaudeConversation {
 
 	// Send a message and wait for Claude's reply; returns the reply as a ClaudeMessage. A string is a
 	// plain prompt (options: model, parentMessageUuid); a ClaudeMessage brings its own files.
+	// options.tool ({ name, description, schema }) asks for structured output instead: the send offers
+	// Claude that one client tool, the result is the arguments Claude called it with (parsed), and it
+	// throws when Claude answers without calling it. The call leaves the conversation paused, so it
+	// can't take another send: use a throwaway one (structuredCall). See _awaitToolCall.
 	async sendMessageAndWaitForResponse(promptOrMessage, options = {}) {
+		const tool = options.tool;
 		if (!(promptOrMessage instanceof ClaudeMessage)) {
 			const { model = null, parentMessageUuid = ROOT_MESSAGE_UUID } = options;
-			return this._sendAndAwaitAssistant({ text: promptOrMessage, parentMessageUuid, model });
+			return this._sendAndAwaitAssistant({ text: promptOrMessage, parentMessageUuid, model }, tool);
 		}
 
 		const msg = promptOrMessage;
 		const send = msg.toSendMessage();
 		if (options.model) send.model = options.model;
-		if (send.attachments.length <= MAX_FILES_PER_MESSAGE) return this._sendAndAwaitAssistant(send);
+		if (send.attachments.length <= MAX_FILES_PER_MESSAGE) return this._sendAndAwaitAssistant(send, tool);
 
 		// Too many files for one message: intermediate "filler" sends carry only a file chunk and a
 		// placeholder text; the final send carries the real text, the inline attachments and the
@@ -270,7 +282,7 @@ class ClaudeConversation {
 			});
 			parentUuid = fillerAsst.uuid;
 		}
-		return this._sendAndAwaitAssistant({ ...send, parentMessageUuid: parentUuid, attachments: chunks[chunks.length - 1] });
+		return this._sendAndAwaitAssistant({ ...send, parentMessageUuid: parentUuid, attachments: chunks[chunks.length - 1] }, tool);
 	}
 
 	async _patchAccountSettingsIfNeeded() {
@@ -299,11 +311,8 @@ class ClaudeConversation {
 
 	// One merged-experience action on this conversation (Connect's JSON codec, so it works from either
 	// world without the protobuf schema). A 200 only means accepted: success or failure arrives on the
-	// StreamTimeline as a mutation ack. The RPCs check Origin: a Firefox content script's own fetch
-	// sends the extension's, so it uses the page's (content.fetch); elsewhere plain fetch already
-	// sends claude.ai's.
+	// StreamTimeline as a mutation ack. The RPCs check Origin, hence pageFetch.
 	async _performAction(action) {
-		const pageFetch = globalThis.content?.fetch?.bind(globalThis.content) ?? fetch;
 		return pageFetch(...ClaudeExtNet.bardRpcRequest('PerformAction', this.orgId, JSON.stringify({
 			header: {
 				conversationId: this.conversationId,
@@ -320,8 +329,9 @@ class ClaudeConversation {
 	// has no name, so the name is set after. `send` is { text, parentMessageUuid, model, timezone,
 	// locale, attachments: [{ id, fileName, fileSize, mediaType }], inlineAttachments: [{ fileName,
 	// fileSize, fileType, extractedContent }] }; timezone, locale and the attachment lists default to
-	// the browser's zone, the account locale and none.
-	async _sendAndAwaitAssistant(send) {
+	// the browser's zone, the account locale and none. With a tool (see sendMessageAndWaitForResponse)
+	// the send offers it as a client tool, and the result is the tool's arguments.
+	async _sendAndAwaitAssistant(send, tool) {
 		const creating = !this.created;
 		const createParams = this._pendingCreateParams;
 		const settingsToRestore = creating ? await this._patchAccountSettingsIfNeeded() : null;
@@ -345,6 +355,7 @@ class ClaudeConversation {
 			sendMessage.parentMessageId = toRoot ? '' : send.parentMessageUuid;
 			if (model) sendMessage.model = { identifier: model };
 			if (creating && createParams?.project_uuid) sendMessage.projectId = createParams.project_uuid;
+			if (tool) sendMessage.clientTools = [{ name: tool.name, description: tool.description, inputSchemaJson: JSON.stringify(tool.schema) }];
 
 			const response = await this._performAction({ sendMessage });
 			if (!response.ok) {
@@ -356,44 +367,122 @@ class ClaudeConversation {
 				this._pendingCreateParams = null;
 			}
 
-			// The reply is done once the tree has it with a stop reason. A rejected send is only
-			// reported on the stream, so: our message showing up in the tree means accepted, and then
-			// the reply gets as long as it needs (a big-model summary of a long chat can take minutes;
-			// the cap only stops a turn that died from hanging forever). Never showing up within a
-			// minute means rejected. Polled with a plain fetch, not getData() (no conversation-cache
-			// write per poll; a brand-new conversation can 404 for a moment), backing off so a long
-			// turn doesn't re-download the tree every second.
-			const treeUrl = this._treeUrl();
-			const started = Date.now();
-			let accepted = false;
-			let interval = 1500;
-			while (Date.now() - started < (accepted ? 20 * 60_000 : 60_000)) {
-				await new Promise(r => setTimeout(r, interval));
-				interval = Math.min(interval * 1.5, 8000);
-				const tree = await fetch(treeUrl);
-				if (!tree.ok) continue;
-				const data = await tree.json();
-				accepted ||= data.chat_messages?.some(m => m.uuid === messageId) ?? false;
-				const reply = data.chat_messages?.find(m => m.uuid === assistantId);
-				if (reply?.stop_reason) {
-					this.conversationData = data;
-					this._syncAccountFeatureSettings();
-					// Named now that the conversation surely exists. A missing name isn't worth failing
-					// the send over, so a failed rename is only logged.
-					if (creating && createParams?.name && data.name !== createParams.name) {
-						const renamed = await this._performAction({ renameConversation: { title: createParams.name } }).catch(e => e);
-						if (!renamed?.ok) apiLog.warn('Could not name the new conversation:', renamed?.status ?? renamed);
-						else this.conversationData.name = createParams.name;
-					}
-					return ClaudeMessage.fromHistoryJSON(this, reply);
-				}
+			if (tool) {
+				const input = await this._awaitToolCall(messageId, assistantId, tool.name);
+				if (creating) await this._nameNew(createParams);
+				return input;
 			}
-			throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
+
+			const { data, reply } = await this._awaitTreeReply(messageId, assistantId);
+			this.conversationData = data;
+			this._syncAccountFeatureSettings();
+			if (creating) await this._nameNew(createParams, data.name);
+			return ClaudeMessage.fromHistoryJSON(this, reply);
 		} finally {
 			if (settingsToRestore) {
 				await updateAccountSettings(settingsToRestore);
 			}
 		}
+	}
+
+	// The reply is done once the tree has it with a stop reason; returns { data, reply }. A rejected
+	// send is only reported on the stream, so: our message showing up in the tree means accepted, and
+	// then the reply gets as long as it needs (a big-model summary of a long chat can take minutes;
+	// the cap only stops a turn that died from hanging forever). Never showing up within a minute
+	// means rejected. Polled with a plain fetch, not getData() (no conversation-cache write per poll;
+	// a brand-new conversation can 404 for a moment), backing off so a long turn doesn't re-download
+	// the tree every second.
+	async _awaitTreeReply(messageId, assistantId) {
+		const treeUrl = this._treeUrl();
+		const started = Date.now();
+		let accepted = false;
+		let interval = 1500;
+		while (Date.now() - started < (accepted ? 20 * 60_000 : 60_000)) {
+			await new Promise(r => setTimeout(r, interval));
+			interval = Math.min(interval * 1.5, 8000);
+			const tree = await fetch(treeUrl);
+			if (!tree.ok) continue;
+			const data = await tree.json();
+			accepted ||= data.chat_messages?.some(m => m.uuid === messageId) ?? false;
+			const reply = data.chat_messages?.find(m => m.uuid === assistantId);
+			if (reply?.stop_reason) return { data, reply };
+		}
+		throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
+	}
+
+	// Client tools: a turn that calls one pauses for the page to run it (the conversation waits for
+	// input) and never shows up in the tree. The call's arguments come on the StreamTimeline, as the
+	// pending elicitation that asks to run the tool. We only want the arguments: the turn is left
+	// paused, and the conversation can't take another send (it would queue behind the call), which is
+	// why tool sends go to throwaway conversations (structuredCall); deleting one needs no stop.
+	// Returns the parsed arguments; throws when the turn ended without calling the tool. The same
+	// limits as the tree wait: a minute to be accepted, then 20. See docs/bard-rework.md, "Client tools".
+	async _awaitToolCall(messageId, assistantId, toolName) {
+		const started = Date.now();
+		let accepted = false;
+		let replied = false;
+		const turnOver = new Set(['STATUS_IDLE', 'STATUS_COMPLETED', 'STATUS_ERROR']);
+		const outcome = await this._watchTimeline((update) => {
+			for (const m of update.messages ?? []) {
+				if (m.id === messageId) accepted = true;
+				if (m.id === assistantId) replied = true;
+			}
+			const call = update.elicitations?.find(e => e.request?.status === 'STATUS_PENDING' && e.request.reportedAction?.toolName === toolName);
+			if (call) return { toolInput: call.request.reportedAction.toolInput };
+			if (replied && turnOver.has(update.conversation?.status)) return { ended: true };
+		}, () => started + (accepted ? 20 * 60_000 : 60_000));
+
+		if (!outcome) throw new Error(accepted ? 'The reply never finished' : 'The message was not accepted');
+		if (outcome.ended) throw new Error(`Claude answered without calling ${toolName}`);
+		return JSON.parse(outcome.toolInput);
+	}
+
+	// Reads this conversation's StreamTimeline, calling onUpdate(update) for every update (the snapshot
+	// first) until it returns something, which is the result; null once deadline() (a timestamp) has
+	// passed. Connect's JSON codec, as in _performAction, so it needs no protobuf schema in either
+	// world (fields come camelCase). The server ends the stream every few seconds, so it's reopened
+	// until done. In MAIN it goes around bard-host, which would try to read the JSON as protobuf.
+	async _watchTimeline(onUpdate, deadline) {
+		const streamFetch = globalThis.QolBardHost?.rawFetch ?? pageFetch;
+		const body = ClaudeExtNet.encodeConnectFrame(new TextEncoder().encode(JSON.stringify({ conversationId: this.conversationId, displayLanguage: accountLocale() })));
+		const decoder = new TextDecoder();
+		while (Date.now() < deadline()) {
+			const [url, init] = ClaudeExtNet.bardRpcRequest('StreamTimeline', this.orgId, body);
+			init.headers['content-type'] = 'application/connect+json';
+			const abort = new AbortController();
+			init.signal = abort.signal;
+			const timer = setTimeout(() => abort.abort(), Math.max(0, deadline() - Date.now()));
+			let result;
+			try {
+				const response = await streamFetch(url, init);
+				if (response.ok) {
+					await ClaudeExtNet.readConnectFrames(response, (frame) => {
+						if (frame.endStream) return;
+						const update = JSON.parse(decoder.decode(frame.payload)).event?.update;
+						if (update) result = onUpdate(update);
+						if (result !== undefined) return false;
+					});
+				} else {
+					apiLog.warn('StreamTimeline refused:', response.status);
+					await new Promise(r => setTimeout(r, 1000));
+				}
+			} catch (e) {
+				if (!abort.signal.aborted) apiLog.warn('StreamTimeline failed:', e);
+			} finally {
+				clearTimeout(timer);
+			}
+			if (result !== undefined) return result;
+		}
+		return null;
+	}
+
+	// Named once the conversation surely exists (send_message has no name). A missing name isn't worth
+	// failing the send over, so a failed rename is only logged.
+	async _nameNew(createParams, currentName) {
+		if (!createParams?.name || currentName === createParams.name) return;
+		const renamed = await this._performAction({ renameConversation: { title: createParams.name } }).catch(e => e);
+		if (!renamed?.ok) apiLog.warn('Could not name the new conversation:', renamed?.status ?? renamed);
+		else if (this.conversationData) this.conversationData.name = createParams.name;
 	}
 
 	// Upload file to code execution environment
@@ -642,7 +731,7 @@ class ClaudeConversation {
 
 	// Delete conversation
 	async delete() {
-		const response = await fetch(`/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}`, {
+		const response = await pageFetch(`/api/organizations/${this.orgId}/chat_conversations/${this.conversationId}`, {
 			method: 'DELETE'
 		});
 
@@ -1721,6 +1810,23 @@ function getOrgId() {
 	const orgId = getActiveOrgId();
 	if (!orgId) throw new Error('Could not find organization ID');
 	return orgId;
+}
+
+// One structured answer from FAST_MODEL: the prompt goes to a throwaway conversation with one client tool, tool =
+// { name, description, schema } (a JSON schema for its input), and Claude's arguments to that tool
+// come back parsed. Throws when Claude answers without calling it. Not validated against the
+// schema: callers check what they use. Built for speed: the conversation isn't named, and it's
+// deleted in the background, which saves 1.5-2 s per call.
+async function structuredCall(prompt, tool) {
+	const conversation = new ClaudeConversation(getOrgId());
+	conversation.prepareNew('', FAST_MODEL);
+	try {
+		return await conversation.sendMessageAndWaitForResponse(prompt, { tool });
+	} finally {
+		if (conversation.created) {
+			conversation.delete().catch(e => apiLog.warn('Could not delete the structured call\'s conversation:', e));
+		}
+	}
 }
 
 // ======== Skills API (used for encryption key storage) ========

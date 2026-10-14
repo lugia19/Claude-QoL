@@ -136,6 +136,7 @@
 			if (entry.cancelled || signal.aborted) return;
 			const voice = voiceMap[segment.character];
 			if (!voice) continue; // character mapped to no voice -> skip
+			if (!provider.isSpeakable(segment.text, settings.model)) continue; // e.g. a lone audio tag
 			await provider.synthesize(segment.text, voice, settings.model, settings.apiKey, { ...segment.extra, baseUrl }, signal, onChunk);
 		}
 	}
