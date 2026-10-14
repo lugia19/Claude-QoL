@@ -27,13 +27,7 @@
 
 	// Synchronous, so a chat without phantoms is never held.
 	function mayHavePhantoms(conversationId) {
-		try {
-			if (readOrgMirror('phantom_ids')?.includes(conversationId)) return true;
-			// Very old forks, not migrated to IndexedDB yet (claude-api.js's getPhantomMessages does that).
-			return legacyPhantomKeys(conversationId).some(key => localStorage.getItem(key));
-		} catch (e) {
-			return false;
-		}
+		return !!readOrgMirror('phantom_ids')?.includes(conversationId);
 	}
 
 	// ======== Building the phantoms ========

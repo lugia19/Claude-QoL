@@ -152,7 +152,6 @@
 		const org = { orgId, key, keyHash, cacheDB, phantomDB };
 		await _claimLegacyPhantoms(org); // before the first read, so a fork's phantoms are there
 		writePhantomIdsMirror(org);
-		_deleteOldConnector(orgId); // fire-and-forget
 		return org;
 	}
 
@@ -297,25 +296,10 @@
 		}
 	}
 
-	async function _deleteOldConnector(orgId) {
-		const OLD_CONNECTOR_NAME = 'QOL_ENCRYPTIONKEY_DO_NOT_DELETE';
-		try {
-			const connectors = await (await fetch(`/api/organizations/${orgId}/mcp/remote_servers`)).json();
-			if (!Array.isArray(connectors)) return;
-			const old = connectors.find(c => c.name === OLD_CONNECTOR_NAME);
-			if (!old) return;
-			log('Deleting old encryption connector:', old.uuid);
-			await fetch(`/api/organizations/${orgId}/mcp/remote_servers/${old.uuid}`, { method: 'DELETE' });
-			log('Old connector deleted');
-		} catch (e) {
-			log.warn('Failed to delete old connector:', e.message);
-		}
-	}
-
-	// One-time migration: delete databases left behind by removed features (the old search index
-	// and the global text search that replaced it) and the shared pre-per-org conversation cache.
+	// One-time migration: delete databases left behind by removed features (the global text search)
+	// and the shared pre-per-org conversation cache.
 	async function deleteOldDatabases() {
-		for (const name of ['claudeSearchIndex', 'ClaudeSearchDB', 'ClaudeExportDB']) {
+		for (const name of ['ClaudeSearchDB', 'ClaudeExportDB']) {
 			try {
 				if (!(await Dexie.exists(name))) continue;
 				await Dexie.delete(name);

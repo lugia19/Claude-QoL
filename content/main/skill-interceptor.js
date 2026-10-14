@@ -7,15 +7,11 @@
 	const log = createLogger('SkillInterceptor');
 
 	const HIDDEN_SKILL_NAME = 'qol-encryptionkey-do-not-delete';
-	// Legacy encryption-key styles that have since been converted into skills.
-	// They carry this marker in their description rather than a known name.
-	const HIDDEN_DESCRIPTION_MARKER = 'QOL_ENCRYPT_NODELETE';
 
 	// A skill, library item or one of its components that is (or wraps) the key.
 	function isKeySkill(entry) {
 		if (!entry || typeof entry !== 'object') return false;
 		if (entry.name === HIDDEN_SKILL_NAME || entry.display_name === HIDDEN_SKILL_NAME) return true;
-		if (typeof entry.description === 'string' && entry.description.includes(HIDDEN_DESCRIPTION_MARKER)) return true;
 		return Array.isArray(entry.components) && entry.components.some(isKeySkill);
 	}
 
@@ -61,7 +57,7 @@
 		try {
 			// Most library responses don't hold the key: only parse and walk the ones that mention it.
 			const text = await response.clone().text();
-			if (!text.includes(HIDDEN_SKILL_NAME) && !text.includes(HIDDEN_DESCRIPTION_MARKER)) return response;
+			if (!text.includes(HIDDEN_SKILL_NAME)) return response;
 			const data = JSON.parse(text);
 			const dropped = dropKeySkills(data);
 			if (!dropped.length) return response;
