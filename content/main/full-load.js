@@ -12,8 +12,8 @@
 // page forget a version picked with the branch arrows on every reconnect.
 // See docs/bard-rework.md, "Loading every message".
 //
-// Setting: "Load whole conversations" (extension-settings.js), on by default, mirrored to
-// localStorage[claude_qol_full_load] ('0' = off) because settings live in the ISOLATED world and load
+// Setting: "Load whole conversations" (extension-settings.js), on by default, mirrored per org to
+// localStorage (org-mirror.js, 'full_load') because settings live in the ISOLATED world and load
 // after the first snapshot. A change applies on the next page load.
 //
 // QolFullLoad.require(conversationId) loads a conversation whole even with the setting off, and starts
@@ -22,7 +22,7 @@
 (function () {
 	'use strict';
 
-	const enabled = localStorage.getItem('claude_qol_full_load') !== '0';
+	const enabled = readOrgMirror('full_load') !== false;
 
 	const TREE_TTL_MS = 5 * 60 * 1000;
 	const MAX_TREES = 3;
@@ -59,10 +59,9 @@
 		return promise;
 	}
 
-	// At document_start page.js hasn't loaded and no request has said the display language yet: the org
-	// is the cookie getActiveOrgId() reads, the language the page's <html lang>.
+	// At document_start no request has said the display language yet: it's the page's <html lang>.
 	function prefetch(conversationId) {
-		const orgId = document.cookie.match(/(?:^|;\s*)lastActiveOrg=([^;]+)/)?.[1];
+		const orgId = getActiveOrgId();
 		if (orgId) fullTree(orgId, conversationId, document.documentElement.lang || 'en-US');
 	}
 

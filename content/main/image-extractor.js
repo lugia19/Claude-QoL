@@ -13,25 +13,19 @@
 // an inline text group holding a zero-width space: real text to the renderer (trim() keeps U+200B),
 // invisible on screen, nothing to strip from copied or read-aloud text.
 //
-// Settings: mirrored to localStorage by content/isolated/image-gallery.js (they live in ISOLATED,
-// and load after the first snapshot).
+// Settings: mirrored per org to localStorage (org-mirror.js) by content/isolated/image-gallery.js (they
+// live in ISOLATED, and load after the first snapshot).
 (function () {
 	'use strict';
 	const log = createLogger('ImageGallery');
 
-	const CONFIG_KEY = 'claude_qol_image_gallery';
 	const DIMS_CACHE_KEY = 'claude_qol_image_dims'; // by image URL
 	const DIMS_CACHE_MAX = 500;
 	const FALLBACK_DIMS = { width: 1024, height: 1024 };
 	const ZERO_WIDTH_SPACE = String.fromCharCode(0x200B); // the gallery break, see above
 
 	function galleryConfig() {
-		const defaults = { enabled: true, limitEnabled: false, limit: 3 };
-		try {
-			return { ...defaults, ...JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}') };
-		} catch (e) {
-			return defaults;
-		}
+		return { enabled: true, limitEnabled: false, limit: 3, ...readOrgMirror('image_gallery') };
 	}
 
 	// Images per gallery: Infinity without a limit. claude.ai shows at most 3 of a gallery inline (its

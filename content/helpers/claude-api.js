@@ -68,10 +68,9 @@ const phantomMessageId = (uuid) => PHANTOM_ID_PREFIX + uuid.slice(PHANTOM_ID_PRE
 // Also true for a phantom row's "<id>-hub-reply" turn key.
 const isPhantomId = (id) => typeof id === 'string' && id.startsWith(PHANTOM_ID_PREFIX);
 
-// Where phantoms live besides IndexedDB: the ids of conversations that have some, mirrored to the
-// page's localStorage by databases.js (phantom-messages.js reads it synchronously), and the keys very
-// old forks stored the phantoms themselves under.
-const PHANTOM_IDS_KEY = 'claude_qol_phantom_ids';
+// Where phantoms live besides IndexedDB: the keys very old forks stored the phantoms themselves under.
+// (The ids of conversations that have some are mirrored per org by databases.js, org-mirror.js's
+// 'phantom_ids'.)
 const legacyPhantomKeys = (conversationId) => [`phantom_messages_${conversationId}`, `fork_history_${conversationId}`];
 
 const PHANTOM_ACK_TEXT = 'Acknowledged - end of previous conversation.';

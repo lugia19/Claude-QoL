@@ -367,18 +367,14 @@
 	// ======== CLAUDE CODE SYSTEM PROMPT ========
 	function initCodePrompt() {
 		const P = SETTINGS_KEYS.CODE_PROMPT;
-		// code-session-prompt.js (MAIN) reads this when a session is created: same origin, synchronous.
+		// code-session-prompt.js (MAIN) reads this org mirror (org-mirror.js) when a session is created.
 		// Written on init and synchronously on every change of the setting (here or in another tab), from
 		// the values in hand: settingsRegistry.set() runs this tab's listeners before it resolves, so the
 		// mirror is current by the time an apply or a mode change completes. Removed when there's no prompt.
-		const MIRROR_KEY = 'claude_qol_code_prompt';
 		const mirror = { text: '', mode: P.MODE.default };
 
 		function writeMirror() {
-			try {
-				if (mirror.text.trim()) localStorage.setItem(MIRROR_KEY, JSON.stringify(mirror));
-				else localStorage.removeItem(MIRROR_KEY);
-			} catch (e) { /* storage unavailable: sessions start without the prompt */ }
+			writeOrgMirror('code_prompt', mirror.text.trim() ? mirror : undefined);
 		}
 
 		// Replace (the default) or append, under the list. Saved as soon as it changes.

@@ -111,16 +111,93 @@
 		return matchRatio >= 0.85;
 	};
 
-	// ======== ENCRYPTION ========
+	// ======== ENCRYPTION AND PER-ORG DATABASES ========
+	// Several orgs can share this storage (switching orgs in one profile), so each org has its own
+	// databases (ClaudeExportDB_<orgId>, ClaudePhantomMessagesDB_<orgId>) and its own key, kept in that
+	// org's ENCRYPTION_SKILL_NAME skill. Nothing here ever touches another org's data.
 	const ENCRYPTION_SKILL_NAME = 'qol-encryptionkey-do-not-delete';
-	let _encryptionKeyPromise = null;
-	let _keyHash = null; // first 8 hex chars of SHA-256 of the raw key
+	const _orgs = new Map(); // orgId -> promise of the org's { orgId, key, keyHash, cacheDB, phantomDB }, or null
 
-	function getEncryptionKey() {
-		if (!_encryptionKeyPromise) {
-			_encryptionKeyPromise = _initEncryptionKey();
+	// The current org's key and databases, or null (logged out, or no key could be fetched or made:
+	// then nothing is stored, rather than stored in plaintext).
+	function getOrg() {
+		const orgId = getActiveOrgId();
+		if (!orgId) return Promise.resolve(null);
+		if (!_orgs.has(orgId)) _orgs.set(orgId, _initOrg(orgId));
+		return _orgs.get(orgId);
+	}
+
+	async function _initOrg(orgId) {
+		const cacheDB = new Dexie(`ClaudeExportDB_${orgId}`);
+		cacheDB.version(1).stores({ conversations: 'uuid' }); // { uuid, updated_at, data }
+		const phantomDB = new Dexie(`ClaudePhantomMessagesDB_${orgId}`);
+		phantomDB.version(1).stores({ phantomMessages: 'conversationId' }); // { conversationId, encryptedData }
+
+		const keySkill = await _fetchKeySkill(orgId);
+		if (keySkill === undefined) return null; // couldn't ask
+		let rawKey;
+		if (keySkill) {
+			log('Found encryption key skill:', keySkill.id);
+			rawKey = Uint8Array.from(atob(keySkill.description.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+		} else {
+			// No skill: this org's data is unreadable (its key is gone). Start over with a new key.
+			log('No encryption key skill found, wiping this org\'s data...');
+			await Promise.all([cacheDB.conversations.clear(), phantomDB.phantomMessages.clear()]);
+			rawKey = await _createKeySkill(orgId);
+			if (!rawKey) return null;
 		}
-		return _encryptionKeyPromise;
+		const keyHash = await _computeKeyHash(rawKey);
+		log('Key hash:', keyHash);
+		const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+		const org = { orgId, key, keyHash, cacheDB, phantomDB };
+		await _claimLegacyPhantoms(org); // before the first read, so a fork's phantoms are there
+		writePhantomIdsMirror(org);
+		_deleteOldConnector(orgId); // fire-and-forget
+		return org;
+	}
+
+	// The org's key skill, null if it has none, undefined if the skills couldn't be listed.
+	async function _fetchKeySkill(orgId) {
+		for (let attempt = 0; attempt < 10; attempt++) {
+			try {
+				const skillsData = await listSkills(orgId);
+				return (skillsData.skills || []).find(s => s.name === ENCRYPTION_SKILL_NAME) ?? null;
+			} catch (e) {
+				if (attempt < 9) {
+					log.warn(`Failed to fetch skills (attempt ${attempt + 1}/10), retrying...`);
+					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+					continue;
+				}
+				log.warn('Failed to fetch skills after 10 attempts, not storing anything this page load:', e.message);
+				return undefined;
+			}
+		}
+	}
+
+	// A new random key, saved as the org's (disabled) key skill. Null if that fails.
+	async function _createKeySkill(orgId) {
+		const rawKey = crypto.getRandomValues(new Uint8Array(16)); // 128-bit
+		const base64Key = btoa(String.fromCharCode(...rawKey))
+			.replace(/=+$/, '')
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_');
+		for (let attempt = 0; attempt < 10; attempt++) {
+			try {
+				const skill = await createSkill(orgId, ENCRYPTION_SKILL_NAME, base64Key);
+				log('Created encryption key skill:', skill.id);
+				await disableSkill(orgId, skill.id);
+				log('Disabled encryption key skill');
+				return rawKey;
+			} catch (e) {
+				if (attempt < 9) {
+					log.warn(`Failed to create key skill (attempt ${attempt + 1}/10), retrying...`);
+					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+					continue;
+				}
+				log.warn('Failed to create key skill after 10 attempts, not storing anything this page load:', e.message);
+				return null;
+			}
+		}
 	}
 
 	async function _computeKeyHash(rawKey) {
@@ -130,143 +207,93 @@
 	}
 
 	// Encrypt: returns { v: 1, keyHash, data: base64(iv + ciphertext) }
-	async function encryptData(data) {
-		const key = await getEncryptionKey();
-		if (!key) {
-			log('encrypt: no key, plaintext passthrough');
-			return data;
-		}
-
-		log('Encrypting with keyHash:', _keyHash);
+	async function encryptData(data, org) {
 		const iv = crypto.getRandomValues(new Uint8Array(12));
 		const encoded = new TextEncoder().encode(JSON.stringify(data));
-		const ciphertext = await crypto.subtle.encrypt(
-			{ name: 'AES-GCM', iv }, key, encoded
-		);
+		const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, org.key, encoded);
 		const combined = new Uint8Array(iv.length + ciphertext.byteLength);
 		combined.set(iv);
 		combined.set(new Uint8Array(ciphertext), iv.length);
 		let binary = '';
 		for (let i = 0; i < combined.length; i++) binary += String.fromCharCode(combined[i]);
-		return { v: 1, keyHash: _keyHash, data: btoa(binary) };
+		return { v: 1, keyHash: org.keyHash, data: btoa(binary) };
 	}
 
-	// Decrypt: detects per-item format
-	async function decryptData(item) {
-		// Plaintext passthrough — not an encrypted wrapper
-		if (!item || typeof item !== 'object' || !item.v || !item.keyHash) {
-			log('decrypt: plaintext passthrough');
-			return item;
+	const isEncrypted = (item) => !!(item && typeof item === 'object' && item.v && item.keyHash);
+
+	async function decryptData(item, org) {
+		if (item.keyHash !== org.keyHash) {
+			throw new Error(`Key mismatch: item encrypted with ${item.keyHash}, current key is ${org.keyHash}`);
 		}
-
-		const key = await getEncryptionKey();
-
-		log('Decrypting, item keyHash:', item.keyHash, 'current keyHash:', _keyHash);
-
-		if (!key || item.keyHash !== _keyHash) {
-			throw new Error(`Key mismatch: item encrypted with ${item.keyHash}, current key is ${_keyHash || 'none'}`);
-		}
-
 		const combined = Uint8Array.from(atob(item.data), c => c.charCodeAt(0));
-		const iv = combined.slice(0, 12);
-		const ciphertext = combined.slice(12);
-		const decrypted = await crypto.subtle.decrypt(
-			{ name: 'AES-GCM', iv }, key, ciphertext
-		);
+		const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: combined.slice(0, 12) }, org.key, combined.slice(12));
 		return JSON.parse(new TextDecoder().decode(decrypted));
 	}
 
-	async function _initEncryptionKey() {
-		let skillsData;
-		for (let attempt = 0; attempt < 10; attempt++) {
-			try {
-				skillsData = await listSkills(getOrgId());
-				break;
-			} catch (e) {
-				if (attempt < 9) {
-					log.warn(`Failed to fetch skills (attempt ${attempt + 1}/10), retrying...`);
-					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-					continue;
-				}
-				log.warn('Failed to fetch skills after 10 attempts, operating in plaintext mode:', e.message);
-				return null;
-			}
-		}
-
-		const keySkill = (skillsData.skills || []).find(s => s.name === ENCRYPTION_SKILL_NAME);
-
-		if (keySkill) {
-			log('Found encryption key skill:', keySkill.id);
-			const base64Key = keySkill.description;
-			const standardBase64 = base64Key.replace(/-/g, '+').replace(/_/g, '/');
-			const rawKey = Uint8Array.from(atob(standardBase64), c => c.charCodeAt(0));
-			_keyHash = await _computeKeyHash(rawKey);
-			log('Key hash:', _keyHash);
-			const key = await crypto.subtle.importKey(
-				'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
-			);
-			_bulkEncryptAll(); // fire-and-forget
-			_deleteOldConnector(); // fire-and-forget
-			return key;
-		}
-
-		// No skill found — wipe any existing encrypted data (old key is unrecoverable)
-		log('No encryption key skill found, wiping existing data...');
-		await _wipeAllEncryptedData();
-
-		// Generate new key
-		const rawKey = crypto.getRandomValues(new Uint8Array(16)); // 128-bit
-		const base64Key = btoa(String.fromCharCode(...rawKey))
-			.replace(/=+$/, '')
-			.replace(/\+/g, '-')
-			.replace(/\//g, '_');
-
-		for (let attempt = 0; attempt < 10; attempt++) {
-			try {
-				const orgId = getOrgId();
-				const skill = await createSkill(orgId, ENCRYPTION_SKILL_NAME, base64Key);
-				log('Created encryption key skill:', skill.id);
-				await disableSkill(orgId, skill.id);
-				log('Disabled encryption key skill');
-				_keyHash = await _computeKeyHash(rawKey);
-				log('New key hash:', _keyHash);
-				const key = await crypto.subtle.importKey(
-					'raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
-				);
-				return key;
-			} catch (e) {
-				if (attempt < 9) {
-					log.warn(`Failed to create key skill (attempt ${attempt + 1}/10), retrying...`);
-					await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
-					continue;
-				}
-				log.warn('Failed to create key skill after 10 attempts, operating in plaintext mode:', e.message);
-				return null;
-			}
-		}
-	}
-
-	async function _wipeAllEncryptedData() {
+	// Row `id` with row[field] decrypted, or null. A row that won't decrypt (its key was replaced) is
+	// deleted.
+	async function readRow(table, id, field) {
+		const org = await getOrg();
+		const row = org && await table(org).get(id);
+		if (!row?.[field]) return null;
 		try {
-			const cacheCount = await cacheDB.conversations.count();
-			const phantomCount = await phantomDB.phantomMessages.count();
-			log(`Wiping: ${cacheCount} cached conversations, ${phantomCount} phantom messages`);
-
-			await Promise.all([
-				cacheDB.conversations.clear(),
-				phantomDB.phantomMessages.clear()
-			]);
-
-			log('Data wipe complete');
+			return { ...row, [field]: await decryptData(row[field], org) };
 		} catch (e) {
-			log.warn('Error during data wipe:', e.message);
+			log.warn(`Decryption failed for ${id}, deleting entry`);
+			await table(org).delete(id);
+			return null;
 		}
 	}
 
-	async function _deleteOldConnector() {
+	// Encrypts `data` into row[field] and stores the row. False when there's no key to encrypt with.
+	async function writeRow(table, row, field, data) {
+		const org = await getOrg();
+		if (!org) {
+			log.warn('No encryption key for this org, not storing', Object.values(row)[0]);
+			return false;
+		}
+		await table(org).put({ ...row, [field]: await encryptData(data, org) });
+		return true;
+	}
+
+	const cacheTable = (org) => org.cacheDB.conversations;
+	const phantomTable = (org) => org.phantomDB.phantomMessages;
+
+	// ======== LEGACY DATABASES ========
+	// Before per-org databases, every org shared ClaudePhantomMessagesDB (and ClaudeExportDB). Each org
+	// moves the phantoms encrypted with its key into its own database, re-encrypting plaintext ones
+	// (from before encryption; whichever org loads first takes those, as the old bulk encryption did).
+	// Rows of an org that hasn't loaded yet stay; the database goes once it's empty. The conversation
+	// cache is just a cache, so its legacy database is simply deleted (deleteOldDatabases).
+	const LEGACY_PHANTOM_DB = 'ClaudePhantomMessagesDB';
+
+	async function _claimLegacyPhantoms(org) {
+		try {
+			if (!(await Dexie.exists(LEGACY_PHANTOM_DB))) return;
+			const legacy = await new Dexie(LEGACY_PHANTOM_DB).open(); // dynamic mode: whatever schema it has
+			const table = legacy.table('phantomMessages');
+			const mine = (await table.toArray()).filter(r => !isEncrypted(r.encryptedData) || r.encryptedData.keyHash === org.keyHash);
+			if (mine.length) {
+				const moved = await Promise.all(mine.map(async ({ conversationId, encryptedData }) => ({
+					conversationId,
+					encryptedData: isEncrypted(encryptedData) ? encryptedData : await encryptData(encryptedData, org),
+				})));
+				await phantomTable(org).bulkPut(moved);
+				await table.bulkDelete(mine.map(r => r.conversationId));
+				log(`Moved ${moved.length} phantom conversations into this org's database`);
+			}
+			const left = await table.count();
+			legacy.close();
+			// Not awaited: an open connection elsewhere (a tab still on an older version) blocks it.
+			if (!left) Dexie.delete(LEGACY_PHANTOM_DB).catch(() => { });
+		} catch (e) {
+			log.warn('Moving legacy phantoms failed:', e.message);
+		}
+	}
+
+	async function _deleteOldConnector(orgId) {
 		const OLD_CONNECTOR_NAME = 'QOL_ENCRYPTIONKEY_DO_NOT_DELETE';
 		try {
-			const orgId = getOrgId();
 			const connectors = await (await fetch(`/api/organizations/${orgId}/mcp/remote_servers`)).json();
 			if (!Array.isArray(connectors)) return;
 			const old = connectors.find(c => c.name === OLD_CONNECTOR_NAME);
@@ -279,18 +306,10 @@
 		}
 	}
 
-	// Expose for use by other scripts
-	window.ClaudeSearchShared.encryptData = encryptData;
-	window.ClaudeSearchShared.decryptData = decryptData;
-
-	// Eagerly initialize encryption key on load
-	getEncryptionKey();
-
-	// ======== INDEXEDDB MANAGEMENT ========
 	// One-time migration: delete databases left behind by removed features (the old search index
-	// and the global text search that replaced it).
+	// and the global text search that replaced it) and the shared pre-per-org conversation cache.
 	async function deleteOldDatabases() {
-		for (const name of ['claudeSearchIndex', 'ClaudeSearchDB']) {
+		for (const name of ['claudeSearchIndex', 'ClaudeSearchDB', 'ClaudeExportDB']) {
 			try {
 				if (!(await Dexie.exists(name))) continue;
 				await Dexie.delete(name);
@@ -303,118 +322,46 @@
 	}
 
 	deleteOldDatabases();
+	getOrg(); // eagerly load this org's key
 
-	// ======== CONVERSATION CACHE DB ========
-	const cacheDB = new Dexie('ClaudeExportDB'); // keep DB name for migration
-	cacheDB.version(1).stores({
-		conversations: 'uuid'  // stores { uuid, updated_at, data }
-	});
-
-	class ConversationCache {
+	// ======== CONVERSATION CACHE ========
+	window.ClaudeSearchShared.conversationCache = {
+		// { uuid, updated_at, data } or null
 		async get(conversationId) {
-			const entry = await cacheDB.conversations.get(conversationId);
-			if (!entry || !entry.data) return null;
-
-			try {
-				const raw = entry.data;
-				const decryptedData = await decryptData(raw);
-				// Encrypt-on-read
-				if (!raw?.v && _keyHash) {
-					const encrypted = await encryptData(decryptedData);
-					await cacheDB.conversations.put({ uuid: entry.uuid, updated_at: entry.updated_at, data: encrypted });
-				}
-				return { uuid: entry.uuid, updated_at: entry.updated_at, data: decryptedData };
-			} catch (e) {
-				log.warn(`Decryption failed for cache ${conversationId}, deleting entry`);
-				await cacheDB.conversations.delete(conversationId);
-				return null;
-			}
-		}
-
+			return readRow(cacheTable, conversationId, 'data');
+		},
 		async put(conversationId, updatedAt, data) {
-			const encrypted = await encryptData(data);
-			await cacheDB.conversations.put({ uuid: conversationId, updated_at: updatedAt, data: encrypted });
-		}
+			await writeRow(cacheTable, { uuid: conversationId, updated_at: updatedAt }, 'data', data);
+		},
+	};
 
-		async delete(conversationId) {
-			await cacheDB.conversations.delete(conversationId);
-		}
-	}
-
-	const conversationCache = new ConversationCache();
-	window.ClaudeSearchShared.conversationCache = conversationCache;
-
-	// ======== PHANTOM MESSAGES DB ========
-	const phantomDB = new Dexie('ClaudePhantomMessagesDB');
-	phantomDB.version(1).stores({
-		phantomMessages: 'conversationId'
-	});
-
-	// Which conversations have phantoms, mirrored to the page's localStorage (ids only) so that
-	// phantom-messages.js (MAIN) can tell synchronously, and only holds those chats' snapshots.
-	async function writePhantomIdsMirror() {
+	// ======== PHANTOM MESSAGES ========
+	// Which conversations have phantoms, mirrored per org to the page's localStorage (ids only,
+	// org-mirror.js) so that phantom-messages.js (MAIN) can tell synchronously, and only holds those
+	// chats' snapshots.
+	async function writePhantomIdsMirror(org) {
 		try {
-			localStorage.setItem(PHANTOM_IDS_KEY, JSON.stringify(await phantomDB.phantomMessages.toCollection().primaryKeys()));
+			writeOrgMirror('phantom_ids', await phantomTable(org).toCollection().primaryKeys());
 		} catch (e) {
 			log.warn('Could not mirror the phantom conversation ids:', e.message);
 		}
 	}
 
 	async function storePhantomMessagesDB(conversationId, messages) {
-		const encrypted = await encryptData({ messages, timestamp: Date.now() });
-		await phantomDB.phantomMessages.put({ conversationId, encryptedData: encrypted });
-		await writePhantomIdsMirror();
+		if (await writeRow(phantomTable, { conversationId }, 'encryptedData', { messages, timestamp: Date.now() })) {
+			await writePhantomIdsMirror(await getOrg());
+		}
 	}
 
 	async function getPhantomMessagesDB(conversationId) {
-		const result = await phantomDB.phantomMessages.get(conversationId);
-		if (!result || !result.encryptedData) return null;
-
-		try {
-			const raw = result.encryptedData;
-			const decrypted = await decryptData(raw);
-			// Encrypt-on-read
-			if (!raw?.v && _keyHash) {
-				const encrypted = await encryptData(decrypted);
-				await phantomDB.phantomMessages.put({ conversationId, encryptedData: encrypted });
-			}
-			return decrypted.messages;
-		} catch (e) {
-			log.warn(`Decryption failed for phantom ${conversationId}, deleting entry`);
-			await phantomDB.phantomMessages.delete(conversationId);
-			await writePhantomIdsMirror();
-			return null;
-		}
+		return (await readRow(phantomTable, conversationId, 'encryptedData'))?.encryptedData.messages ?? null;
 	}
 
 	async function clearPhantomMessagesDB(conversationId) {
-		await phantomDB.phantomMessages.delete(conversationId);
-		await writePhantomIdsMirror();
-	}
-
-	writePhantomIdsMirror();
-
-	async function _bulkEncryptAll() {
-		try {
-			// Encrypt all plaintext conversation cache entries
-			const allConvos = await cacheDB.conversations.toArray();
-			for (const row of allConvos) {
-				if (!row.data?.v && _keyHash) {
-					const encrypted = await encryptData(row.data);
-					await cacheDB.conversations.put({ uuid: row.uuid, updated_at: row.updated_at, data: encrypted });
-				}
-			}
-			// Encrypt all plaintext phantom messages
-			const allPhantom = await phantomDB.phantomMessages.toArray();
-			for (const row of allPhantom) {
-				if (!row.encryptedData?.v && _keyHash) {
-					const encrypted = await encryptData(row.encryptedData);
-					await phantomDB.phantomMessages.put({ conversationId: row.conversationId, encryptedData: encrypted });
-				}
-			}
-		} catch (e) {
-			log.warn('Bulk migration error:', e.message);
-		}
+		const org = await getOrg();
+		if (!org) return;
+		await phantomTable(org).delete(conversationId);
+		await writePhantomIdsMirror(org);
 	}
 
 	// Expose for direct use in isolated world

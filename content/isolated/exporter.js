@@ -1842,7 +1842,7 @@
 		loadingModal.show();
 
 		try {
-			localStorage.setItem('lastExportFormat', formatSelectValue);
+			settingsRegistry.set(SETTINGS_KEYS.EXPORT.LAST_FORMAT, formatSelectValue);
 
 			const parts = formatSelectValue.split("_");
 			const format = parts[0];
@@ -1997,8 +1997,8 @@
 		const isInConversation = Boolean(conversationId);
 		const isOnProjectPage = Boolean(projectId);
 
-		// Get last used format from localStorage (default to zip for full fidelity)
-		const lastFormat = localStorage.getItem('lastExportFormat') || 'html_html';
+		// Last used format (default: HTML)
+		const lastFormat = await settingsRegistry.get(SETTINGS_KEYS.EXPORT.LAST_FORMAT);
 
 		// Build the modal content: export on the left, import on the right, each column's action buttons
 		// at its bottom (as in the fork modal), level with each other.
@@ -2159,7 +2159,7 @@
 					loadingModal.show();
 
 					try {
-						localStorage.setItem('lastExportFormat', formatSelect.value);
+						settingsRegistry.set(SETTINGS_KEYS.EXPORT.LAST_FORMAT, formatSelect.value);
 
 						const parts = formatSelect.value.split("_");
 						const format = parts[0];
@@ -2201,7 +2201,7 @@
 				loadingModal.show();
 
 				try {
-					localStorage.setItem('lastExportFormat', formatSelect.value);
+					settingsRegistry.set(SETTINGS_KEYS.EXPORT.LAST_FORMAT, formatSelect.value);
 
 					const parts = formatSelect.value.split("_");
 					const format = parts[0];

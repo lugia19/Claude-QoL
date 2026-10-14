@@ -12,8 +12,8 @@
 // Phantoms get page ids of their own (claude-api.js's phantomMessageId: a marker prefix), so a stylesheet
 // dims their rows and hides their toolbars by data-turn-key alone. No markers in the text.
 //
-// The phantoms come from ISOLATED over the bridge, so only conversations listed in
-// localStorage[claude_qol_phantom_ids] (databases.js keeps it current) wait for them.
+// The phantoms come from ISOLATED over the bridge, so only conversations in the org's 'phantom_ids'
+// mirror (org-mirror.js; databases.js keeps it current) wait for them.
 (function () {
 	'use strict';
 
@@ -28,7 +28,7 @@
 	// Synchronous, so a chat without phantoms is never held.
 	function mayHavePhantoms(conversationId) {
 		try {
-			if (JSON.parse(localStorage.getItem(PHANTOM_IDS_KEY) || '[]').includes(conversationId)) return true;
+			if (readOrgMirror('phantom_ids')?.includes(conversationId)) return true;
 			// Very old forks, not migrated to IndexedDB yet (claude-api.js's getPhantomMessages does that).
 			return legacyPhantomKeys(conversationId).some(key => localStorage.getItem(key));
 		} catch (e) {

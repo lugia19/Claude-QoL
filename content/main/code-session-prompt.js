@@ -3,21 +3,15 @@
 // to every Claude Code cloud session the page creates: POST /v1/code/sessions takes it in its config, fixed
 // for the session's life. "append" chains it onto config.append_system_prompt, which claude.ai already
 // fills with its own text (how to write PR links); "replace" sets config.custom_system_prompt, which takes
-// the place of Claude Code's built-in instructions. Read from the localStorage mirror at request time, so a
+// the place of Claude Code's built-in instructions. Read from the org's localStorage mirror at request time, so a
 // change applies to the next session without a reload. Desktop "Local" sessions don't come through here.
 (function () {
 	'use strict';
 	const log = createLogger('CodePrompt');
 
-	const MIRROR_KEY = 'claude_qol_code_prompt';
-
 	function promptSetting() {
-		try {
-			const setting = JSON.parse(localStorage.getItem(MIRROR_KEY) || 'null');
-			return setting?.text?.trim() ? setting : null;
-		} catch (e) {
-			return null;
-		}
+		const setting = readOrgMirror('code_prompt');
+		return setting?.text?.trim() ? setting : null;
 	}
 
 	// getFetchUrl resolves relative URLs, but returns '' for an input it can't read: never throw on the way past.
