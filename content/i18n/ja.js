@@ -368,6 +368,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// settings
 	"settings.full_load": "会話全体を読み込む",
 	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
+	"settings.project_prefix": "チャットのタイトルにプロジェクト名を表示",
+	"settings.project_prefix_hint": "プロジェクト内のチャットの名前の前に、サイドバーとチャットのタイトルでプロジェクト名を付けます。こうしたチャットの名前を変更すると、接頭辞は名前に残ります。",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code のシステムプロンプト",

@@ -368,6 +368,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// settings
 	"settings.full_load": "Muat seluruh percakapan",
 	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
+	"settings.project_prefix": "Tampilkan nama proyek di judul obrolan",
+	"settings.project_prefix_hint": "Menambahkan nama proyek di depan obrolan yang ada di dalam proyek, di bilah samping dan judul obrolan. Mengganti nama obrolan seperti itu tetap menyimpan awalan di namanya.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt sistem Claude Code",

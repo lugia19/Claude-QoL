@@ -368,6 +368,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// settings
 	"settings.full_load": "전체 대화 불러오기",
 	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
+	"settings.project_prefix": "채팅 제목에 프로젝트 이름 표시",
+	"settings.project_prefix_hint": "프로젝트에 속한 채팅 이름 앞에 사이드바와 채팅 제목에서 프로젝트 이름을 붙입니다. 이런 채팅의 이름을 바꾸면 접두어가 이름에 남습니다.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code 시스템 프롬프트",

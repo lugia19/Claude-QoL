@@ -81,6 +81,7 @@
 				"content/main/code-session-prompt.js",
 				"content/main/tts-interceptor.js",
 				"content/main/full-load.js",
+				"content/main/project-prefix.js",
 				"content/main/phantom-messages.js",
 				"content/main/image-extractor.js",
 				"content/main/branch-arrows.js",

@@ -7,8 +7,8 @@
 //
 //   QolBardHost.onSnapshot(fn)     every StreamTimeline update with replace_all_state: the first one,
 //                                  and reconnects (which can bring a fresh snapshot)
-//   QolBardHost.onLiveUpdate(fn)   other StreamTimeline updates carrying messages, display groups or
-//                                  content blocks
+//   QolBardHost.onLiveUpdate(fn)   every other StreamTimeline update (each patch skips what it doesn't
+//                                  touch)
 //   QolBardHost.onHistoryPage(fn)  ReadConversationHistoryResponse.update (scrolling up)
 //   QolBardHost.onSend(fn)         PerformAction's send_message, before it leaves
 //   QolBardHost.guardSend(fn)      fn(ctx) before every send_message and warm_turn (ctx.action says
@@ -114,8 +114,6 @@
 		};
 	}
 
-	const hasContent = (update) => !!(update.messages?.length || update.display_groups?.length || update.content_blocks?.length);
-
 	// ======== StreamTimeline ========
 
 	async function wrapTimeline(thisArg, input, init) {
@@ -150,8 +148,8 @@
 			notify(event, ctx);
 			const update = event.update;
 			if (!update) return undefined;
-			const list = update.replace_all_state ? patches.snapshot : hasContent(update) ? patches.liveUpdate : null;
-			if (!list?.length) return undefined;
+			const list = update.replace_all_state ? patches.snapshot : patches.liveUpdate;
+			if (!list.length) return undefined;
 			const patchCtx = update.replace_all_state ? { ...ctx, within: waitBudget(SNAPSHOT_WAIT_MS) } : ctx;
 			return await runPatches(list, update, patchCtx) ? n.encodeBard('StreamTimelineResponse', decoded) : undefined;
 		}, { onError: (e) => log.error('StreamTimeline rewrite error:', e) });

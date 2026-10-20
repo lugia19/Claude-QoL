@@ -368,6 +368,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// settings
 	"settings.full_load": "पूरी बातचीत लोड करें",
 	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
+	"settings.project_prefix": "चैट शीर्षकों में प्रोजेक्ट का नाम दिखाएँ",
+	"settings.project_prefix_hint": "किसी प्रोजेक्ट की चैट के आगे प्रोजेक्ट का नाम जोड़ता है, साइडबार और चैट के शीर्षक में। ऐसी चैट का नाम बदलने पर उपसर्ग नाम में बना रहता है।",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code सिस्टम प्रॉम्प्ट",
