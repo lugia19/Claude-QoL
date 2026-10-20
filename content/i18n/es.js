@@ -368,6 +368,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	// settings
 	"settings.full_load": "Cargar conversaciones completas",
 	"settings.full_load_hint": "Carga todos los mensajes al abrir un chat, para que Ctrl+F, la búsqueda en el chat y los marcadores lleguen a los mensajes antiguos. Desactívalo si los chats largos van lentos.",
+	"settings.project_prefix": "Mostrar el nombre del proyecto en los títulos de los chats",
+	"settings.project_prefix_hint": "Antepone el nombre del proyecto a los chats que forman parte de uno, en la barra lateral y en el título del chat. Al renombrar uno de estos chats, el prefijo se queda en su nombre.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts del sistema de Claude Code",

@@ -372,6 +372,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	// settings
 	"settings.full_load": "Load whole conversations",
 	"settings.full_load_hint": "Loads every message when a chat opens, so Ctrl+F, chat search and bookmarks can reach old messages. Turn it off if long chats feel slow.",
+	"settings.project_prefix": "Show project names in chat titles",
+	"settings.project_prefix_hint": "Prefixes chats that are in a project with the project's name, in the sidebar and the chat's title. Renaming such a chat keeps the prefix in its name.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code System Prompts",
@@ -763,6 +765,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	// settings
 	"settings.full_load": "Ganze Unterhaltungen laden",
 	"settings.full_load_hint": "Lädt beim Öffnen eines Chats alle Nachrichten, damit Strg+F, die Chatsuche und Lesezeichen auch alte Nachrichten erreichen. Schalte es aus, wenn lange Chats träge wirken.",
+	"settings.project_prefix": "Projektnamen in Chat-Titeln anzeigen",
+	"settings.project_prefix_hint": "Stellt Chats in einem Projekt den Projektnamen voran, in der Seitenleiste und im Chat-Titel. Wenn du einen solchen Chat umbenennst, bleibt das Präfix im Namen.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code-Systemprompts",
@@ -1154,6 +1158,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	// settings
 	"settings.full_load": "Cargar conversaciones completas",
 	"settings.full_load_hint": "Carga todos los mensajes al abrir un chat, para que Ctrl+F, la búsqueda en el chat y los marcadores lleguen a los mensajes antiguos. Desactívalo si los chats largos van lentos.",
+	"settings.project_prefix": "Mostrar el nombre del proyecto en los títulos de los chats",
+	"settings.project_prefix_hint": "Antepone el nombre del proyecto a los chats que forman parte de uno, en la barra lateral y en el título del chat. Al renombrar uno de estos chats, el prefijo se queda en su nombre.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts del sistema de Claude Code",
@@ -1545,6 +1551,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	// settings
 	"settings.full_load": "Charger les conversations entières",
 	"settings.full_load_hint": "Charge tous les messages à l'ouverture d'un chat, pour que Ctrl+F, la recherche dans le chat et les signets atteignent les anciens messages. Désactivez-le si les longs chats semblent lents.",
+	"settings.project_prefix": "Afficher le nom du projet dans le titre des chats",
+	"settings.project_prefix_hint": "Ajoute le nom du projet devant les chats qui en font partie, dans la barre latérale et le titre du chat. Renommer un de ces chats garde le préfixe dans son nom.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts système de Claude Code",
@@ -1936,6 +1944,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// settings
 	"settings.full_load": "पूरी बातचीत लोड करें",
 	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
+	"settings.project_prefix": "चैट शीर्षकों में प्रोजेक्ट का नाम दिखाएँ",
+	"settings.project_prefix_hint": "किसी प्रोजेक्ट की चैट के आगे प्रोजेक्ट का नाम जोड़ता है, साइडबार और चैट के शीर्षक में। ऐसी चैट का नाम बदलने पर उपसर्ग नाम में बना रहता है।",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code सिस्टम प्रॉम्प्ट",
@@ -2327,6 +2337,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// settings
 	"settings.full_load": "Muat seluruh percakapan",
 	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
+	"settings.project_prefix": "Tampilkan nama proyek di judul obrolan",
+	"settings.project_prefix_hint": "Menambahkan nama proyek di depan obrolan yang ada di dalam proyek, di bilah samping dan judul obrolan. Mengganti nama obrolan seperti itu tetap menyimpan awalan di namanya.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt sistem Claude Code",
@@ -2718,6 +2730,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	// settings
 	"settings.full_load": "Carica le conversazioni intere",
 	"settings.full_load_hint": "Carica tutti i messaggi all'apertura di una chat, così Ctrl+F, la ricerca nella chat e i segnalibri raggiungono anche i messaggi vecchi. Disattivalo se le chat lunghe sembrano lente.",
+	"settings.project_prefix": "Mostra il nome del progetto nei titoli delle chat",
+	"settings.project_prefix_hint": "Antepone il nome del progetto alle chat che ne fanno parte, nella barra laterale e nel titolo della chat. Rinominando una di queste chat, il prefisso resta nel nome.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt di sistema di Claude Code",
@@ -3109,6 +3123,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// settings
 	"settings.full_load": "会話全体を読み込む",
 	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
+	"settings.project_prefix": "チャットのタイトルにプロジェクト名を表示",
+	"settings.project_prefix_hint": "プロジェクト内のチャットの名前の前に、サイドバーとチャットのタイトルでプロジェクト名を付けます。こうしたチャットの名前を変更すると、接頭辞は名前に残ります。",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code のシステムプロンプト",
@@ -3500,6 +3516,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// settings
 	"settings.full_load": "전체 대화 불러오기",
 	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
+	"settings.project_prefix": "채팅 제목에 프로젝트 이름 표시",
+	"settings.project_prefix_hint": "프로젝트에 속한 채팅 이름 앞에 사이드바와 채팅 제목에서 프로젝트 이름을 붙입니다. 이런 채팅의 이름을 바꾸면 접두어가 이름에 남습니다.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code 시스템 프롬프트",
@@ -3891,6 +3909,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	// settings
 	"settings.full_load": "Carregar conversas inteiras",
 	"settings.full_load_hint": "Carrega todas as mensagens ao abrir um chat, para que Ctrl+F, a busca no chat e os favoritos alcancem mensagens antigas. Desative se chats longos ficarem lentos.",
+	"settings.project_prefix": "Mostrar o nome do projeto nos títulos dos chats",
+	"settings.project_prefix_hint": "Coloca o nome do projeto antes dos chats que fazem parte de um, na barra lateral e no título do chat. Ao renomear um desses chats, o prefixo fica no nome.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts de sistema do Claude Code",

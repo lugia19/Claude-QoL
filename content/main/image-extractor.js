@@ -165,6 +165,8 @@
 	// the conversation's state over; history pages and live updates add to it.
 	function addGalleries(update, ctx, reset) {
 		if (!ctx.conversationId) return false;
+		// Live updates without groups or blocks (status, title) have nothing to add or move.
+		if (!reset && !update.display_groups?.length && !update.content_blocks?.length) return false;
 		const config = galleryConfig();
 		if (!config.enabled) return false;
 		const state = stateFor(ctx.conversationId, reset);

@@ -57,6 +57,10 @@ const SETTINGS_KEYS = {
 	FULL_LOAD: {
 		ENABLED: { key: 'full_load_enabled', default: true, type: 'boolean' },
 	},
+	// Mirrored to localStorage (org-mirror.js, 'project_prefix') by extension-settings.js for content/main/project-prefix.js.
+	PROJECT_PREFIX: {
+		ENABLED: { key: 'project_prefix_enabled', default: false, type: 'boolean' },
+	},
 	IMAGE_EXTRACTOR: {
 		ENABLED: { key: 'image_gallery_enabled', default: true, type: 'boolean' },
 		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },
