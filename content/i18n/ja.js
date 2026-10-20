@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"gallery.limit_toggle": "ギャラリーごとの画像数を制限",
 	"gallery.images_per_gallery": "ギャラリーごとの画像数",
 	"gallery.inline_note": "注意：ギャラリーにインライン表示される画像は最大3枚です。",
-	"gallery.settings_title": "画像ギャラリーの設定",
 	"gallery.invalid_limit_title": "無効な上限",
 	"gallery.invalid_limit": "ギャラリーごとの画像数は1以上の整数で指定してください。",
 

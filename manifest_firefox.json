@@ -54,7 +54,6 @@
 				"content/isolated/navigation.js",
 				"content/isolated/pref-switcher.js",
 				"content/isolated/tts.js",
-				"content/isolated/image-gallery.js",
 				"content/isolated/exporter.js",
 				"content/isolated/file-download.js",
 				"content/isolated/notifications.js",

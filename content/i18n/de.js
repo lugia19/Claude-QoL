@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"gallery.limit_toggle": "Bilder pro Galerie begrenzen",
 	"gallery.images_per_gallery": "Bilder pro Galerie",
 	"gallery.inline_note": "Hinweis: In einer Galerie werden höchstens 3 Bilder eingebettet angezeigt.",
-	"gallery.settings_title": "Einstellungen der Bildergalerie",
 	"gallery.invalid_limit_title": "Ungültiges Limit",
 	"gallery.invalid_limit": "Die Anzahl der Bilder pro Galerie muss eine ganze Zahl von mindestens 1 sein.",
 

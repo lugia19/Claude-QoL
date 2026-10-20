@@ -13,7 +13,7 @@
 // an inline text group holding a zero-width space: real text to the renderer (trim() keeps U+200B),
 // invisible on screen, nothing to strip from copied or read-aloud text.
 //
-// Settings: mirrored per org to localStorage (org-mirror.js) by content/isolated/image-gallery.js (they
+// Settings: mirrored per org to localStorage (org-mirror.js) by content/isolated/extension-settings.js (they
 // live in ISOLATED, and load after the first snapshot).
 (function () {
 	'use strict';

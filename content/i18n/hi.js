@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"gallery.limit_toggle": "प्रति गैलरी इमेज सीमित करें",
 	"gallery.images_per_gallery": "प्रति गैलरी इमेज",
 	"gallery.inline_note": "ध्यान दें: गैलरी में इनलाइन केवल 3 इमेज तक दिखाई जाती हैं।",
-	"gallery.settings_title": "इमेज गैलरी सेटिंग्स",
 	"gallery.invalid_limit_title": "अमान्य सीमा",
 	"gallery.invalid_limit": "प्रति गैलरी इमेज कम से कम 1 की पूर्ण संख्या होनी चाहिए।",
 

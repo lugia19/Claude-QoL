@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"gallery.limit_toggle": "Limitar imágenes por galería",
 	"gallery.images_per_gallery": "Imágenes por galería",
 	"gallery.inline_note": "Nota: solo se muestran hasta 3 imágenes integradas en una galería.",
-	"gallery.settings_title": "Configuración de la galería de imágenes",
 	"gallery.invalid_limit_title": "Límite no válido",
 	"gallery.invalid_limit": "Las imágenes por galería deben ser un número entero mayor o igual a 1.",
 
