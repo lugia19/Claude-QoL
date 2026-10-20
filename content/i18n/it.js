@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"gallery.limit_toggle": "Limita le immagini per galleria",
 	"gallery.images_per_gallery": "Immagini per galleria",
 	"gallery.inline_note": "Nota: in una galleria vengono mostrate in linea al massimo 3 immagini.",
-	"gallery.settings_title": "Impostazioni galleria immagini",
 	"gallery.invalid_limit_title": "Limite non valido",
 	"gallery.invalid_limit": "Le immagini per galleria devono essere un numero intero pari almeno a 1.",
 

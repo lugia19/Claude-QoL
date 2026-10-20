@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"gallery.limit_toggle": "Batasi gambar per galeri",
 	"gallery.images_per_gallery": "Gambar per galeri",
 	"gallery.inline_note": "Catatan: Maksimal hanya 3 gambar yang ditampilkan sebaris dalam galeri.",
-	"gallery.settings_title": "Pengaturan Galeri Gambar",
 	"gallery.invalid_limit_title": "Batas tidak valid",
 	"gallery.invalid_limit": "Gambar per galeri harus berupa bilangan bulat minimal 1.",
 

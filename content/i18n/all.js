@@ -248,7 +248,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"gallery.limit_toggle": "Limit images per gallery",
 	"gallery.images_per_gallery": "Images per gallery",
 	"gallery.inline_note": "Note: Only up to 3 images are displayed inline in a gallery.",
-	"gallery.settings_title": "Image Gallery Settings",
 	"gallery.invalid_limit_title": "Invalid limit",
 	"gallery.invalid_limit": "Images per gallery must be a whole number of at least 1.",
 
@@ -641,7 +640,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"gallery.limit_toggle": "Bilder pro Galerie begrenzen",
 	"gallery.images_per_gallery": "Bilder pro Galerie",
 	"gallery.inline_note": "Hinweis: In einer Galerie werden höchstens 3 Bilder eingebettet angezeigt.",
-	"gallery.settings_title": "Einstellungen der Bildergalerie",
 	"gallery.invalid_limit_title": "Ungültiges Limit",
 	"gallery.invalid_limit": "Die Anzahl der Bilder pro Galerie muss eine ganze Zahl von mindestens 1 sein.",
 
@@ -1034,7 +1032,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"gallery.limit_toggle": "Limitar imágenes por galería",
 	"gallery.images_per_gallery": "Imágenes por galería",
 	"gallery.inline_note": "Nota: solo se muestran hasta 3 imágenes integradas en una galería.",
-	"gallery.settings_title": "Configuración de la galería de imágenes",
 	"gallery.invalid_limit_title": "Límite no válido",
 	"gallery.invalid_limit": "Las imágenes por galería deben ser un número entero mayor o igual a 1.",
 
@@ -1427,7 +1424,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"gallery.limit_toggle": "Limiter les images par galerie",
 	"gallery.images_per_gallery": "Images par galerie",
 	"gallery.inline_note": "Remarque : une galerie affiche au maximum 3 images intégrées.",
-	"gallery.settings_title": "Paramètres de la galerie d'images",
 	"gallery.invalid_limit_title": "Limite invalide",
 	"gallery.invalid_limit": "Le nombre d'images par galerie doit être un nombre entier supérieur ou égal à 1.",
 
@@ -1820,7 +1816,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"gallery.limit_toggle": "प्रति गैलरी इमेज सीमित करें",
 	"gallery.images_per_gallery": "प्रति गैलरी इमेज",
 	"gallery.inline_note": "ध्यान दें: गैलरी में इनलाइन केवल 3 इमेज तक दिखाई जाती हैं।",
-	"gallery.settings_title": "इमेज गैलरी सेटिंग्स",
 	"gallery.invalid_limit_title": "अमान्य सीमा",
 	"gallery.invalid_limit": "प्रति गैलरी इमेज कम से कम 1 की पूर्ण संख्या होनी चाहिए।",
 
@@ -2213,7 +2208,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"gallery.limit_toggle": "Batasi gambar per galeri",
 	"gallery.images_per_gallery": "Gambar per galeri",
 	"gallery.inline_note": "Catatan: Maksimal hanya 3 gambar yang ditampilkan sebaris dalam galeri.",
-	"gallery.settings_title": "Pengaturan Galeri Gambar",
 	"gallery.invalid_limit_title": "Batas tidak valid",
 	"gallery.invalid_limit": "Gambar per galeri harus berupa bilangan bulat minimal 1.",
 
@@ -2606,7 +2600,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"gallery.limit_toggle": "Limita le immagini per galleria",
 	"gallery.images_per_gallery": "Immagini per galleria",
 	"gallery.inline_note": "Nota: in una galleria vengono mostrate in linea al massimo 3 immagini.",
-	"gallery.settings_title": "Impostazioni galleria immagini",
 	"gallery.invalid_limit_title": "Limite non valido",
 	"gallery.invalid_limit": "Le immagini per galleria devono essere un numero intero pari almeno a 1.",
 
@@ -2999,7 +2992,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"gallery.limit_toggle": "ギャラリーごとの画像数を制限",
 	"gallery.images_per_gallery": "ギャラリーごとの画像数",
 	"gallery.inline_note": "注意：ギャラリーにインライン表示される画像は最大3枚です。",
-	"gallery.settings_title": "画像ギャラリーの設定",
 	"gallery.invalid_limit_title": "無効な上限",
 	"gallery.invalid_limit": "ギャラリーごとの画像数は1以上の整数で指定してください。",
 
@@ -3392,7 +3384,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"gallery.limit_toggle": "갤러리당 이미지 수 제한",
 	"gallery.images_per_gallery": "갤러리당 이미지 수",
 	"gallery.inline_note": "참고: 갤러리에는 최대 3개의 이미지만 인라인으로 표시됩니다.",
-	"gallery.settings_title": "이미지 갤러리 설정",
 	"gallery.invalid_limit_title": "잘못된 제한 값",
 	"gallery.invalid_limit": "갤러리당 이미지 수는 1 이상의 정수여야 합니다.",
 
@@ -3785,7 +3776,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"gallery.limit_toggle": "Limitar imagens por galeria",
 	"gallery.images_per_gallery": "Imagens por galeria",
 	"gallery.inline_note": "Observação: apenas até 3 imagens são exibidas diretamente em uma galeria.",
-	"gallery.settings_title": "Configurações da galeria de imagens",
 	"gallery.invalid_limit_title": "Limite inválido",
 	"gallery.invalid_limit": "Imagens por galeria deve ser um número inteiro de pelo menos 1.",
 

@@ -345,7 +345,7 @@ Every "splice" / "rewrite" / "watch the stream" below means a patch registered w
 - **Merging:** adjacent galleries merge into one strip of at most 3 images (as on the legacy renderer). Split galleries are kept apart by an `GROUP_STYLE_INLINE` group whose block text is a zero-width space: real text to the renderer, invisible, harmless in copied and read-aloud text. (Whitespace-only text is dropped.)
 - **Sizes:** the cached measured size, else the tool's width/height or aspect-ratio input (`input_display.table` rows), else a square placeholder while the preview is measured for next time. The snapshot never waits on image loads.
 - **Live:** galleries are drawn when the tool run closes, not image by image (also as before). Live updates carry only what changed, so the module keeps each conversation's groups and run images; a snapshot starts them over.
-- **Settings:** unchanged (`content/isolated/image-gallery.js`, mirrored to `localStorage.claude_qol_image_gallery`). The legacy stream wrapper, its "conversations with images" gate and the `====GALLERY_BREAK====` markers (and their hiding and stripping) are gone.
+- **Settings:** in the "Extension settings" gear modal (`content/isolated/extension-settings.js`; until 3.2 their own button, `image-gallery.js`), mirrored to `localStorage.claude_qol_image_gallery`). The legacy stream wrapper, its "conversations with images" gate and the `====GALLERY_BREAK====` markers (and their hiding and stripping) are gone.
 
 ## Still open
 

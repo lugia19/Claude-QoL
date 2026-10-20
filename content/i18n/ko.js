@@ -244,7 +244,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"gallery.limit_toggle": "갤러리당 이미지 수 제한",
 	"gallery.images_per_gallery": "갤러리당 이미지 수",
 	"gallery.inline_note": "참고: 갤러리에는 최대 3개의 이미지만 인라인으로 표시됩니다.",
-	"gallery.settings_title": "이미지 갤러리 설정",
 	"gallery.invalid_limit_title": "잘못된 제한 값",
 	"gallery.invalid_limit": "갤러리당 이미지 수는 1 이상의 정수여야 합니다.",
 
