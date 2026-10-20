@@ -15,7 +15,8 @@
 
 	const log = createLogger('ProjectPrefix');
 
-	const projectNames = new Map(); // project uuid -> promise of its name (null: unknown)
+	const projectNames = new Map(); // project uuid -> name, once known
+	const fetching = new Map(); // project uuid -> promise of its name (null: unknown), while fetching
 
 	function prefixed(name, projectName) {
 		if (!name || !projectName) return name;
@@ -25,17 +26,21 @@
 
 	// The project's name: known from the sidebar list, or fetched once (the snapshot only has its id).
 	function projectName(orgId, projectId) {
-		if (!projectNames.has(projectId)) {
-			projectNames.set(projectId, QolBardHost.rawFetch(`/api/organizations/${orgId}/projects/${projectId}`)
+		if (projectNames.has(projectId)) return Promise.resolve(projectNames.get(projectId));
+		if (!fetching.has(projectId)) {
+			fetching.set(projectId, QolBardHost.rawFetch(`/api/organizations/${orgId}/projects/${projectId}`)
 				.then(response => (response.ok ? response.json() : null))
-				.then(project => project?.name ?? null)
+				.then(project => {
+					if (project?.name) projectNames.set(projectId, project.name);
+					return project?.name ?? null;
+				})
 				.catch((e) => {
 					log.warn(`no name for project ${projectId}:`, e);
-					projectNames.delete(projectId);
 					return null;
-				}));
+				})
+				.finally(() => fetching.delete(projectId)));
 		}
-		return projectNames.get(projectId);
+		return fetching.get(projectId);
 	}
 
 	// ======== Sidebar list ========
@@ -55,7 +60,7 @@
 			for (const conversation of data?.data ?? []) {
 				const project = conversation.project;
 				if (!project?.uuid || !project.name) continue;
-				projectNames.set(project.uuid, Promise.resolve(project.name));
+				projectNames.set(project.uuid, project.name);
 				const name = prefixed(conversation.name, project.name);
 				if (name === conversation.name) continue;
 				conversation.name = name;
@@ -70,14 +75,13 @@
 
 	// ======== Open chats ========
 
-	// A snapshot waits for an unknown project's name; live updates only use names already known
-	// (the snapshot came first and fetched it).
+	// A snapshot waits for an unknown project's name (within its budget); live updates only use names
+	// already known, never a fetch still running: they'd hold every frame behind them.
 	async function prefixTitle(update, ctx) {
 		const conversation = update.conversation;
 		if (!conversation?.title || !conversation.project_id || !ctx.orgId) return false;
 		const projectId = conversation.project_id;
-		if (!ctx.within && !projectNames.has(projectId)) return false;
-		const name = ctx.within ? (await ctx.within(projectName(ctx.orgId, projectId)))?.value : await projectNames.get(projectId);
+		const name = ctx.within ? (await ctx.within(projectName(ctx.orgId, projectId)))?.value : projectNames.get(projectId);
 		const title = prefixed(conversation.title, name);
 		if (title === conversation.title) return false;
 		conversation.title = title;
