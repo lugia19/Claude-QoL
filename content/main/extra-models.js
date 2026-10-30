@@ -197,6 +197,51 @@
             },
             // 4.7 has no `extended` mode — its thinking toggle is `auto`/`off`.
             defaultThinking: { type: 'effort_and_mode', effort: 'xhigh', mode: 'auto' }
+        },
+        {
+            // Claude still ships Haiku 4.5 in the legacy bootstrap config and in the Code surfaces
+            // (with `thinking: none`), but not in `chat`.
+            bootstrap: {
+                model: 'claude-haiku-4-5-20251001',
+                name: 'Claude Haiku 4.5',
+                inactive: false,
+                overflow: true,
+                paprika_modes: ['extended'],
+                thinking_modes: [
+                    {
+                        description: t('models.think_longer', 'Think longer for complex tasks'),
+                        id: 'extended',
+                        mode: 'extended',
+                        paprika_mode_value: 'extended',
+                        selection_title: t('models.extended', 'Extended'),
+                        title: t('models.extended_thinking', 'Extended thinking')
+                    }
+                ],
+                hard_limit: 190000
+            },
+            selector: {
+                id: 'claude-haiku-4-5-20251001',
+                name: 'Haiku 4.5',
+                short_name: 'Haiku',
+                section: TARGET_SECTION,
+                capabilities: {
+                    compass: true,
+                    gsuite_tools: true,
+                    mm_images: true,
+                    mm_pdf: true,
+                    web_search: true
+                },
+                // No effort levels on 4.5: thinking is a plain on/off mode, like Opus 4.1's.
+                thinking: {
+                    type: 'mode',
+                    mode_options: [
+                        { id: 'extended', name: t('models.extended', 'Extended'), description: t('models.extended_description', 'Always uses deep reasoning') },
+                        { id: 'off', name: t('models.off', 'Off') }
+                    ]
+                },
+                hard_limit: 190000
+            },
+            defaultThinking: { type: 'mode', mode: 'off' }
         }
     ];
 
