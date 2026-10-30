@@ -1,4 +1,3 @@
-Support for several Claude accounts in one browser (Firefox and Brave containers): each account keeps its own settings and data.
-TTS actor mode: expressive audio tags for ElevenLabs v3 and v4, and Eleven v4 support.
-TTS actor mode: narration and "she said" no longer read in the characters' voices.
-Bugfixes.
+Haiku 4.5 is back in the model picker, under "More models".
+Optional project names in chat titles (off by default, in Extension settings).
+Image gallery settings moved to Extension settings, now reachable from every page.
