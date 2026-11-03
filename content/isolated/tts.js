@@ -18,9 +18,12 @@
 
 	function initializeProvider(providerKey) {
 		const providerInfo = window.TTSProviders.TTS_PROVIDERS[providerKey];
-		// 'claude' (native passthrough) has class: null; unknown keys too.
-		if (!providerInfo || !providerInfo.class) return null;
-		return new providerInfo.class();
+		return providerInfo ? new providerInfo.class() : null; // null: unknown key
+	}
+
+	// Claude's built-in TTS: native plays, never hijacked (relayed for per-chat options).
+	function isNativeProvider(providerKey) {
+		return !!window.TTSProviders.TTS_PROVIDERS[providerKey]?.native;
 	}
 
 	let ttsProviderKey = null;
@@ -60,18 +63,43 @@
 		}
 	}
 
-	async function handleSynthRequest({ requestId, text, conversationId }) {
-		const settings = await loadSettings();
-		const provider = getProvider(settings.provider);
-		// Defensive: MAIN gating should prevent this, but never leave native hanging.
-		if (!provider) { postSynthDone(requestId); return; }
-
+	async function readChatOptions(conversationId) {
 		const [actorModeEnabled, voiceOverride, quotesOnly, characters] = await Promise.all([
 			settingsRegistry.getPerChat(TP.ACTOR_MODE, conversationId).then(v => v === true),
 			settingsRegistry.getPerChat(TP.VOICE, conversationId).then(v => v || ''),
 			settingsRegistry.getPerChat(TP.QUOTES_ONLY, conversationId).then(v => v === true),
 			settingsRegistry.getPerChat(TP.CHARACTERS, conversationId).then(v => v || [])
 		]);
+		return { actorModeEnabled, voiceOverride, quotesOnly, characters };
+	}
+
+	// Actor mode: `text` split by character (an LLM round-trip), as [{ voice, text, extra }] in reading
+	// order. Characters without a voice aren't read; consecutive segments in the same voice with the same
+	// extra are joined (fewer requests).
+	async function actorSegments(provider, text, characters, model) {
+		const voiceMap = {}; // lowercased name -> voice
+		characters.forEach(char => {
+			if (char.voice) voiceMap[char.name.toLowerCase()] = char.voice;
+		});
+		const attributed = await provider.attributeDialogueToCharacters(text, characters, model);
+		const merged = [];
+		for (const s of attributed) {
+			const voice = voiceMap[s.character];
+			if (!voice || !provider.isSpeakable(s.text, model)) continue; // e.g. a lone audio tag
+			const last = merged.at(-1);
+			if (last && last.voice === voice && JSON.stringify(last.extra) === JSON.stringify(s.extra)) last.text += ' ' + s.text;
+			else merged.push({ voice, text: s.text, extra: s.extra });
+		}
+		return merged;
+	}
+
+	async function handleSynthRequest({ requestId, text, conversationId }) {
+		const settings = await loadSettings();
+		const provider = getProvider(settings.provider);
+		// Defensive: MAIN gating should prevent this, but never leave native hanging.
+		if (!provider) { postSynthDone(requestId); return; }
+
+		const { actorModeEnabled, voiceOverride, quotesOnly, characters } = await readChatOptions(conversationId);
 
 		const defaultVoice = voiceOverride || settings.voice;
 		const baseUrl = settings.openaiBaseUrl || '';
@@ -108,36 +136,47 @@
 		// Prime the native player so it doesn't time out while attribution (an LLM round-trip) runs.
 		if (SILENCE_PRIMER_MS > 0) onChunk(makeSilence(SILENCE_PRIMER_MS));
 
-		const segments = await provider.attributeDialogueToCharacters(text, characters, settings.model);
-		if (entry.cancelled || signal.aborted) return;
-
-		const voiceMap = {};
-		characters.forEach(char => {
-			if (char.voice) voiceMap[char.name.toLowerCase()] = char.voice;
-		});
-
-		// Merge consecutive segments from the same character with matching extra (fewer API calls).
-		const mergedSegments = [];
-		let currentSegment = null;
-		for (const segment of segments) {
-			const characterName = segment.character.toLowerCase();
-			const extraStr = JSON.stringify(segment.extra || {});
-			if (currentSegment && currentSegment.character === characterName && currentSegment.extraStr === extraStr) {
-				currentSegment.text += ' ' + segment.text;
-			} else {
-				if (currentSegment) mergedSegments.push(currentSegment);
-				currentSegment = { character: characterName, text: segment.text, extra: segment.extra || {}, extraStr };
-			}
-		}
-		if (currentSegment) mergedSegments.push(currentSegment);
+		const segments = await actorSegments(provider, text, characters, settings.model);
 
 		// Synthesize sequentially so PCM stays ordered; native concatenates the frames gaplessly.
-		for (const segment of mergedSegments) {
+		for (const segment of segments) {
 			if (entry.cancelled || signal.aborted) return;
-			const voice = voiceMap[segment.character];
-			if (!voice) continue; // character mapped to no voice -> skip
-			if (!provider.isSpeakable(segment.text, settings.model)) continue; // e.g. a lone audio tag
-			await provider.synthesize(segment.text, voice, settings.model, settings.apiKey, { ...segment.extra, baseUrl }, signal, onChunk);
+			await provider.synthesize(segment.text, segment.voice, settings.model, settings.apiKey, { ...segment.extra, baseUrl }, signal, onChunk);
+		}
+	}
+
+	// Claude's built-in TTS, in a chat with per-chat options: tts-ws-interceptor.js's RelaySocket asks
+	// what to read in which voice and plays it through claude.ai's own socket, one per segment:
+	// [{ voice, language, text }]. A null voice keeps the page's (the user's claude.ai voice), a null
+	// language the page's (set for a voice of another language). An empty plan reads nothing; a failed
+	// one (the attribution's LLM call, say) reads it all in the page's voice.
+	async function handlePlanRequest({ requestId, text, conversationId }) {
+		const entry = { abort: new AbortController(), cancelled: false };
+		activeSynth.set(requestId, entry);
+		let segments = [];
+		let finalText = text;
+		try {
+			const provider = getProvider('claude');
+			const { actorModeEnabled, voiceOverride, quotesOnly, characters } = await readChatOptions(conversationId);
+			finalText = cleanupText(text, quotesOnly);
+			if (!finalText) return; // e.g. quotes only with no quotes: the empty plan
+			const actor = actorModeEnabled && characters.length > 0;
+			// Loads alongside the attribution, and only when a voice is to be picked.
+			const voices = actor || voiceOverride ? provider.getVoices() : Promise.resolve([]);
+			const planned = actor
+				? await actorSegments(provider, finalText, characters)
+				: [{ voice: voiceOverride, text: finalText }];
+			// A voice that isn't claude.ai's (one saved for another provider) reads in the page's voice.
+			const languages = new Map((await voices).map(v => [v.voice_id, v.language]));
+			segments = planned.map(s => languages.has(s.voice)
+				? { voice: s.voice, language: languages.get(s.voice), text: s.text }
+				: { voice: null, language: null, text: s.text });
+		} catch (error) {
+			log.error('Could not plan the reading, reading it all in the default voice:', error);
+			segments = [{ voice: null, language: null, text: finalText }];
+		} finally {
+			if (!entry.cancelled) window.postMessage({ type: 'TTS_PLAN', requestId, segments }, window.location.origin);
+			activeSynth.delete(requestId);
 		}
 	}
 	//#endregion
@@ -150,10 +189,12 @@
 
 		if (d?.type === 'TTS_SYNTH_REQUEST') {
 			handleSynthRequest(d);
+		} else if (d?.type === 'TTS_PLAN_REQUEST') {
+			handlePlanRequest(d);
 		} else if (d?.type === 'TTS_SYNTH_ABORT') {
 			abortSynth(d.requestId);
 		} else if (d?.type === 'TTS_HIJACK_CONFIG_REQUEST') {
-			pushHijackConfig();
+			postHijackConfig(); // MAIN is waiting: no coalescing
 		} else if (d?.type === 'TTS_OPUS_WASM_REQUEST') {
 			sendOpusWasm();
 		}
@@ -259,8 +300,8 @@
 				label: info.name
 			}));
 			const currentProviderInfo = window.TTSProviders.TTS_PROVIDERS[settings.provider];
-			// 'claude' is native passthrough: no key/voice/model of ours, native TTS handles it.
-			const isNative = (key) => !!window.TTSProviders.TTS_PROVIDERS[key]?.native;
+			// The per-chat voice override's options: "use the default", then the provider's voices.
+			const overrideOptionsOf = (voiceOptions) => [{ value: '', label: localize('tts.use_default_voice') }, ...voiceOptions];
 
 			// When OpenAI is used with a custom Base URL, the hardcoded model dropdown
 			// can't name the custom endpoint's models, so use a free-text input instead.
@@ -308,7 +349,7 @@
 			nativeNote.id = 'ttsNativeNote';
 			nativeNote.className = CLAUDE_CLASSES.TEXT_MUTED + ' mb-4';
 			nativeNote.textContent = localize('tts.native_note');
-			nativeNote.style.display = isNative(settings.provider) ? 'block' : 'none';
+			nativeNote.style.display = isNativeProvider(settings.provider) ? 'block' : 'none';
 			content.appendChild(nativeNote);
 
 			// API Key input
@@ -355,7 +396,7 @@
 			const voiceSection = document.createElement('div');
 			voiceSection.className = 'mb-4';
 			voiceSection.id = 'voiceSection';
-			voiceSection.style.display = isNative(settings.provider) ? 'none' : 'block';
+			voiceSection.style.display = isNativeProvider(settings.provider) ? 'none' : 'block';
 			const voiceLabel = document.createElement('label');
 			voiceLabel.className = CLAUDE_CLASSES.LABEL;
 			voiceLabel.textContent = localize('tts.voice_label');
@@ -393,14 +434,14 @@
 			modelSelect.id = 'modelSelect';
 			modelSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;
 			modelSection.appendChild(modelSelect);
-			modelSection.style.display = (isNative(settings.provider) || useCustomModel(settings.provider, settings.openaiBaseUrl)) ? 'none' : 'block';
+			modelSection.style.display = (isNativeProvider(settings.provider) || useCustomModel(settings.provider, settings.openaiBaseUrl)) ? 'none' : 'block';
 			content.appendChild(modelSection);
 
 			// Custom model input (OpenAI with a custom Base URL)
 			const modelCustomSection = document.createElement('div');
 			modelCustomSection.className = 'mb-4';
 			modelCustomSection.id = 'modelCustomSection';
-			modelCustomSection.style.display = (!isNative(settings.provider) && useCustomModel(settings.provider, settings.openaiBaseUrl)) ? 'block' : 'none';
+			modelCustomSection.style.display = (!isNativeProvider(settings.provider) && useCustomModel(settings.provider, settings.openaiBaseUrl)) ? 'block' : 'none';
 			const modelCustomLabel = document.createElement('label');
 			modelCustomLabel.className = CLAUDE_CLASSES.LABEL;
 			modelCustomLabel.textContent = localize('tts.model_label');
@@ -454,13 +495,10 @@
 			overrideLabel.textContent = localize('tts.voice_override_label');
 			overrideSection.appendChild(overrideLabel);
 
-			const overrideOptions = [
-				{ value: '', label: localize('tts.use_default_voice') },
-				...voiceOptions.filter(opt => opt.value) // Exclude "Set an API key..." option
-			];
+			const overrideOptions = overrideOptionsOf(voiceOptions.filter(opt => opt.value)); // not "Set an API key..."
 			const chatVoiceOverrideSelect = createClaudeSearchableSelect(overrideOptions, chatVoiceOverride);
 			chatVoiceOverrideSelect.id = 'chatVoiceOverride';
-			chatVoiceOverrideSelect.disabled = !settings.apiKey;
+			chatVoiceOverrideSelect.disabled = currentProviderInfo.requiresApiKey && !settings.apiKey;
 			overrideSection.appendChild(chatVoiceOverrideSelect);
 			perChatSection.appendChild(overrideSection);
 
@@ -505,13 +543,16 @@
 
 			modal.addCancel();
 			modal.addConfirm(localize('common.save'), async () => {
+				// Claude's own voice is picked in claude.ai's settings: its voice and model fields are hidden,
+				// and the stored ones (another provider's) stay for switching back.
+				const native = isNativeProvider(providerSelect.value);
 				const newSettings = {
 					provider: providerSelect.value,
 					apiKey: apiKeyInput.value.trim(),
-					voice: voiceSelect.value,
-					model: useCustomModel(providerSelect.value, baseUrlInput.value)
-						? modelCustomInput.value.trim()
-						: modelSelect.value,
+					voice: native ? settings.voice : voiceSelect.value,
+					model: native ? settings.model
+						: useCustomModel(providerSelect.value, baseUrlInput.value) ? modelCustomInput.value.trim()
+							: modelSelect.value,
 					autoSpeak: autoSpeakToggle.input.checked,
 					openaiBaseUrl: baseUrlInput.value.trim().replace(/\/+$/, '')  // Strip trailing slashes
 				};
@@ -599,7 +640,7 @@
 			providerSelect.addEventListener('change', async (e) => {
 				const newProviderKey = e.target.value;
 				const newProviderInfo = window.TTSProviders.TTS_PROVIDERS[newProviderKey];
-				const native = isNative(newProviderKey);
+				const native = isNativeProvider(newProviderKey);
 
 				// Native (Claude built-in): hide all of our provider config.
 				nativeNote.style.display = native ? 'block' : 'none';
@@ -613,8 +654,6 @@
 				modelSection.style.display = (native || custom) ? 'none' : 'block';
 				modelCustomSection.style.display = (!native && custom) ? 'block' : 'none';
 
-				if (native) return; // nothing of ours to load
-
 				const tempProvider = initializeProvider(newProviderKey);
 
 				// Check if we need to load data
@@ -623,6 +662,8 @@
 					if (!currentApiKey) {
 						voiceSelect.populateOptions([{ value: '', label: localize('tts.set_api_key_option') }]);
 						modelSelect.populateOptions([{ value: '', label: localize('tts.set_api_key_option') }]);
+						chatVoiceOverrideSelect.populateOptions(overrideOptionsOf([]));
+						chatVoiceOverrideSelect.disabled = true;
 						return;
 					}
 				}
@@ -651,6 +692,8 @@
 						label: v.name
 					}));
 					voiceSelect.populateOptions(newVoiceOptions);
+					chatVoiceOverrideSelect.populateOptions(overrideOptionsOf(newVoiceOptions));
+					chatVoiceOverrideSelect.disabled = false;
 
 					const newModelOptions = newModels.map(m => ({ value: m.model_id, label: m.name }));
 					modelSelect.populateOptions(newModelOptions);
@@ -693,10 +736,7 @@
 						}));
 						voiceSelect.populateOptions(newVoiceOptions);
 
-						chatVoiceOverrideSelect.populateOptions([
-							{ value: '', label: localize('tts.use_default_voice') },
-							...newVoiceOptions
-						]);
+						chatVoiceOverrideSelect.populateOptions(overrideOptionsOf(newVoiceOptions));
 
 						const newModelOptions = newModels.map(m => ({ value: m.model_id, label: m.name }));
 						modelSelect.populateOptions(newModelOptions);
@@ -985,7 +1025,7 @@
 		button = button || document.querySelector('.tts-settings-button');
 		if (!button) return;
 		const provider = await settingsRegistry.get(T.PROVIDER);
-		button.classList.toggle('tts-custom-provider', !!provider && provider !== 'claude');
+		button.classList.toggle('tts-custom-provider', !!provider && !isNativeProvider(provider));
 	}
 	//#endregion
 
@@ -997,11 +1037,33 @@
 			settingsRegistry.get(T.API_KEY),
 			settingsRegistry.get(T.VOICE)
 		]);
-		return !!provider && provider !== 'claude' && !!apiKey && !!voice;
+		return !!provider && !isNativeProvider(provider) && !!apiKey && !!voice;
 	}
 
-	async function pushHijackConfig() {
-		window.postMessage({ type: 'TTS_HIJACK_CONFIG', hijack: await computeHijack() }, window.location.origin);
+	// With Claude's built-in TTS, the chats whose reads go through MAIN's RelaySocket: those with a
+	// per-chat option set. Other chats keep native's socket untouched.
+	async function computeRelayChats() {
+		const provider = await settingsRegistry.get(T.PROVIDER);
+		if (!isNativeProvider(provider)) return [];
+		const [actorMode, characters, quotesOnly, voice] = await Promise.all(
+			[TP.ACTOR_MODE, TP.CHARACTERS, TP.QUOTES_ONLY, TP.VOICE].map(k => settingsRegistry.get(k).then(v => v || {})));
+		const ids = new Set();
+		for (const [id, on] of Object.entries(actorMode)) if (on === true && characters[id]?.length) ids.add(id);
+		for (const [id, on] of Object.entries(quotesOnly)) if (on === true) ids.add(id);
+		for (const [id, override] of Object.entries(voice)) if (override) ids.add(id);
+		return [...ids];
+	}
+
+	async function postHijackConfig() {
+		const [hijack, relayChats] = await Promise.all([computeHijack(), computeRelayChats()]);
+		window.postMessage({ type: 'TTS_HIJACK_CONFIG', hijack, relayChats }, window.location.origin);
+	}
+
+	// For setting changes: a save changes several keys at once, one push covers them all.
+	let pushTimer = null;
+	function pushHijackConfig() {
+		clearTimeout(pushTimer);
+		pushTimer = setTimeout(postHijackConfig, 0);
 	}
 
 	//#endregion
@@ -1029,11 +1091,13 @@
 			forceDisplayOnMobile: false, // on phones: in the More-actions menu (the preset switcher stays out)
 			pages: ['chat', 'home', 'codeHome', 'codeChat'],
 		});
-		pushHijackConfig();
+		postHijackConfig();
 		// Re-push the hijack decision + recolor the icon whenever a relevant setting changes.
 		[T.PROVIDER, T.API_KEY, T.VOICE, T.BASE_URL].forEach(k =>
 			settingsRegistry.onChange(k, () => { pushHijackConfig(); refreshTTSButtonColor(); })
 		);
+		// The per-chat options decide which chats relay (the actor modal saves without a reload).
+		[TP.ACTOR_MODE, TP.CHARACTERS, TP.QUOTES_ONLY, TP.VOICE].forEach(k => settingsRegistry.onChange(k, pushHijackConfig));
 	}
 
 	// Wait for DOM to be ready before initializing

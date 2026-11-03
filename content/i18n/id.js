@@ -190,7 +190,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Memuat pengaturan...",
 	"tts.provider_label": "Penyedia TTS",
-	"tts.native_note": "Menggunakan suara bawaan Claude (atur di pengaturan Claude). Pilih ElevenLabs atau OpenAI untuk menggunakan suara kustom.",
+	"tts.native_note": "Menggunakan suara bawaan Claude (atur di pengaturan Claude). Pilih ElevenLabs atau OpenAI untuk menggunakan suara kustom. Mode aktor dan ganti suara juga berfungsi dengan suara Claude.",
 	"tts.api_key_label": "Kunci API",
 	"tts.api_key_placeholder": "Masukkan kunci API Anda",
 	"tts.base_url_label": "URL Dasar (opsional)",

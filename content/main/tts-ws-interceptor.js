@@ -18,19 +18,29 @@
 // SpeechComplete. Opus is encoded here with the vendored libopus build (lib/opus/opus-encoder.js; WebCodecs
 // can't encode Opus in Firefox), one 20 ms packet per frame; its .wasm comes from ISOLATED on first use,
 // since claude.ai's CSP keeps this world from fetching extension files. Native handles all
-// playback / pause / resume / stop / button state. When the provider is 'claude' (or TTS isn't
-// configured) we pass through to the real WebSocket so native TTS plays normally.
+// playback / pause / resume / stop / button state.
+//
+// When the provider is 'claude' (or TTS isn't configured) we pass through to the real WebSocket so
+// native TTS plays normally, except in chats with per-chat options (actor mode, quotes only, a voice
+// override): there a RelaySocket asks ISOLATED for a plan ([{ voice, language, text }]) and plays it
+// through real sockets, one per segment, each the page's URL with its own voice= (and language=, for a
+// voice of another language). The server limits concurrent sessions (a 4th open socket gets SpeechError
+// rate_limit, close 4029), so at most two are open: the one playing and the next one, prefetching.
 (function () {
 	'use strict';
 	const log = createLogger('TTSWebSocket');
 
 	const OrigWS = window.WebSocket;
 	let hijack = false; // pushed from the ISOLATED world; false until told otherwise
+	let relayChats = new Set(); // conversation ids whose native reads go through a RelaySocket
 
 	// --- config sync with ISOLATED (tts.js) ---
 	window.addEventListener('message', (e) => {
 		if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
-		if (e.data.type === 'TTS_HIJACK_CONFIG') hijack = !!e.data.hijack;
+		if (e.data.type === 'TTS_HIJACK_CONFIG') {
+			hijack = !!e.data.hijack;
+			relayChats = new Set(e.data.relayChats || []);
+		}
 	});
 	// Ask for the current config (covers the case where ISOLATED loaded before we did).
 	window.postMessage({ type: 'TTS_HIJACK_CONFIG_REQUEST' }, window.location.origin);
@@ -54,17 +64,20 @@
 
 	const OPUS_FRAME = 320; // 20 ms at 16 kHz
 
-	// --- routing of synthesis results back to the owning socket ---
-	const liveSockets = new Map(); // requestId -> FakeWebSocket
+	// --- routing of ISOLATED's replies back to the owning socket ---
+	const liveSockets = new Map(); // requestId -> FakeWebSocket | RelaySocket
 	window.addEventListener('message', (e) => {
 		if (e.source !== window || e.origin !== window.location.origin || !e.data) return;
 		const sock = liveSockets.get(e.data.requestId);
 		if (!sock) return; // late frame from an aborted/closed request -> drop
-		if (e.data.type === 'TTS_SYNTH_PCM') sock._emitBinary(e.data.chunk);
-		else if (e.data.type === 'TTS_SYNTH_DONE' || e.data.type === 'TTS_SYNTH_ERROR') sock._emitComplete();
+		if (e.data.type === 'TTS_SYNTH_PCM') sock._emitBinary?.(e.data.chunk);
+		else if (e.data.type === 'TTS_SYNTH_DONE' || e.data.type === 'TTS_SYNTH_ERROR') sock._emitComplete?.();
+		else if (e.data.type === 'TTS_PLAN') sock._play?.(e.data.segments || []);
 	});
 
-	class FakeWebSocket extends EventTarget {
+	// What the page sees of a socket: events, readyState, the text it sends. Subclasses decide what to do
+	// with the text (_request) and with keep-alives.
+	class SocketShell extends EventTarget {
 		static CONNECTING = 0;
 		static OPEN = 1;
 		static CLOSING = 2;
@@ -82,15 +95,8 @@
 			this._chunks = [];
 			this._closed = false;
 			this._handlers = {};
-			// Opus when the page asks for it: Opus takes the 16 kHz input as is, and its packets decode at
-			// 48 kHz whatever the input rate.
+			// Opus unless the page asks for PCM.
 			this._opus = !/output_format=pcm/.test(url);
-			this._encoder = this._opus ? opusWasm().then(bytes => QolOpus.createEncoder(bytes, 16000, 1)) : null;
-			this._encoder?.catch(e => log.error('No Opus encoder, this reply stays silent:', e));
-			this._work = Promise.resolve(); // encoding runs in order, after the encoder is ready
-			this._pending = new Int16Array(0); // samples waiting for a full 20 ms frame
-			this._samples = 0; // PCM samples received, for audio_sent_ms
-			this._oddByte = null; // a sample split across two chunks
 			liveSockets.set(this._requestId, this);
 			// Open asynchronously so native code can attach handlers first.
 			queueMicrotask(() => {
@@ -122,14 +128,45 @@
 		send(data) {
 			let msg;
 			try { msg = JSON.parse(data); } catch { return; } // native only sends JSON strings
-			if (msg.type === 'text_chunk') {
-				this._chunks.push(msg.text ?? '');
-			} else if (msg.type === 'close_stream') {
-				const text = this._chunks.join('');
-				const conversationId = (typeof getConversationId === 'function') ? getConversationId() : null;
-				window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, window.location.origin);
-			}
-			// keep_alive: ignore
+			if (msg.type === 'text_chunk') this._chunks.push(msg.text ?? '');
+			else if (msg.type === 'close_stream') this._request(this._chunks.join(''), getConversationId());
+			else if (msg.type === 'keep_alive') this._keepAlive(data);
+		}
+
+		_keepAlive() { }
+
+		_complete(audioMs) {
+			if (this._closed) return;
+			this._fire('message', { data: JSON.stringify({ type: 'SpeechComplete', audio_sent_ms: audioMs }) });
+			// Native calls close() itself after receiving SpeechComplete.
+		}
+
+		close(code, reason) {
+			if (this._closed) return;
+			this._closed = true;
+			this.readyState = 3; // CLOSED
+			liveSockets.delete(this._requestId);
+			// Tell ISOLATED to abort any in-flight work for this request (saves API calls).
+			window.postMessage({ type: 'TTS_SYNTH_ABORT', requestId: this._requestId }, window.location.origin);
+			this._fire('close', { wasClean: true, code: code || 1000, reason: reason || '' });
+		}
+	}
+
+	// A premium provider's audio: ISOLATED synthesizes 16 kHz PCM, sent as is or encoded to Opus (Opus takes
+	// the 16 kHz input as is, and its packets decode at 48 kHz whatever the input rate).
+	class FakeWebSocket extends SocketShell {
+		constructor(url) {
+			super(url);
+			this._encoder = this._opus ? opusWasm().then(bytes => QolOpus.createEncoder(bytes, 16000, 1)) : null;
+			this._encoder?.catch(e => log.error('No Opus encoder, this reply stays silent:', e));
+			this._work = Promise.resolve(); // encoding runs in order, after the encoder is ready
+			this._pending = new Int16Array(0); // samples waiting for a full 20 ms frame
+			this._samples = 0; // PCM samples received, for audio_sent_ms
+			this._oddByte = null; // a sample split across two chunks
+		}
+
+		_request(text, conversationId) {
+			window.postMessage({ type: 'TTS_SYNTH_REQUEST', requestId: this._requestId, text, conversationId }, window.location.origin);
 		}
 
 		_emitBinary(ab) {
@@ -186,28 +223,126 @@
 			if (this._opus) {
 				this._encodeLater(new Int16Array(0), true);
 				await this._work;
-				if (this._closed) return;
 			}
-			this._fire('message', { data: JSON.stringify({ type: 'SpeechComplete', audio_sent_ms: Math.round(this._samples / 16) }) });
-			// Native calls close() itself after receiving SpeechComplete.
+			this._complete(Math.round(this._samples / 16));
 		}
 
 		close(code, reason) {
-			if (this._closed) return;
-			this._closed = true;
-			this.readyState = 3; // CLOSED
-			liveSockets.delete(this._requestId);
 			this._encoder?.then(encoder => encoder.free(), () => { });
-			// Tell ISOLATED to abort any in-flight synthesis for this request (saves API calls).
-			window.postMessage({ type: 'TTS_SYNTH_ABORT', requestId: this._requestId }, window.location.origin);
-			this._fire('close', { wasClean: true, code: code || 1000, reason: reason || '' });
+			super.close(code, reason);
+		}
+	}
+
+	// 160 ms of silence, sent while ISOLATED works out the plan (actor mode's attribution is an LLM
+	// round-trip) so native's player doesn't give up: 8 frames of 20 ms, as PCM zeros or as Opus's
+	// silent frame (TOC 0xF8: CELT fullband 20 ms mono, one frame; 0xFF 0xFE: silence).
+	const PRIMER_FRAMES = 8;
+	const PRIMER_MS = PRIMER_FRAMES * 20;
+	const OPUS_SILENCE = [0xF8, 0xFF, 0xFE];
+
+	// The page's socket URL with a segment's voice and language (each kept when null).
+	function segmentUrl(url, { voice, language }) {
+		const parsed = new URL(url);
+		if (voice) parsed.searchParams.set('voice', voice);
+		if (language) parsed.searchParams.set('language', language);
+		return parsed.href;
+	}
+
+	// Native TTS, played from a plan: the page's own text and format, one real socket per segment. The
+	// segments' frames are already in the format the page asked for, so they're forwarded untouched.
+	class RelaySocket extends SocketShell {
+		constructor(url, protocols) {
+			super(url);
+			this._protocols = protocols; // the page's, for every segment's socket
+			this._real = new Set(); // open real sockets
+		}
+
+		_request(text, conversationId) {
+			for (let i = 0; i < PRIMER_FRAMES; i++) {
+				this._fire('message', { data: this._opus ? new Uint8Array(OPUS_SILENCE).buffer : new ArrayBuffer(OPUS_FRAME * 2) });
+			}
+			window.postMessage({ type: 'TTS_PLAN_REQUEST', requestId: this._requestId, text, conversationId }, window.location.origin);
+		}
+
+		_keepAlive(data) {
+			for (const ws of this._real) if (ws.readyState === OrigWS.OPEN) ws.send(data);
+		}
+
+		// Opens a segment's socket right away; its frames wait in a buffer until attach() (prefetch).
+		_open(segment) {
+			const url = segmentUrl(this.url, segment);
+			const ws = this._protocols === undefined ? new OrigWS(url) : new OrigWS(url, this._protocols);
+			ws.binaryType = 'arraybuffer';
+			this._real.add(ws);
+			const frames = [];
+			let deliver = (ab) => frames.push(ab);
+			const result = new Promise(resolve => {
+				ws.onopen = () => {
+					ws.send(JSON.stringify({ type: 'text_chunk', text: segment.text }));
+					ws.send(JSON.stringify({ type: 'close_stream' }));
+				};
+				ws.onmessage = (m) => {
+					if (typeof m.data !== 'string') return deliver(m.data);
+					let msg;
+					try { msg = JSON.parse(m.data); } catch { return; }
+					if (msg.type === 'SpeechComplete') resolve({ ms: msg.audio_sent_ms || 0 });
+					else if (msg.type === 'SpeechError') resolve({ error: m.data });
+				};
+				ws.onclose = (c) => resolve({ code: c.code }); // a no-op once settled
+			}).finally(() => {
+				this._real.delete(ws);
+				ws.close();
+			});
+			return {
+				result,
+				attach: (onFrame) => {
+					frames.forEach(onFrame);
+					deliver = onFrame;
+				}
+			};
+		}
+
+		async _play(segments) {
+			if (this._closed || this._playing) return; // one plan per read
+			this._playing = true;
+			let total = 0;
+			let next = segments.length ? this._open(segments[0]) : null;
+			for (let i = 0; next; i++) {
+				const current = next;
+				next = i + 1 < segments.length ? this._open(segments[i + 1]) : null;
+				current.attach(ab => { if (!this._closed) this._fire('message', { data: ab }); });
+				const result = await current.result;
+				if (this._closed) return;
+				if (result.ms === undefined) {
+					this._fail(result);
+					return;
+				}
+				total += result.ms;
+			}
+			this._complete(PRIMER_MS + total);
+		}
+
+		// A segment ended without SpeechComplete: pass its SpeechError on (native ends the read and closes
+		// us), or, if the socket just closed, close as it did. The prefetched socket is closed now either way.
+		_fail({ error, code }) {
+			log.warn('Relayed segment failed:', error || `closed with ${code}`);
+			for (const ws of this._real) ws.close();
+			if (error) this._fire('message', { data: error });
+			else this.close(code || 1006);
+		}
+
+		close(code, reason) {
+			for (const ws of this._real) ws.close();
+			this._real.clear();
+			super.close(code, reason);
 		}
 	}
 
 	function WSProxy(url, protocols) {
 		try {
-			if (hijack && typeof url === 'string' && url.includes('/text_to_speech/')) {
-				return new FakeWebSocket(url);
+			if (typeof url === 'string' && url.includes('/text_to_speech/')) {
+				if (hijack) return new FakeWebSocket(url);
+				if (relayChats.has(getConversationId())) return new RelaySocket(url, protocols);
 			}
 		} catch (e) {
 			log.error('WS hijack decision failed, passing through', e);
