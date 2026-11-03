@@ -1,3 +1,2 @@
-Haiku 4.5 is back in the model picker, under "More models".
-Optional project names in chat titles (off by default, in Extension settings).
-Image gallery settings moved to Extension settings, now reachable from every page.
+TTS actor mode now works with Claude's built-in voices, no API key needed: pick from every language's voices, per character.
+With Claude's built-in voices, "Only speak quoted text" and the per-chat voice override now work too.
