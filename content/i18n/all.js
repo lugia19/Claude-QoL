@@ -194,7 +194,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Loading settings...",
 	"tts.provider_label": "TTS Provider",
-	"tts.native_note": "Using Claude's built-in voice (set it in Claude's own settings). Pick ElevenLabs or OpenAI to use a custom voice.",
+	"tts.native_note": "Using Claude's built-in voice (set it in Claude's own settings). Pick ElevenLabs or OpenAI to use a custom voice. Actor mode and the voice override work with Claude's voices too.",
 	"tts.api_key_label": "API Key",
 	"tts.api_key_placeholder": "Enter your API key",
 	"tts.base_url_label": "Base URL (optional)",
@@ -586,7 +586,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Einstellungen werden geladen...",
 	"tts.provider_label": "TTS-Anbieter",
-	"tts.native_note": "Verwendet die integrierte Stimme von Claude (in den Einstellungen von Claude festlegen). Wählen Sie ElevenLabs oder OpenAI, um eine eigene Stimme zu verwenden.",
+	"tts.native_note": "Verwendet die integrierte Stimme von Claude (in den Einstellungen von Claude festlegen). Wählen Sie ElevenLabs oder OpenAI, um eine eigene Stimme zu verwenden. Der Schauspielermodus und das Überschreiben der Stimme funktionieren auch mit den Stimmen von Claude.",
 	"tts.api_key_label": "API-Schlüssel",
 	"tts.api_key_placeholder": "API-Schlüssel eingeben",
 	"tts.base_url_label": "Basis-URL (optional)",
@@ -978,7 +978,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Cargando configuración...",
 	"tts.provider_label": "Proveedor de TTS",
-	"tts.native_note": "Usando la voz integrada de Claude (configúrala en los ajustes de Claude). Elige ElevenLabs u OpenAI para usar una voz personalizada.",
+	"tts.native_note": "Usando la voz integrada de Claude (configúrala en los ajustes de Claude). Elige ElevenLabs u OpenAI para usar una voz personalizada. El modo actor y la voz personalizada también funcionan con las voces de Claude.",
 	"tts.api_key_label": "Clave de API",
 	"tts.api_key_placeholder": "Escribe tu clave de API",
 	"tts.base_url_label": "URL base (opcional)",
@@ -1370,7 +1370,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Chargement des paramètres...",
 	"tts.provider_label": "Fournisseur TTS",
-	"tts.native_note": "Utilise la voix intégrée de Claude (à définir dans les paramètres de Claude). Choisissez ElevenLabs ou OpenAI pour utiliser une voix personnalisée.",
+	"tts.native_note": "Utilise la voix intégrée de Claude (à définir dans les paramètres de Claude). Choisissez ElevenLabs ou OpenAI pour utiliser une voix personnalisée. Le mode acteur et la voix de remplacement fonctionnent aussi avec les voix de Claude.",
 	"tts.api_key_label": "Clé API",
 	"tts.api_key_placeholder": "Saisissez votre clé API",
 	"tts.base_url_label": "URL de base (facultatif)",
@@ -1762,7 +1762,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// tts
 	"tts.loading_settings": "सेटिंग्स लोड हो रही हैं...",
 	"tts.provider_label": "TTS प्रदाता",
-	"tts.native_note": "Claude की बिल्ट-इन आवाज़ का उपयोग हो रहा है (इसे Claude की अपनी सेटिंग्स में सेट करें)। कस्टम आवाज़ के लिए ElevenLabs या OpenAI चुनें।",
+	"tts.native_note": "Claude की बिल्ट-इन आवाज़ का उपयोग हो रहा है (इसे Claude की अपनी सेटिंग्स में सेट करें)। कस्टम आवाज़ के लिए ElevenLabs या OpenAI चुनें। एक्टर मोड और आवाज़ ओवरराइड Claude की आवाज़ों के साथ भी काम करते हैं।",
 	"tts.api_key_label": "API कुंजी",
 	"tts.api_key_placeholder": "अपनी API कुंजी दर्ज करें",
 	"tts.base_url_label": "बेस URL (वैकल्पिक)",
@@ -2154,7 +2154,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Memuat pengaturan...",
 	"tts.provider_label": "Penyedia TTS",
-	"tts.native_note": "Menggunakan suara bawaan Claude (atur di pengaturan Claude). Pilih ElevenLabs atau OpenAI untuk menggunakan suara kustom.",
+	"tts.native_note": "Menggunakan suara bawaan Claude (atur di pengaturan Claude). Pilih ElevenLabs atau OpenAI untuk menggunakan suara kustom. Mode aktor dan ganti suara juga berfungsi dengan suara Claude.",
 	"tts.api_key_label": "Kunci API",
 	"tts.api_key_placeholder": "Masukkan kunci API Anda",
 	"tts.base_url_label": "URL Dasar (opsional)",
@@ -2546,7 +2546,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Caricamento delle impostazioni...",
 	"tts.provider_label": "Provider TTS",
-	"tts.native_note": "Viene usata la voce integrata di Claude (impostala nelle impostazioni di Claude). Scegli ElevenLabs o OpenAI per usare una voce personalizzata.",
+	"tts.native_note": "Viene usata la voce integrata di Claude (impostala nelle impostazioni di Claude). Scegli ElevenLabs o OpenAI per usare una voce personalizzata. La modalità attori e la voce personalizzata funzionano anche con le voci di Claude.",
 	"tts.api_key_label": "Chiave API",
 	"tts.api_key_placeholder": "Inserisci la tua chiave API",
 	"tts.base_url_label": "URL di base (facoltativo)",
@@ -2938,7 +2938,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	// tts
 	"tts.loading_settings": "設定を読み込み中…",
 	"tts.provider_label": "TTSプロバイダー",
-	"tts.native_note": "Claudeの内蔵音声を使用します（Claude側の設定で変更できます）。カスタム音声を使うには、ElevenLabsまたはOpenAIを選択してください。",
+	"tts.native_note": "Claudeの内蔵音声を使用します（Claude側の設定で変更できます）。カスタム音声を使うには、ElevenLabsまたはOpenAIを選択してください。アクターモードと音声の上書きはClaudeの音声でも使えます。",
 	"tts.api_key_label": "APIキー",
 	"tts.api_key_placeholder": "APIキーを入力",
 	"tts.base_url_label": "ベースURL（任意）",
@@ -3330,7 +3330,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// tts
 	"tts.loading_settings": "설정 로딩 중...",
 	"tts.provider_label": "TTS 제공자",
-	"tts.native_note": "Claude의 기본 제공 음성을 사용합니다(Claude 자체 설정에서 변경). 사용자 지정 음성을 사용하려면 ElevenLabs 또는 OpenAI를 선택하세요.",
+	"tts.native_note": "Claude의 기본 제공 음성을 사용합니다(Claude 자체 설정에서 변경). 사용자 지정 음성을 사용하려면 ElevenLabs 또는 OpenAI를 선택하세요. 배우 모드와 음성 재정의도 Claude의 음성으로 사용할 수 있습니다.",
 	"tts.api_key_label": "API 키",
 	"tts.api_key_placeholder": "API 키를 입력하세요",
 	"tts.base_url_label": "기본 URL(선택 사항)",
@@ -3722,7 +3722,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Carregando configurações...",
 	"tts.provider_label": "Provedor de TTS",
-	"tts.native_note": "Usando a voz integrada do Claude (defina-a nas configurações do próprio Claude). Escolha ElevenLabs ou OpenAI para usar uma voz personalizada.",
+	"tts.native_note": "Usando a voz integrada do Claude (defina-a nas configurações do próprio Claude). Escolha ElevenLabs ou OpenAI para usar uma voz personalizada. O modo ator e a substituição de voz também funcionam com as vozes do Claude.",
 	"tts.api_key_label": "Chave de API",
 	"tts.api_key_placeholder": "Digite sua chave de API",
 	"tts.base_url_label": "URL base (opcional)",

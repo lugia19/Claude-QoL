@@ -190,7 +190,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	// tts
 	"tts.loading_settings": "설정 로딩 중...",
 	"tts.provider_label": "TTS 제공자",
-	"tts.native_note": "Claude의 기본 제공 음성을 사용합니다(Claude 자체 설정에서 변경). 사용자 지정 음성을 사용하려면 ElevenLabs 또는 OpenAI를 선택하세요.",
+	"tts.native_note": "Claude의 기본 제공 음성을 사용합니다(Claude 자체 설정에서 변경). 사용자 지정 음성을 사용하려면 ElevenLabs 또는 OpenAI를 선택하세요. 배우 모드와 음성 재정의도 Claude의 음성으로 사용할 수 있습니다.",
 	"tts.api_key_label": "API 키",
 	"tts.api_key_placeholder": "API 키를 입력하세요",
 	"tts.base_url_label": "기본 URL(선택 사항)",

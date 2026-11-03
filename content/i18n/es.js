@@ -190,7 +190,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	// tts
 	"tts.loading_settings": "Cargando configuración...",
 	"tts.provider_label": "Proveedor de TTS",
-	"tts.native_note": "Usando la voz integrada de Claude (configúrala en los ajustes de Claude). Elige ElevenLabs u OpenAI para usar una voz personalizada.",
+	"tts.native_note": "Usando la voz integrada de Claude (configúrala en los ajustes de Claude). Elige ElevenLabs u OpenAI para usar una voz personalizada. El modo actor y la voz personalizada también funcionan con las voces de Claude.",
 	"tts.api_key_label": "Clave de API",
 	"tts.api_key_placeholder": "Escribe tu clave de API",
 	"tts.base_url_label": "URL base (opcional)",

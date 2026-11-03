@@ -190,7 +190,7 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	// tts
 	"tts.loading_settings": "सेटिंग्स लोड हो रही हैं...",
 	"tts.provider_label": "TTS प्रदाता",
-	"tts.native_note": "Claude की बिल्ट-इन आवाज़ का उपयोग हो रहा है (इसे Claude की अपनी सेटिंग्स में सेट करें)। कस्टम आवाज़ के लिए ElevenLabs या OpenAI चुनें।",
+	"tts.native_note": "Claude की बिल्ट-इन आवाज़ का उपयोग हो रहा है (इसे Claude की अपनी सेटिंग्स में सेट करें)। कस्टम आवाज़ के लिए ElevenLabs या OpenAI चुनें। एक्टर मोड और आवाज़ ओवरराइड Claude की आवाज़ों के साथ भी काम करते हैं।",
 	"tts.api_key_label": "API कुंजी",
 	"tts.api_key_placeholder": "अपनी API कुंजी दर्ज करें",
 	"tts.base_url_label": "बेस URL (वैकल्पिक)",

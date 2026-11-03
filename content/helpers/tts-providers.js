@@ -510,6 +510,81 @@ Example segments:
 	}
 	//#endregion
 
+	//#region Claude (built-in) Provider
+	// claude.ai's own voices. Nothing is synthesized here: actor mode, quotes only and the voice override
+	// play through claude.ai's TTS socket, one socket per segment (tts-ws-interceptor.js, RelaySocket).
+	//
+	// The voices differ per language. claude.ai lists them in a GrowthBook remote config that comes with
+	// its startup bootstrap (GET /edge-api/bootstrap/<org>/app_start, org_growthbook.features, under a
+	// hashed key, so it's found by its shape: speech_input.supported_languages = [{ code, display_name,
+	// voices: [{ id, display_name }] }]), and reads aloud in the account's voice_language_code. Its own
+	// fallback is the five English voices below (with language=en, in case the page reads in another). The user's language comes first; any other voice carries
+	// its language, which the relay puts in that segment's socket URL (language=).
+	const ENGLISH_VOICES = [
+		{ voice_id: 'buttery', name: 'Buttery (English)', language: 'en' },
+		{ voice_id: 'airy', name: 'Airy (English)', language: 'en' },
+		{ voice_id: 'mellow', name: 'Mellow (English)', language: 'en' },
+		{ voice_id: 'glassy', name: 'Glassy (English)', language: 'en' },
+		{ voice_id: 'rounded', name: 'Rounded (English)', language: 'en' }
+	];
+
+	const baseLanguage = (code) => String(code).split(/[-_]/)[0].toLowerCase();
+
+	// Once per page (the bootstrap is ~1 MB); a failure keeps the English voices until a reload.
+	let nativeVoicesPromise = null;
+	function loadNativeVoices() {
+		nativeVoicesPromise ??= (async () => {
+			const [bootstrapResponse, account] = await Promise.all([
+				fetch(`/edge-api/bootstrap/${getOrgId()}/app_start`),
+				getAccountSettings().catch(() => null) // then the UI language
+			]);
+			if (!bootstrapResponse.ok) throw new Error(`bootstrap: ${bootstrapResponse.status}`);
+			const features = (await bootstrapResponse.json()).org_growthbook?.features || {};
+			const config = Object.values(features).find(f => Array.isArray(f?.value?.speech_input?.supported_languages));
+			const languages = (config?.value.speech_input.supported_languages || []).filter(l => l?.code && Array.isArray(l.voices));
+			if (!languages.length) throw new Error('no voice config in the bootstrap');
+			// Like claude.ai: the account's voice language, else the UI's, else English.
+			const wanted = account?.settings?.voice_language_code || accountLocale();
+			const own = languages.find(l => l.code === wanted)
+				?? languages.find(l => baseLanguage(l.code) === baseLanguage(wanted))
+				?? languages.find(l => l.code === 'en');
+			const voices = [];
+			const seen = new Set();
+			for (const language of [own, ...languages.filter(l => l !== own)]) {
+				for (const voice of language?.voices || []) {
+					if (!voice?.id || seen.has(voice.id)) continue;
+					seen.add(voice.id);
+					voices.push({
+						voice_id: voice.id,
+						name: `${voice.display_name || voice.id} (${language.display_name || language.code})`,
+						language: language === own ? null : language.code
+					});
+				}
+			}
+			return voices;
+		})().catch(e => {
+			log.warn('Could not load claude.ai\'s voices, using the English ones:', e);
+			return ENGLISH_VOICES;
+		});
+		return nativeVoicesPromise;
+	}
+
+	class ClaudeNativeProvider extends Provider {
+		// [{ voice_id, name, language }], language null for the user's own voice language.
+		async getVoices() {
+			return loadNativeVoices();
+		}
+
+		async getModels() {
+			return [];
+		}
+
+		async attributeDialogueToCharacters(text, characters) {
+			return this.splitIntoSegments(text, characters);
+		}
+	}
+	//#endregion
+
 
 	// Export to window for use by main script
 	window.TTSProviders = {
@@ -517,8 +592,8 @@ Example segments:
 			claude: {
 				name: localize('tts.provider_claude_builtin'),
 				requiresApiKey: false,
-				native: true, // passthrough: let claude.ai's own TTS play, no hijack
-				class: null
+				native: true, // claude.ai's own TTS plays; never hijacked, relayed for per-chat options
+				class: ClaudeNativeProvider
 			},
 			elevenlabs: {
 				name: 'ElevenLabs',
