@@ -228,6 +228,7 @@
 		}
 
 		close(code, reason) {
+			if (this._closed) return; // freeing the encoder twice would corrupt the WASM heap
 			this._encoder?.then(encoder => encoder.free(), () => { });
 			super.close(code, reason);
 		}
@@ -332,6 +333,7 @@
 		}
 
 		close(code, reason) {
+			if (this._closed) return;
 			for (const ws of this._real) ws.close();
 			this._real.clear();
 			super.close(code, reason);
