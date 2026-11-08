@@ -77,8 +77,16 @@
 				loadingModal.destroy();
 				await createEditModal(orgId, conversationId, existingMessage);
 
+				// The button captured above is usually gone by now: React remounts the row's
+				// toolbar while the modal is open, and a detached button's click goes nowhere.
+				const nativeEdit = await findNativeEditButton(existingMessage.uuid) ?? (editButton.isConnected ? editButton : null);
+				if (!nativeEdit) {
+					cleanupEditState();
+					showClaudeAlert(localize('common.error'), localize('edit.editor_not_found'));
+					return;
+				}
 				pendingEditData = {};
-				editButton.click();
+				nativeEdit.click();
 				setTimeout(() => autoSubmitEditWithText(editMessage.text), 100);
 			} catch (error) {
 				if (error.message === 'Edit cancelled by user') {
@@ -104,6 +112,19 @@
 		} else {
 			editButton.parentElement.insertBefore(button, editButton);
 		}
+	}
+
+	// The live native edit button of a user message. Its toolbar is deferred (data-deferred,
+	// a lone sr-only "show actions" button) until hovered or focused; focusing that button mounts it.
+	async function findNativeEditButton(uuid) {
+		const row = document.querySelector(`[data-turn-key="${CSS.escape(uuid)}"]`);
+		if (!row) return null;
+		const selector = '[data-testid="user-message-edit"]';
+		if (!row.querySelector(selector)) {
+			row.querySelector('[data-cds="MessageActions"][data-deferred] button')?.focus();
+			await new Promise(resolve => setTimeout(resolve, 50)); // the toolbar mounts asynchronously
+		}
+		return row.querySelector(selector);
 	}
 
 	// The native edit UI is no longer a <form> with a submit button: it swaps the
