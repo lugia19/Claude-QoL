@@ -1,2 +1,1 @@
-TTS actor mode now works with Claude's built-in voices, no API key needed: pick from every language's voices, per character.
-With Claude's built-in voices, "Only speak quoted text" and the per-chat voice override now work too.
+Fixed Advanced Edit failing with "The UI may have changed" after a claude.ai update.
