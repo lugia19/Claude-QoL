@@ -737,14 +737,12 @@
 			target: 'user',
 			createFn: createNavUpButton,
 			pages: ['chat'],
-			insertFn: (button, container) => container.appendChild(button),
 		});
 		MessageButtonBar.register({
 			buttonClass: 'nav-down-button',
 			target: 'user',
 			createFn: createNavDownButton,
 			pages: ['chat'],
-			insertFn: (button, container) => container.appendChild(button),
 		});
 	}
 
