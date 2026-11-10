@@ -437,28 +437,37 @@ function highlightMessage(row) {
 // ======== MESSAGE BUTTON BAR SINGLETON ========
 // Manages per-message buttons (injected into message controls area).
 // Callers register once; MessageButtonBar handles polling, injection, and ordering.
-const MessageButtonBar = {
-	ASSISTANT_BUTTON_PRIORITY: [
-		'fork-button',
-		'bookmark-button',
-	],
-	USER_BUTTON_PRIORITY: [
-		'advanced-edit-button',
-	],
+//
+// Where every button sits, shared by both worlds (each registers only its own buttons, but places
+// all of them, so they agree). A slot's buttons stay together in this order, at the toolbar's
+// start (`at: 'start'`), its end (`at: 'end'`), or right before the native button `before` selects.
+// One slot per position: two slots both at 'end' would keep moving each other, forever.
+// claude.ai hides and re-adds native buttons (time, retry, version arrows) around a send, and
+// React puts a returning node before its next React sibling, past ours; so placement is re-checked
+// on every toolbar change.
+const MESSAGE_BUTTON_SLOTS = [
+	{ classes: ['fork-button', 'bookmark-button'], at: 'start' },
+	{ classes: ['advanced-edit-button'], before: '[data-testid="user-message-edit"]' },
+	{ classes: ['nav-up-button', 'nav-down-button'], at: 'end' },
+];
 
+const MessageButtonBar = {
 	_registrations: new Map(),
 	_pollInterval: null,
+	// One observer for every toolbar; observing a toolbar again is a no-op.
+	_observer: null,
 
-	register({ buttonClass, target, createFn, pages, shouldInject = null, insertFn = null }) {
+	register({ buttonClass, target, createFn, pages }) {
 		if (this._registrations.has(buttonClass)) return;
-		this._registrations.set(buttonClass, { buttonClass, target, createFn, pages, shouldInject, insertFn });
+		const slot = MESSAGE_BUTTON_SLOTS.find(s => s.classes.includes(buttonClass));
+		this._registrations.set(buttonClass, { buttonClass, target, createFn, pages, slot });
 		if (!this._pollInterval) {
 			this._pollInterval = setInterval(() => this._tick(), 1000);
 			this._tick();
 		}
 	},
 
-	async _tick() {
+	_tick() {
 		// Detect current page group (reuse ButtonBar's detection or detect independently)
 		let group = ButtonBar.getCurrentGroup();
 		if (!group) {
@@ -470,65 +479,56 @@ const MessageButtonBar = {
 		if (!group) return;
 
 		const { assistantMessages, userMessages } = getUIMessages();
+		const regs = [...this._registrations.values()].filter(reg => reg.pages.includes(group));
 
-		for (const [buttonClass, reg] of this._registrations) {
-			if (!reg.pages.includes(group)) continue;
-
-			if (reg.shouldInject) {
-				const allowed = await reg.shouldInject();
-				if (!allowed) continue;
-			}
-
-			const messages = reg.target === 'assistant' ? assistantMessages : userMessages;
-			const priorityArray = reg.target === 'assistant'
-				? this.ASSISTANT_BUTTON_PRIORITY
-				: this.USER_BUTTON_PRIORITY;
-
+		for (const [target, messages] of [['assistant', assistantMessages], ['user', userMessages]]) {
 			for (const message of messages) {
 				const container = findMessageControls(message);
 				if (!container) continue;
-				if (container.querySelector('.' + buttonClass)) continue;
 
-				const button = reg.createFn();
-				button.classList.add(buttonClass);
+				for (const reg of regs) {
+					if (reg.target !== target) continue;
+					if (container.querySelector(':scope > .' + reg.buttonClass)) continue;
+					// Anchored buttons wait for their native button.
+					if (reg.slot.before && !container.querySelector(reg.slot.before)) continue;
 
-				if (reg.insertFn) {
-					reg.insertFn(button, container);
-				} else {
-					this._defaultInsert(button, buttonClass, container, priorityArray);
+					const button = reg.createFn();
+					button.classList.add(reg.buttonClass);
+					container.appendChild(button);
 				}
+
+				// The observer does the placing; this pass is a fallback.
+				this._placeAll(container);
+				this._observer ??= new MutationObserver(records => {
+					for (const toolbar of new Set(records.map(r => r.target))) this._placeAll(toolbar);
+				});
+				this._observer.observe(container, { childList: true });
 			}
 		}
 	},
 
-	_defaultInsert(button, buttonClass, container, priorityArray) {
-		let insertBefore = null;
+	// Moves our buttons only when they're out of place, so our own moves settle at once.
+	_placeAll(container) {
+		for (const slot of MESSAGE_BUTTON_SLOTS) {
+			const buttons = slot.classes
+				.map(cls => container.querySelector(':scope > .' + cls))
+				.filter(Boolean);
+			if (!buttons.length) continue;
 
-		const currentPriority = priorityArray.indexOf(buttonClass);
-		for (let i = currentPriority + 1; i < priorityArray.length; i++) {
-			const lowerPriorityButton = container.querySelector('.' + priorityArray[i]);
-			if (lowerPriorityButton) {
-				insertBefore = lowerPriorityButton;
-				break;
+			let next; // the node the group goes right before; null = the end
+			if (slot.at === 'start') {
+				next = [...container.children].find(el => !buttons.includes(el)) ?? null;
+			} else if (slot.at === 'end') {
+				next = null;
+			} else {
+				next = container.querySelector(slot.before);
+				while (next && next.parentElement !== container) next = next.parentElement;
+				if (!next) continue;
 			}
-		}
 
-		// Fallback: insert before the copy button
-		if (!insertBefore) {
-			const copyButton = container.querySelector('[data-testid="action-bar-copy"]');
-			if (copyButton) {
-				insertBefore = copyButton;
-			}
-		}
-
-		while (insertBefore && insertBefore.parentElement !== container) {
-			insertBefore = insertBefore.parentElement;
-		}
-
-		if (insertBefore) {
-			container.insertBefore(button, insertBefore);
-		} else {
-			container.insertBefore(button, container.firstElementChild);
+			// For 'start', a chain that ends at the first non-slot child also starts the toolbar.
+			if (buttons.every((btn, i) => btn.nextElementSibling === (buttons[i + 1] ?? next))) continue;
+			for (const btn of buttons) container.insertBefore(btn, next);
 		}
 	},
 };
