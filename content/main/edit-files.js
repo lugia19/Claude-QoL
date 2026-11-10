@@ -29,12 +29,11 @@
             </div>
         `;
 
-		const btn = createClaudeButton(svgContent, 'icon-message');
+		const btn = createClaudeButton(svgContent, 'icon-message', onAdvancedEditClick);
 		btn.type = 'button';
 		btn.setAttribute('data-state', 'closed');
 		btn.setAttribute('aria-label', localize('edit.advanced_edit'));
 		createClaudeTooltip(btn, localize('edit.advanced_edit'), true);
-		btn.onclick = onAdvancedEditClick;
 		return btn;
 	}
 
@@ -60,9 +59,8 @@
 			const conversation = new ClaudeConversation(orgId, conversationId);
 			const messages = await conversation.getMessages(false);
 
-			const existingMessage = uuid ? messages.find(m => m.uuid === uuid) ?? null : null;
+			const existingMessage = messages.find(m => m.uuid === uuid);
 			if (!existingMessage) {
-				loadingModal.destroy();
 				showClaudeAlert(localize('common.error'), localize('edit.message_not_found'));
 				return;
 			}

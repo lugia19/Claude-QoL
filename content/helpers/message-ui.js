@@ -440,23 +440,27 @@ function highlightMessage(row) {
 //
 // Where every button sits, shared by both worlds (each registers only its own buttons, but places
 // all of them, so they agree). A slot's buttons stay together in this order, at the toolbar's
-// start, its end, or right before the native button `at` selects. claude.ai hides and re-adds
-// native buttons (time, retry, version arrows) around a send, and React puts a returning node
-// before its next React sibling, past ours; so placement is re-checked on every toolbar change.
+// start (`at: 'start'`), its end (`at: 'end'`), or right before the native button `before` selects.
+// One slot per position: two slots both at 'end' would keep moving each other, forever.
+// claude.ai hides and re-adds native buttons (time, retry, version arrows) around a send, and
+// React puts a returning node before its next React sibling, past ours; so placement is re-checked
+// on every toolbar change.
 const MESSAGE_BUTTON_SLOTS = [
 	{ classes: ['fork-button', 'bookmark-button'], at: 'start' },
-	{ classes: ['advanced-edit-button'], at: '[data-testid="user-message-edit"]' },
+	{ classes: ['advanced-edit-button'], before: '[data-testid="user-message-edit"]' },
 	{ classes: ['nav-up-button', 'nav-down-button'], at: 'end' },
 ];
 
 const MessageButtonBar = {
 	_registrations: new Map(),
 	_pollInterval: null,
-	_watched: new WeakSet(),
+	// One observer for every toolbar; observing a toolbar again is a no-op.
+	_observer: null,
 
 	register({ buttonClass, target, createFn, pages }) {
 		if (this._registrations.has(buttonClass)) return;
-		this._registrations.set(buttonClass, { buttonClass, target, createFn, pages });
+		const slot = MESSAGE_BUTTON_SLOTS.find(s => s.classes.includes(buttonClass));
+		this._registrations.set(buttonClass, { buttonClass, target, createFn, pages, slot });
 		if (!this._pollInterval) {
 			this._pollInterval = setInterval(() => this._tick(), 1000);
 			this._tick();
@@ -485,20 +489,20 @@ const MessageButtonBar = {
 				for (const reg of regs) {
 					if (reg.target !== target) continue;
 					if (container.querySelector(':scope > .' + reg.buttonClass)) continue;
-					const slot = MESSAGE_BUTTON_SLOTS.find(s => s.classes.includes(reg.buttonClass));
 					// Anchored buttons wait for their native button.
-					if (slot.at !== 'start' && slot.at !== 'end' && !container.querySelector(slot.at)) continue;
+					if (reg.slot.before && !container.querySelector(reg.slot.before)) continue;
 
 					const button = reg.createFn();
 					button.classList.add(reg.buttonClass);
 					container.appendChild(button);
 				}
 
+				// The observer does the placing; this pass is a fallback.
 				this._placeAll(container);
-				if (!this._watched.has(container)) {
-					this._watched.add(container);
-					new MutationObserver(() => this._placeAll(container)).observe(container, { childList: true });
-				}
+				this._observer ??= new MutationObserver(records => {
+					for (const toolbar of new Set(records.map(r => r.target))) this._placeAll(toolbar);
+				});
+				this._observer.observe(container, { childList: true });
 			}
 		}
 	},
@@ -517,14 +521,13 @@ const MessageButtonBar = {
 			} else if (slot.at === 'end') {
 				next = null;
 			} else {
-				next = container.querySelector(slot.at);
+				next = container.querySelector(slot.before);
 				while (next && next.parentElement !== container) next = next.parentElement;
 				if (!next) continue;
 			}
 
-			const inPlace = buttons.every((btn, i) => btn.nextElementSibling === (buttons[i + 1] ?? next))
-				&& (slot.at !== 'start' || container.firstElementChild === buttons[0]);
-			if (inPlace) continue;
+			// For 'start', a chain that ends at the first non-slot child also starts the toolbar.
+			if (buttons.every((btn, i) => btn.nextElementSibling === (buttons[i + 1] ?? next))) continue;
 			for (const btn of buttons) container.insertBefore(btn, next);
 		}
 	},
