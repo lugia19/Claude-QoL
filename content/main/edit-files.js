@@ -29,7 +29,7 @@
             </div>
         `;
 
-		const btn = createClaudeButton(svgContent, 'icon-message');
+		const btn = createClaudeButton(svgContent, 'icon-message', onAdvancedEditClick);
 		btn.type = 'button';
 		btn.setAttribute('data-state', 'closed');
 		btn.setAttribute('aria-label', localize('edit.advanced_edit'));
@@ -37,80 +37,56 @@
 		return btn;
 	}
 
-	// The user message whose toolbar holds controlsContainer: user rows are keyed by their own uuid
-	// (data-turn-key, see message-ui.js).
-	function findExistingMessage(controlsContainer, messages) {
-		const uuid = resolveUserMessageUuid(controlsContainer);
-		return uuid ? messages.find(m => m.uuid === uuid) ?? null : null;
-	}
+	async function onAdvancedEditClick(e) {
+		e.preventDefault();
+		e.stopPropagation();
 
-	function insertAdvancedEditButton(button, controlsContainer) {
-		// Find the native edit button by its testid - its aria-label is localized by claude.ai
-		const editButton = controlsContainer.querySelector('[data-testid="user-message-edit"]');
-		if (!editButton) return;
+		if (editSessionActive) return;
+		editSessionActive = true;
 
-		button.onclick = async (e) => {
-			e.preventDefault();
-			e.stopPropagation();
+		// The user message whose toolbar holds the button: user rows are keyed by their own uuid
+		// (data-turn-key, see message-ui.js).
+		const uuid = resolveUserMessageUuid(e.currentTarget);
 
-			if (editSessionActive) return;
-			editSessionActive = true;
+		// Fetching the conversation takes a moment; the modal both tells the user
+		// something is happening and blocks a second click on the button.
+		const loadingModal = createLoadingModal(localize('edit.loading_message'));
+		loadingModal.show();
 
-			// Fetching the conversation takes a moment; the modal both tells the user
-			// something is happening and blocks a second click on the button.
-			const loadingModal = createLoadingModal(localize('edit.loading_message'));
-			loadingModal.show();
+		try {
+			const orgId = getOrgId();
+			const conversationId = getConversationId();
+			const conversation = new ClaudeConversation(orgId, conversationId);
+			const messages = await conversation.getMessages(false);
 
-			try {
-				const orgId = getOrgId();
-				const conversationId = getConversationId();
-				const conversation = new ClaudeConversation(orgId, conversationId);
-				const messages = await conversation.getMessages(false);
-
-				const existingMessage = findExistingMessage(controlsContainer, messages);
-				if (!existingMessage) {
-					loadingModal.destroy();
-					showClaudeAlert(localize('common.error'), localize('edit.message_not_found'));
-					return;
-				}
-
-				loadingModal.destroy();
-				await createEditModal(orgId, conversationId, existingMessage);
-
-				// The button captured above is usually gone by now: React remounts the row's
-				// toolbar while the modal is open, and a detached button's click goes nowhere.
-				const nativeEdit = await findNativeEditButton(existingMessage.uuid) ?? (editButton.isConnected ? editButton : null);
-				if (!nativeEdit) {
-					cleanupEditState();
-					showClaudeAlert(localize('common.error'), localize('edit.editor_not_found'));
-					return;
-				}
-				pendingEditData = {};
-				nativeEdit.click();
-				setTimeout(() => autoSubmitEditWithText(editMessage.text), 100);
-			} catch (error) {
-				if (error.message === 'Edit cancelled by user') {
-					log('Edit cancelled — no side effects');
-				} else {
-					log.error('Advanced edit error:', error);
-				}
-			} finally {
-				loadingModal.destroy();
-				editSessionActive = false;
+			const existingMessage = messages.find(m => m.uuid === uuid);
+			if (!existingMessage) {
+				showClaudeAlert(localize('common.error'), localize('edit.message_not_found'));
+				return;
 			}
-		};
 
-		// Old layout: each button is wrapped in <div class="w-fit">.
-		// New layout: buttons are direct children of a flex container (no w-fit wrapper).
-		const editButtonWrapper = editButton.closest('div.w-fit');
-		if (editButtonWrapper) {
-			const wrapper = document.createElement('div');
-			wrapper.className = 'w-fit';
-			wrapper.setAttribute('data-state', 'closed');
-			wrapper.appendChild(button);
-			editButtonWrapper.parentElement.insertBefore(wrapper, editButtonWrapper);
-		} else {
-			editButton.parentElement.insertBefore(button, editButton);
+			loadingModal.destroy();
+			await createEditModal(orgId, conversationId, existingMessage);
+
+			// Looked up only now: React remounts the row's toolbar while the modal is open.
+			const nativeEdit = await findNativeEditButton(existingMessage.uuid);
+			if (!nativeEdit) {
+				cleanupEditState();
+				showClaudeAlert(localize('common.error'), localize('edit.editor_not_found'));
+				return;
+			}
+			pendingEditData = {};
+			nativeEdit.click();
+			setTimeout(() => autoSubmitEditWithText(editMessage.text), 100);
+		} catch (error) {
+			if (error.message === 'Edit cancelled by user') {
+				log('Edit cancelled — no side effects');
+			} else {
+				log.error('Advanced edit error:', error);
+			}
+		} finally {
+			loadingModal.destroy();
+			editSessionActive = false;
 		}
 	}
 
@@ -726,6 +702,5 @@
 		target: 'user',
 		createFn: createAdvancedEditButton,
 		pages: ['chat'],
-		insertFn: insertAdvancedEditButton,
 	});
 })();

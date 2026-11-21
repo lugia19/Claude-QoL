@@ -91,7 +91,6 @@
 	function isBlockCopyButton(btn) {
 		if (btn.classList.contains(RICH_COPY_CLASS)) return false;
 		if (iconGlyph(btn) !== COPY_ICON_GLYPH) return false;
-		if (btn.dataset.testid === 'action-bar-copy') return false;
 		if (btn.closest('[data-cds="MessageActions"]')) return false;
 		if (btn.closest('[role="group"]')?.querySelector('pre')) return false;
 		return true;
