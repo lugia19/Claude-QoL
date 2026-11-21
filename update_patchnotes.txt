@@ -1,1 +1,1 @@
-Fixed Advanced Edit failing with "The UI may have changed" after a claude.ai update.
+Per-message buttons (fork, bookmark, advanced edit, navigation arrows) now always stay in the same order and position.
