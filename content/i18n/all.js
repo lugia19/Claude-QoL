@@ -242,15 +242,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"tts.actor_config_failed": "Failed to load character configuration: {error}",
 	"tts.provider_claude_builtin": "Claude (built-in)",
 
-	// gallery
-	"gallery.show_as_galleries": "Show generated images as galleries",
-	"gallery.enabled_hint": "Turns image tool results into inline galleries.",
-	"gallery.limit_toggle": "Limit images per gallery",
-	"gallery.images_per_gallery": "Images per gallery",
-	"gallery.inline_note": "Note: Only up to 3 images are displayed inline in a gallery.",
-	"gallery.invalid_limit_title": "Invalid limit",
-	"gallery.invalid_limit": "Images per gallery must be a whole number of at least 1.",
-
 	// banner
 	"banner.first_warning": "First Warning",
 	"banner.second_warning": "Second Warning",
@@ -333,10 +324,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"download.failed": "Failed to download file",
 	"download.download_file": "Download file",
 
-	// images
-	"images.generated_image": "Generated image",
-	"images.generated_images": "Generated images",
-
 	// models
 	"models.opus_notice": "Opus consumes usage limits faster than other models",
 	"models.think_longer": "Think longer for complex tasks",
@@ -373,6 +360,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"settings.full_load_hint": "Loads every message when a chat opens, so Ctrl+F, chat search and bookmarks can reach old messages. Turn it off if long chats feel slow.",
 	"settings.project_prefix": "Show project names in chat titles",
 	"settings.project_prefix_hint": "Prefixes chats that are in a project with the project's name, in the sidebar and the chat's title. Renaming such a chat keeps the prefix in its name.",
+	"settings.tool_images": "Show tool images full size",
+	"settings.tool_images_hint": "Shows the images that tools return (image generators, MCP servers) full size instead of as small thumbnails.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code System Prompts",
@@ -634,15 +623,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"tts.actor_config_failed": "Figurenkonfiguration konnte nicht geladen werden: {error}",
 	"tts.provider_claude_builtin": "Claude (integriert)",
 
-	// gallery
-	"gallery.show_as_galleries": "Generierte Bilder als Galerien anzeigen",
-	"gallery.enabled_hint": "Wandelt Ergebnisse von Bild-Tools in eingebettete Galerien um.",
-	"gallery.limit_toggle": "Bilder pro Galerie begrenzen",
-	"gallery.images_per_gallery": "Bilder pro Galerie",
-	"gallery.inline_note": "Hinweis: In einer Galerie werden höchstens 3 Bilder eingebettet angezeigt.",
-	"gallery.invalid_limit_title": "Ungültiges Limit",
-	"gallery.invalid_limit": "Die Anzahl der Bilder pro Galerie muss eine ganze Zahl von mindestens 1 sein.",
-
 	// banner
 	"banner.first_warning": "Erste Warnung",
 	"banner.second_warning": "Zweite Warnung",
@@ -725,10 +705,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"download.failed": "Datei konnte nicht heruntergeladen werden",
 	"download.download_file": "Datei herunterladen",
 
-	// images
-	"images.generated_image": "Generiertes Bild",
-	"images.generated_images": "Generierte Bilder",
-
 	// models
 	"models.opus_notice": "Opus verbraucht Nutzungslimits schneller als andere Modelle",
 	"models.think_longer": "Länger nachdenken bei komplexen Aufgaben",
@@ -765,6 +741,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"settings.full_load_hint": "Lädt beim Öffnen eines Chats alle Nachrichten, damit Strg+F, die Chatsuche und Lesezeichen auch alte Nachrichten erreichen. Schalte es aus, wenn lange Chats träge wirken.",
 	"settings.project_prefix": "Projektnamen in Chat-Titeln anzeigen",
 	"settings.project_prefix_hint": "Stellt Chats in einem Projekt den Projektnamen voran, in der Seitenleiste und im Chat-Titel. Wenn du einen solchen Chat umbenennst, bleibt das Präfix im Namen.",
+	"settings.tool_images": "Bilder von Tools in voller Größe anzeigen",
+	"settings.tool_images_hint": "Zeigt die Bilder, die Tools zurückgeben (Bildgeneratoren, MCP-Server), in voller Größe statt als kleine Vorschaubilder.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code-Systemprompts",
@@ -1026,15 +1004,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"tts.actor_config_failed": "No se pudo cargar la configuración de personajes: {error}",
 	"tts.provider_claude_builtin": "Claude (integrado)",
 
-	// gallery
-	"gallery.show_as_galleries": "Mostrar las imágenes generadas como galerías",
-	"gallery.enabled_hint": "Convierte los resultados de las herramientas de imágenes en galerías integradas.",
-	"gallery.limit_toggle": "Limitar imágenes por galería",
-	"gallery.images_per_gallery": "Imágenes por galería",
-	"gallery.inline_note": "Nota: solo se muestran hasta 3 imágenes integradas en una galería.",
-	"gallery.invalid_limit_title": "Límite no válido",
-	"gallery.invalid_limit": "Las imágenes por galería deben ser un número entero mayor o igual a 1.",
-
 	// banner
 	"banner.first_warning": "Primera advertencia",
 	"banner.second_warning": "Segunda advertencia",
@@ -1117,10 +1086,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"download.failed": "No se pudo descargar el archivo",
 	"download.download_file": "Descargar archivo",
 
-	// images
-	"images.generated_image": "Imagen generada",
-	"images.generated_images": "Imágenes generadas",
-
 	// models
 	"models.opus_notice": "Opus consume los límites de uso más rápido que otros modelos",
 	"models.think_longer": "Piensa más para tareas complejas",
@@ -1157,6 +1122,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"settings.full_load_hint": "Carga todos los mensajes al abrir un chat, para que Ctrl+F, la búsqueda en el chat y los marcadores lleguen a los mensajes antiguos. Desactívalo si los chats largos van lentos.",
 	"settings.project_prefix": "Mostrar el nombre del proyecto en los títulos de los chats",
 	"settings.project_prefix_hint": "Antepone el nombre del proyecto a los chats que forman parte de uno, en la barra lateral y en el título del chat. Al renombrar uno de estos chats, el prefijo se queda en su nombre.",
+	"settings.tool_images": "Mostrar las imágenes de las herramientas a tamaño completo",
+	"settings.tool_images_hint": "Muestra las imágenes que devuelven las herramientas (generadores de imágenes, servidores MCP) a tamaño completo en lugar de miniaturas pequeñas.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts del sistema de Claude Code",
@@ -1418,15 +1385,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"tts.actor_config_failed": "Impossible de charger la configuration des personnages : {error}",
 	"tts.provider_claude_builtin": "Claude (intégré)",
 
-	// gallery
-	"gallery.show_as_galleries": "Afficher les images générées en galeries",
-	"gallery.enabled_hint": "Transforme les résultats des outils d'images en galeries intégrées.",
-	"gallery.limit_toggle": "Limiter les images par galerie",
-	"gallery.images_per_gallery": "Images par galerie",
-	"gallery.inline_note": "Remarque : une galerie affiche au maximum 3 images intégrées.",
-	"gallery.invalid_limit_title": "Limite invalide",
-	"gallery.invalid_limit": "Le nombre d'images par galerie doit être un nombre entier supérieur ou égal à 1.",
-
 	// banner
 	"banner.first_warning": "Premier avertissement",
 	"banner.second_warning": "Deuxième avertissement",
@@ -1509,10 +1467,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"download.failed": "Impossible de télécharger le fichier",
 	"download.download_file": "Télécharger le fichier",
 
-	// images
-	"images.generated_image": "Image générée",
-	"images.generated_images": "Images générées",
-
 	// models
 	"models.opus_notice": "Opus consomme les limites d'utilisation plus rapidement que les autres modèles",
 	"models.think_longer": "Réfléchir plus longtemps pour les tâches complexes",
@@ -1549,6 +1503,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"settings.full_load_hint": "Charge tous les messages à l'ouverture d'un chat, pour que Ctrl+F, la recherche dans le chat et les signets atteignent les anciens messages. Désactivez-le si les longs chats semblent lents.",
 	"settings.project_prefix": "Afficher le nom du projet dans le titre des chats",
 	"settings.project_prefix_hint": "Ajoute le nom du projet devant les chats qui en font partie, dans la barre latérale et le titre du chat. Renommer un de ces chats garde le préfixe dans son nom.",
+	"settings.tool_images": "Afficher les images des outils en taille réelle",
+	"settings.tool_images_hint": "Affiche les images renvoyées par les outils (générateurs d'images, serveurs MCP) en taille réelle plutôt qu'en petites miniatures.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts système de Claude Code",
@@ -1810,15 +1766,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"tts.actor_config_failed": "पात्र कॉन्फ़िगरेशन लोड नहीं हो सका: {error}",
 	"tts.provider_claude_builtin": "Claude (बिल्ट-इन)",
 
-	// gallery
-	"gallery.show_as_galleries": "जनरेट की गई इमेज गैलरी के रूप में दिखाएँ",
-	"gallery.enabled_hint": "इमेज टूल के नतीजों को इनलाइन गैलरी में बदलता है।",
-	"gallery.limit_toggle": "प्रति गैलरी इमेज सीमित करें",
-	"gallery.images_per_gallery": "प्रति गैलरी इमेज",
-	"gallery.inline_note": "ध्यान दें: गैलरी में इनलाइन केवल 3 इमेज तक दिखाई जाती हैं।",
-	"gallery.invalid_limit_title": "अमान्य सीमा",
-	"gallery.invalid_limit": "प्रति गैलरी इमेज कम से कम 1 की पूर्ण संख्या होनी चाहिए।",
-
 	// banner
 	"banner.first_warning": "पहली चेतावनी",
 	"banner.second_warning": "दूसरी चेतावनी",
@@ -1901,10 +1848,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"download.failed": "फ़ाइल डाउनलोड नहीं हो सकी",
 	"download.download_file": "फ़ाइल डाउनलोड करें",
 
-	// images
-	"images.generated_image": "जनरेट की गई इमेज",
-	"images.generated_images": "जनरेट की गई इमेज",
-
 	// models
 	"models.opus_notice": "Opus अन्य मॉडलों की तुलना में उपयोग सीमा तेज़ी से खर्च करता है",
 	"models.think_longer": "जटिल कार्यों के लिए ज़्यादा देर सोचता है",
@@ -1941,6 +1884,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
 	"settings.project_prefix": "चैट शीर्षकों में प्रोजेक्ट का नाम दिखाएँ",
 	"settings.project_prefix_hint": "किसी प्रोजेक्ट की चैट के आगे प्रोजेक्ट का नाम जोड़ता है, साइडबार और चैट के शीर्षक में। ऐसी चैट का नाम बदलने पर उपसर्ग नाम में बना रहता है।",
+	"settings.tool_images": "टूल की इमेज पूरे आकार में दिखाएँ",
+	"settings.tool_images_hint": "टूल से मिली इमेज (इमेज जनरेटर, MCP सर्वर) को छोटे थंबनेल के बजाय पूरे आकार में दिखाता है।",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code सिस्टम प्रॉम्प्ट",
@@ -2202,15 +2147,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"tts.actor_config_failed": "Gagal memuat konfigurasi karakter: {error}",
 	"tts.provider_claude_builtin": "Claude (bawaan)",
 
-	// gallery
-	"gallery.show_as_galleries": "Tampilkan gambar yang dihasilkan sebagai galeri",
-	"gallery.enabled_hint": "Mengubah hasil alat gambar menjadi galeri sebaris.",
-	"gallery.limit_toggle": "Batasi gambar per galeri",
-	"gallery.images_per_gallery": "Gambar per galeri",
-	"gallery.inline_note": "Catatan: Maksimal hanya 3 gambar yang ditampilkan sebaris dalam galeri.",
-	"gallery.invalid_limit_title": "Batas tidak valid",
-	"gallery.invalid_limit": "Gambar per galeri harus berupa bilangan bulat minimal 1.",
-
 	// banner
 	"banner.first_warning": "Peringatan Pertama",
 	"banner.second_warning": "Peringatan Kedua",
@@ -2293,10 +2229,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"download.failed": "Gagal mengunduh file",
 	"download.download_file": "Unduh file",
 
-	// images
-	"images.generated_image": "Gambar yang dihasilkan",
-	"images.generated_images": "Gambar yang dihasilkan",
-
 	// models
 	"models.opus_notice": "Opus menghabiskan batas penggunaan lebih cepat daripada model lain",
 	"models.think_longer": "Berpikir lebih lama untuk tugas kompleks",
@@ -2333,6 +2265,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
 	"settings.project_prefix": "Tampilkan nama proyek di judul obrolan",
 	"settings.project_prefix_hint": "Menambahkan nama proyek di depan obrolan yang ada di dalam proyek, di bilah samping dan judul obrolan. Mengganti nama obrolan seperti itu tetap menyimpan awalan di namanya.",
+	"settings.tool_images": "Tampilkan gambar dari alat dalam ukuran penuh",
+	"settings.tool_images_hint": "Menampilkan gambar yang dihasilkan alat (generator gambar, server MCP) dalam ukuran penuh, bukan sebagai thumbnail kecil.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt sistem Claude Code",
@@ -2594,15 +2528,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"tts.actor_config_failed": "Impossibile caricare la configurazione dei personaggi: {error}",
 	"tts.provider_claude_builtin": "Claude (integrata)",
 
-	// gallery
-	"gallery.show_as_galleries": "Mostra le immagini generate come gallerie",
-	"gallery.enabled_hint": "Trasforma i risultati degli strumenti per immagini in gallerie in linea.",
-	"gallery.limit_toggle": "Limita le immagini per galleria",
-	"gallery.images_per_gallery": "Immagini per galleria",
-	"gallery.inline_note": "Nota: in una galleria vengono mostrate in linea al massimo 3 immagini.",
-	"gallery.invalid_limit_title": "Limite non valido",
-	"gallery.invalid_limit": "Le immagini per galleria devono essere un numero intero pari almeno a 1.",
-
 	// banner
 	"banner.first_warning": "Primo avviso",
 	"banner.second_warning": "Secondo avviso",
@@ -2685,10 +2610,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"download.failed": "Impossibile scaricare il file",
 	"download.download_file": "Scarica file",
 
-	// images
-	"images.generated_image": "Immagine generata",
-	"images.generated_images": "Immagini generate",
-
 	// models
 	"models.opus_notice": "Opus consuma i limiti di utilizzo più velocemente degli altri modelli",
 	"models.think_longer": "Ragiona più a lungo per le attività complesse",
@@ -2725,6 +2646,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['it'] ??= {}, {
 	"settings.full_load_hint": "Carica tutti i messaggi all'apertura di una chat, così Ctrl+F, la ricerca nella chat e i segnalibri raggiungono anche i messaggi vecchi. Disattivalo se le chat lunghe sembrano lente.",
 	"settings.project_prefix": "Mostra il nome del progetto nei titoli delle chat",
 	"settings.project_prefix_hint": "Antepone il nome del progetto alle chat che ne fanno parte, nella barra laterale e nel titolo della chat. Rinominando una di queste chat, il prefisso resta nel nome.",
+	"settings.tool_images": "Mostra le immagini degli strumenti a grandezza piena",
+	"settings.tool_images_hint": "Mostra le immagini restituite dagli strumenti (generatori di immagini, server MCP) a grandezza piena invece che come piccole miniature.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt di sistema di Claude Code",
@@ -2986,15 +2909,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"tts.actor_config_failed": "キャラクター設定を読み込めませんでした：{error}",
 	"tts.provider_claude_builtin": "Claude（内蔵）",
 
-	// gallery
-	"gallery.show_as_galleries": "生成された画像をギャラリーで表示",
-	"gallery.enabled_hint": "画像ツールの結果をインラインのギャラリーとして表示します。",
-	"gallery.limit_toggle": "ギャラリーごとの画像数を制限",
-	"gallery.images_per_gallery": "ギャラリーごとの画像数",
-	"gallery.inline_note": "注意：ギャラリーにインライン表示される画像は最大3枚です。",
-	"gallery.invalid_limit_title": "無効な上限",
-	"gallery.invalid_limit": "ギャラリーごとの画像数は1以上の整数で指定してください。",
-
 	// banner
 	"banner.first_warning": "1回目の警告",
 	"banner.second_warning": "2回目の警告",
@@ -3077,10 +2991,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"download.failed": "ファイルをダウンロードできませんでした",
 	"download.download_file": "ファイルをダウンロード",
 
-	// images
-	"images.generated_image": "生成された画像",
-	"images.generated_images": "生成された画像",
-
 	// models
 	"models.opus_notice": "Opusは他のモデルよりも早く使用制限に達します",
 	"models.think_longer": "複雑なタスクのためにより長く思考",
@@ -3117,6 +3027,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
 	"settings.project_prefix": "チャットのタイトルにプロジェクト名を表示",
 	"settings.project_prefix_hint": "プロジェクト内のチャットの名前の前に、サイドバーとチャットのタイトルでプロジェクト名を付けます。こうしたチャットの名前を変更すると、接頭辞は名前に残ります。",
+	"settings.tool_images": "ツールの画像をフルサイズで表示",
+	"settings.tool_images_hint": "ツール（画像生成、MCP サーバー）が返した画像を、小さなサムネイルではなくフルサイズで表示します。",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code のシステムプロンプト",
@@ -3378,15 +3290,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"tts.actor_config_failed": "캐릭터 구성을 불러오지 못했습니다: {error}",
 	"tts.provider_claude_builtin": "Claude(기본 제공)",
 
-	// gallery
-	"gallery.show_as_galleries": "생성된 이미지를 갤러리로 표시",
-	"gallery.enabled_hint": "이미지 도구 결과를 인라인 갤러리로 표시합니다.",
-	"gallery.limit_toggle": "갤러리당 이미지 수 제한",
-	"gallery.images_per_gallery": "갤러리당 이미지 수",
-	"gallery.inline_note": "참고: 갤러리에는 최대 3개의 이미지만 인라인으로 표시됩니다.",
-	"gallery.invalid_limit_title": "잘못된 제한 값",
-	"gallery.invalid_limit": "갤러리당 이미지 수는 1 이상의 정수여야 합니다.",
-
 	// banner
 	"banner.first_warning": "1차 경고",
 	"banner.second_warning": "2차 경고",
@@ -3469,10 +3372,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"download.failed": "파일을 다운로드하지 못했습니다",
 	"download.download_file": "파일 다운로드",
 
-	// images
-	"images.generated_image": "생성된 이미지",
-	"images.generated_images": "생성된 이미지",
-
 	// models
 	"models.opus_notice": "Opus는 다른 모델보다 사용 한도를 더 빨리 소모합니다",
 	"models.think_longer": "복잡한 작업을 위해 더 오래 생각",
@@ -3509,6 +3408,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
 	"settings.project_prefix": "채팅 제목에 프로젝트 이름 표시",
 	"settings.project_prefix_hint": "프로젝트에 속한 채팅 이름 앞에 사이드바와 채팅 제목에서 프로젝트 이름을 붙입니다. 이런 채팅의 이름을 바꾸면 접두어가 이름에 남습니다.",
+	"settings.tool_images": "도구 이미지를 원래 크기로 표시",
+	"settings.tool_images_hint": "도구(이미지 생성기, MCP 서버)가 반환한 이미지를 작은 썸네일 대신 원래 크기로 표시합니다.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code 시스템 프롬프트",
@@ -3770,15 +3671,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"tts.actor_config_failed": "Não foi possível carregar a configuração dos personagens: {error}",
 	"tts.provider_claude_builtin": "Claude (integrado)",
 
-	// gallery
-	"gallery.show_as_galleries": "Mostrar imagens geradas como galerias",
-	"gallery.enabled_hint": "Transforma os resultados das ferramentas de imagem em galerias no chat.",
-	"gallery.limit_toggle": "Limitar imagens por galeria",
-	"gallery.images_per_gallery": "Imagens por galeria",
-	"gallery.inline_note": "Observação: apenas até 3 imagens são exibidas diretamente em uma galeria.",
-	"gallery.invalid_limit_title": "Limite inválido",
-	"gallery.invalid_limit": "Imagens por galeria deve ser um número inteiro de pelo menos 1.",
-
 	// banner
 	"banner.first_warning": "Primeiro aviso",
 	"banner.second_warning": "Segundo aviso",
@@ -3861,10 +3753,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"download.failed": "Não foi possível baixar o arquivo",
 	"download.download_file": "Baixar arquivo",
 
-	// images
-	"images.generated_image": "Imagem gerada",
-	"images.generated_images": "Imagens geradas",
-
 	// models
 	"models.opus_notice": "O Opus consome os limites de uso mais rápido que outros modelos",
 	"models.think_longer": "Pensa por mais tempo em tarefas complexas",
@@ -3901,6 +3789,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"settings.full_load_hint": "Carrega todas as mensagens ao abrir um chat, para que Ctrl+F, a busca no chat e os favoritos alcancem mensagens antigas. Desative se chats longos ficarem lentos.",
 	"settings.project_prefix": "Mostrar o nome do projeto nos títulos dos chats",
 	"settings.project_prefix_hint": "Coloca o nome do projeto antes dos chats que fazem parte de um, na barra lateral e no título do chat. Ao renomear um desses chats, o prefixo fica no nome.",
+	"settings.tool_images": "Mostrar imagens das ferramentas em tamanho real",
+	"settings.tool_images_hint": "Mostra as imagens retornadas pelas ferramentas (geradores de imagens, servidores MCP) em tamanho real em vez de miniaturas pequenas.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts de sistema do Claude Code",

@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"tts.actor_config_failed": "캐릭터 구성을 불러오지 못했습니다: {error}",
 	"tts.provider_claude_builtin": "Claude(기본 제공)",
 
-	// gallery
-	"gallery.show_as_galleries": "생성된 이미지를 갤러리로 표시",
-	"gallery.enabled_hint": "이미지 도구 결과를 인라인 갤러리로 표시합니다.",
-	"gallery.limit_toggle": "갤러리당 이미지 수 제한",
-	"gallery.images_per_gallery": "갤러리당 이미지 수",
-	"gallery.inline_note": "참고: 갤러리에는 최대 3개의 이미지만 인라인으로 표시됩니다.",
-	"gallery.invalid_limit_title": "잘못된 제한 값",
-	"gallery.invalid_limit": "갤러리당 이미지 수는 1 이상의 정수여야 합니다.",
-
 	// banner
 	"banner.first_warning": "1차 경고",
 	"banner.second_warning": "2차 경고",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"download.failed": "파일을 다운로드하지 못했습니다",
 	"download.download_file": "파일 다운로드",
 
-	// images
-	"images.generated_image": "생성된 이미지",
-	"images.generated_images": "생성된 이미지",
-
 	// models
 	"models.opus_notice": "Opus는 다른 모델보다 사용 한도를 더 빨리 소모합니다",
 	"models.think_longer": "복잡한 작업을 위해 더 오래 생각",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ko'] ??= {}, {
 	"settings.full_load_hint": "채팅을 열 때 모든 메시지를 불러와 Ctrl+F, 채팅 검색, 북마크가 오래된 메시지에도 닿을 수 있게 합니다. 긴 채팅이 느리게 느껴지면 끄세요.",
 	"settings.project_prefix": "채팅 제목에 프로젝트 이름 표시",
 	"settings.project_prefix_hint": "프로젝트에 속한 채팅 이름 앞에 사이드바와 채팅 제목에서 프로젝트 이름을 붙입니다. 이런 채팅의 이름을 바꾸면 접두어가 이름에 남습니다.",
+	"settings.tool_images": "도구 이미지를 원래 크기로 표시",
+	"settings.tool_images_hint": "도구(이미지 생성기, MCP 서버)가 반환한 이미지를 작은 썸네일 대신 원래 크기로 표시합니다.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code 시스템 프롬프트",
