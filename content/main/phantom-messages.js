@@ -41,7 +41,7 @@
 		return (result.content ?? []).map(textOf).filter(Boolean).join('\n');
 	}
 
-	// A tool_result's images as result_images: image_gallery items (the legacy image-extractor.js, image search) and
+	// A tool_result's images as result_images: image_gallery items (image search; older versions' galleries) and
 	// bare image items (MCP tools), the latter by url or, failing that, by file uuid in this org.
 	function resultImages(result, orgId) {
 		if (!Array.isArray(result?.content)) return [];

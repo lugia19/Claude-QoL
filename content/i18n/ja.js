@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"tts.actor_config_failed": "キャラクター設定を読み込めませんでした：{error}",
 	"tts.provider_claude_builtin": "Claude（内蔵）",
 
-	// gallery
-	"gallery.show_as_galleries": "生成された画像をギャラリーで表示",
-	"gallery.enabled_hint": "画像ツールの結果をインラインのギャラリーとして表示します。",
-	"gallery.limit_toggle": "ギャラリーごとの画像数を制限",
-	"gallery.images_per_gallery": "ギャラリーごとの画像数",
-	"gallery.inline_note": "注意：ギャラリーにインライン表示される画像は最大3枚です。",
-	"gallery.invalid_limit_title": "無効な上限",
-	"gallery.invalid_limit": "ギャラリーごとの画像数は1以上の整数で指定してください。",
-
 	// banner
 	"banner.first_warning": "1回目の警告",
 	"banner.second_warning": "2回目の警告",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"download.failed": "ファイルをダウンロードできませんでした",
 	"download.download_file": "ファイルをダウンロード",
 
-	// images
-	"images.generated_image": "生成された画像",
-	"images.generated_images": "生成された画像",
-
 	// models
 	"models.opus_notice": "Opusは他のモデルよりも早く使用制限に達します",
 	"models.think_longer": "複雑なタスクのためにより長く思考",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['ja'] ??= {}, {
 	"settings.full_load_hint": "チャットを開いたときにすべてのメッセージを読み込み、Ctrl+F、チャット検索、ブックマークが古いメッセージにも届くようにします。長いチャットが重く感じる場合はオフにしてください。",
 	"settings.project_prefix": "チャットのタイトルにプロジェクト名を表示",
 	"settings.project_prefix_hint": "プロジェクト内のチャットの名前の前に、サイドバーとチャットのタイトルでプロジェクト名を付けます。こうしたチャットの名前を変更すると、接頭辞は名前に残ります。",
+	"settings.tool_images": "ツールの画像をフルサイズで表示",
+	"settings.tool_images_hint": "ツール（画像生成、MCP サーバー）が返した画像を、小さなサムネイルではなくフルサイズで表示します。",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code のシステムプロンプト",

@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"tts.actor_config_failed": "Gagal memuat konfigurasi karakter: {error}",
 	"tts.provider_claude_builtin": "Claude (bawaan)",
 
-	// gallery
-	"gallery.show_as_galleries": "Tampilkan gambar yang dihasilkan sebagai galeri",
-	"gallery.enabled_hint": "Mengubah hasil alat gambar menjadi galeri sebaris.",
-	"gallery.limit_toggle": "Batasi gambar per galeri",
-	"gallery.images_per_gallery": "Gambar per galeri",
-	"gallery.inline_note": "Catatan: Maksimal hanya 3 gambar yang ditampilkan sebaris dalam galeri.",
-	"gallery.invalid_limit_title": "Batas tidak valid",
-	"gallery.invalid_limit": "Gambar per galeri harus berupa bilangan bulat minimal 1.",
-
 	// banner
 	"banner.first_warning": "Peringatan Pertama",
 	"banner.second_warning": "Peringatan Kedua",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"download.failed": "Gagal mengunduh file",
 	"download.download_file": "Unduh file",
 
-	// images
-	"images.generated_image": "Gambar yang dihasilkan",
-	"images.generated_images": "Gambar yang dihasilkan",
-
 	// models
 	"models.opus_notice": "Opus menghabiskan batas penggunaan lebih cepat daripada model lain",
 	"models.think_longer": "Berpikir lebih lama untuk tugas kompleks",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['id'] ??= {}, {
 	"settings.full_load_hint": "Memuat semua pesan saat obrolan dibuka, agar Ctrl+F, pencarian obrolan, dan penanda dapat menjangkau pesan lama. Matikan jika obrolan panjang terasa lambat.",
 	"settings.project_prefix": "Tampilkan nama proyek di judul obrolan",
 	"settings.project_prefix_hint": "Menambahkan nama proyek di depan obrolan yang ada di dalam proyek, di bilah samping dan judul obrolan. Mengganti nama obrolan seperti itu tetap menyimpan awalan di namanya.",
+	"settings.tool_images": "Tampilkan gambar dari alat dalam ukuran penuh",
+	"settings.tool_images_hint": "Menampilkan gambar yang dihasilkan alat (generator gambar, server MCP) dalam ukuran penuh, bukan sebagai thumbnail kecil.",
 
 	// code_prompt
 	"code_prompt.title": "Prompt sistem Claude Code",

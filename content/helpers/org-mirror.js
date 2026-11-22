@@ -8,10 +8,10 @@
 
 // Older versions kept one copy for every org (claude_qol_<name>). An org without a copy of its own
 // yet (its first load after updating, before the ISOLATED side writes one) reads that instead. They're
-// never removed: there's no telling when every org sharing this storage has its own.
+// never removed while the setting exists: there's no telling when every org sharing this storage has
+// its own. A retired setting's copies go with removeOrgMirrors.
 const _QOL_LEGACY_MIRRORS = {
 	full_load: (raw) => raw !== '0',
-	image_gallery: JSON.parse,
 	code_prompt: JSON.parse,
 	phantom_ids: JSON.parse,
 };
@@ -43,4 +43,15 @@ function writeOrgMirror(name, value) {
 		const key = _qolMirrorKey(name);
 		if (key) localStorage.setItem(key, JSON.stringify(value ?? null));
 	} catch (e) { /* storage unavailable: MAIN falls back to its defaults */ }
+}
+
+// Remove every org's copy of a retired setting `name`, and the legacy shared one.
+function removeOrgMirrors(name) {
+	try {
+		const suffix = `:${name}`;
+		for (const key of Object.keys(localStorage)) {
+			if (key.startsWith('claude_qol_mirror:') && key.endsWith(suffix)) localStorage.removeItem(key);
+		}
+		localStorage.removeItem(`claude_qol_${name}`);
+	} catch (e) { /* storage unavailable */ }
 }

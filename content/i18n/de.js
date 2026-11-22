@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"tts.actor_config_failed": "Figurenkonfiguration konnte nicht geladen werden: {error}",
 	"tts.provider_claude_builtin": "Claude (integriert)",
 
-	// gallery
-	"gallery.show_as_galleries": "Generierte Bilder als Galerien anzeigen",
-	"gallery.enabled_hint": "Wandelt Ergebnisse von Bild-Tools in eingebettete Galerien um.",
-	"gallery.limit_toggle": "Bilder pro Galerie begrenzen",
-	"gallery.images_per_gallery": "Bilder pro Galerie",
-	"gallery.inline_note": "Hinweis: In einer Galerie werden höchstens 3 Bilder eingebettet angezeigt.",
-	"gallery.invalid_limit_title": "Ungültiges Limit",
-	"gallery.invalid_limit": "Die Anzahl der Bilder pro Galerie muss eine ganze Zahl von mindestens 1 sein.",
-
 	// banner
 	"banner.first_warning": "Erste Warnung",
 	"banner.second_warning": "Zweite Warnung",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"download.failed": "Datei konnte nicht heruntergeladen werden",
 	"download.download_file": "Datei herunterladen",
 
-	// images
-	"images.generated_image": "Generiertes Bild",
-	"images.generated_images": "Generierte Bilder",
-
 	// models
 	"models.opus_notice": "Opus verbraucht Nutzungslimits schneller als andere Modelle",
 	"models.think_longer": "Länger nachdenken bei komplexen Aufgaben",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['de'] ??= {}, {
 	"settings.full_load_hint": "Lädt beim Öffnen eines Chats alle Nachrichten, damit Strg+F, die Chatsuche und Lesezeichen auch alte Nachrichten erreichen. Schalte es aus, wenn lange Chats träge wirken.",
 	"settings.project_prefix": "Projektnamen in Chat-Titeln anzeigen",
 	"settings.project_prefix_hint": "Stellt Chats in einem Projekt den Projektnamen voran, in der Seitenleiste und im Chat-Titel. Wenn du einen solchen Chat umbenennst, bleibt das Präfix im Namen.",
+	"settings.tool_images": "Bilder von Tools in voller Größe anzeigen",
+	"settings.tool_images_hint": "Zeigt die Bilder, die Tools zurückgeben (Bildgeneratoren, MCP-Server), in voller Größe statt als kleine Vorschaubilder.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code-Systemprompts",

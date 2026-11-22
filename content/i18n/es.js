@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"tts.actor_config_failed": "No se pudo cargar la configuración de personajes: {error}",
 	"tts.provider_claude_builtin": "Claude (integrado)",
 
-	// gallery
-	"gallery.show_as_galleries": "Mostrar las imágenes generadas como galerías",
-	"gallery.enabled_hint": "Convierte los resultados de las herramientas de imágenes en galerías integradas.",
-	"gallery.limit_toggle": "Limitar imágenes por galería",
-	"gallery.images_per_gallery": "Imágenes por galería",
-	"gallery.inline_note": "Nota: solo se muestran hasta 3 imágenes integradas en una galería.",
-	"gallery.invalid_limit_title": "Límite no válido",
-	"gallery.invalid_limit": "Las imágenes por galería deben ser un número entero mayor o igual a 1.",
-
 	// banner
 	"banner.first_warning": "Primera advertencia",
 	"banner.second_warning": "Segunda advertencia",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"download.failed": "No se pudo descargar el archivo",
 	"download.download_file": "Descargar archivo",
 
-	// images
-	"images.generated_image": "Imagen generada",
-	"images.generated_images": "Imágenes generadas",
-
 	// models
 	"models.opus_notice": "Opus consume los límites de uso más rápido que otros modelos",
 	"models.think_longer": "Piensa más para tareas complejas",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['es'] ??= {}, {
 	"settings.full_load_hint": "Carga todos los mensajes al abrir un chat, para que Ctrl+F, la búsqueda en el chat y los marcadores lleguen a los mensajes antiguos. Desactívalo si los chats largos van lentos.",
 	"settings.project_prefix": "Mostrar el nombre del proyecto en los títulos de los chats",
 	"settings.project_prefix_hint": "Antepone el nombre del proyecto a los chats que forman parte de uno, en la barra lateral y en el título del chat. Al renombrar uno de estos chats, el prefijo se queda en su nombre.",
+	"settings.tool_images": "Mostrar las imágenes de las herramientas a tamaño completo",
+	"settings.tool_images_hint": "Muestra las imágenes que devuelven las herramientas (generadores de imágenes, servidores MCP) a tamaño completo en lugar de miniaturas pequeñas.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts del sistema de Claude Code",

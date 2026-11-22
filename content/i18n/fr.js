@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"tts.actor_config_failed": "Impossible de charger la configuration des personnages : {error}",
 	"tts.provider_claude_builtin": "Claude (intégré)",
 
-	// gallery
-	"gallery.show_as_galleries": "Afficher les images générées en galeries",
-	"gallery.enabled_hint": "Transforme les résultats des outils d'images en galeries intégrées.",
-	"gallery.limit_toggle": "Limiter les images par galerie",
-	"gallery.images_per_gallery": "Images par galerie",
-	"gallery.inline_note": "Remarque : une galerie affiche au maximum 3 images intégrées.",
-	"gallery.invalid_limit_title": "Limite invalide",
-	"gallery.invalid_limit": "Le nombre d'images par galerie doit être un nombre entier supérieur ou égal à 1.",
-
 	// banner
 	"banner.first_warning": "Premier avertissement",
 	"banner.second_warning": "Deuxième avertissement",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"download.failed": "Impossible de télécharger le fichier",
 	"download.download_file": "Télécharger le fichier",
 
-	// images
-	"images.generated_image": "Image générée",
-	"images.generated_images": "Images générées",
-
 	// models
 	"models.opus_notice": "Opus consomme les limites d'utilisation plus rapidement que les autres modèles",
 	"models.think_longer": "Réfléchir plus longtemps pour les tâches complexes",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['fr'] ??= {}, {
 	"settings.full_load_hint": "Charge tous les messages à l'ouverture d'un chat, pour que Ctrl+F, la recherche dans le chat et les signets atteignent les anciens messages. Désactivez-le si les longs chats semblent lents.",
 	"settings.project_prefix": "Afficher le nom du projet dans le titre des chats",
 	"settings.project_prefix_hint": "Ajoute le nom du projet devant les chats qui en font partie, dans la barre latérale et le titre du chat. Renommer un de ces chats garde le préfixe dans son nom.",
+	"settings.tool_images": "Afficher les images des outils en taille réelle",
+	"settings.tool_images_hint": "Affiche les images renvoyées par les outils (générateurs d'images, serveurs MCP) en taille réelle plutôt qu'en petites miniatures.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts système de Claude Code",

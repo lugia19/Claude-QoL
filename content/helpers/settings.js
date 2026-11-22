@@ -61,10 +61,9 @@ const SETTINGS_KEYS = {
 	PROJECT_PREFIX: {
 		ENABLED: { key: 'project_prefix_enabled', default: false, type: 'boolean' },
 	},
-	IMAGE_EXTRACTOR: {
+	// Read by content/isolated/tool-images.js. Stored under the old galleries' key: the same on/off choice.
+	TOOL_IMAGES: {
 		ENABLED: { key: 'image_gallery_enabled', default: true, type: 'boolean' },
-		LIMIT_ENABLED: { key: 'image_gallery_limit_enabled', default: false, type: 'boolean' },
-		LIMIT: { key: 'image_gallery_limit', default: 3, type: 'number' },
 	},
 	// Mirrored to localStorage[claude_qol_code_prompt] by pref-switcher.js for content/main/code-session-prompt.js.
 	CODE_PROMPT: {

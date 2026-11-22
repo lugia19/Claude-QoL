@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"tts.actor_config_failed": "Não foi possível carregar a configuração dos personagens: {error}",
 	"tts.provider_claude_builtin": "Claude (integrado)",
 
-	// gallery
-	"gallery.show_as_galleries": "Mostrar imagens geradas como galerias",
-	"gallery.enabled_hint": "Transforma os resultados das ferramentas de imagem em galerias no chat.",
-	"gallery.limit_toggle": "Limitar imagens por galeria",
-	"gallery.images_per_gallery": "Imagens por galeria",
-	"gallery.inline_note": "Observação: apenas até 3 imagens são exibidas diretamente em uma galeria.",
-	"gallery.invalid_limit_title": "Limite inválido",
-	"gallery.invalid_limit": "Imagens por galeria deve ser um número inteiro de pelo menos 1.",
-
 	// banner
 	"banner.first_warning": "Primeiro aviso",
 	"banner.second_warning": "Segundo aviso",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"download.failed": "Não foi possível baixar o arquivo",
 	"download.download_file": "Baixar arquivo",
 
-	// images
-	"images.generated_image": "Imagem gerada",
-	"images.generated_images": "Imagens geradas",
-
 	// models
 	"models.opus_notice": "O Opus consome os limites de uso mais rápido que outros modelos",
 	"models.think_longer": "Pensa por mais tempo em tarefas complexas",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['pt-BR'] ??= {}, {
 	"settings.full_load_hint": "Carrega todas as mensagens ao abrir um chat, para que Ctrl+F, a busca no chat e os favoritos alcancem mensagens antigas. Desative se chats longos ficarem lentos.",
 	"settings.project_prefix": "Mostrar o nome do projeto nos títulos dos chats",
 	"settings.project_prefix_hint": "Coloca o nome do projeto antes dos chats que fazem parte de um, na barra lateral e no título do chat. Ao renomear um desses chats, o prefixo fica no nome.",
+	"settings.tool_images": "Mostrar imagens das ferramentas em tamanho real",
+	"settings.tool_images_hint": "Mostra as imagens retornadas pelas ferramentas (geradores de imagens, servidores MCP) em tamanho real em vez de miniaturas pequenas.",
 
 	// code_prompt
 	"code_prompt.title": "Prompts de sistema do Claude Code",

@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"tts.actor_config_failed": "Failed to load character configuration: {error}",
 	"tts.provider_claude_builtin": "Claude (built-in)",
 
-	// gallery
-	"gallery.show_as_galleries": "Show generated images as galleries",
-	"gallery.enabled_hint": "Turns image tool results into inline galleries.",
-	"gallery.limit_toggle": "Limit images per gallery",
-	"gallery.images_per_gallery": "Images per gallery",
-	"gallery.inline_note": "Note: Only up to 3 images are displayed inline in a gallery.",
-	"gallery.invalid_limit_title": "Invalid limit",
-	"gallery.invalid_limit": "Images per gallery must be a whole number of at least 1.",
-
 	// banner
 	"banner.first_warning": "First Warning",
 	"banner.second_warning": "Second Warning",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"download.failed": "Failed to download file",
 	"download.download_file": "Download file",
 
-	// images
-	"images.generated_image": "Generated image",
-	"images.generated_images": "Generated images",
-
 	// models
 	"models.opus_notice": "Opus consumes usage limits faster than other models",
 	"models.think_longer": "Think longer for complex tasks",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['en'] ??= {}, {
 	"settings.full_load_hint": "Loads every message when a chat opens, so Ctrl+F, chat search and bookmarks can reach old messages. Turn it off if long chats feel slow.",
 	"settings.project_prefix": "Show project names in chat titles",
 	"settings.project_prefix_hint": "Prefixes chats that are in a project with the project's name, in the sidebar and the chat's title. Renaming such a chat keeps the prefix in its name.",
+	"settings.tool_images": "Show tool images full size",
+	"settings.tool_images_hint": "Shows the images that tools return (image generators, MCP servers) full size instead of as small thumbnails.",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code System Prompts",

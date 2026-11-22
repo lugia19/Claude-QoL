@@ -238,15 +238,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"tts.actor_config_failed": "पात्र कॉन्फ़िगरेशन लोड नहीं हो सका: {error}",
 	"tts.provider_claude_builtin": "Claude (बिल्ट-इन)",
 
-	// gallery
-	"gallery.show_as_galleries": "जनरेट की गई इमेज गैलरी के रूप में दिखाएँ",
-	"gallery.enabled_hint": "इमेज टूल के नतीजों को इनलाइन गैलरी में बदलता है।",
-	"gallery.limit_toggle": "प्रति गैलरी इमेज सीमित करें",
-	"gallery.images_per_gallery": "प्रति गैलरी इमेज",
-	"gallery.inline_note": "ध्यान दें: गैलरी में इनलाइन केवल 3 इमेज तक दिखाई जाती हैं।",
-	"gallery.invalid_limit_title": "अमान्य सीमा",
-	"gallery.invalid_limit": "प्रति गैलरी इमेज कम से कम 1 की पूर्ण संख्या होनी चाहिए।",
-
 	// banner
 	"banner.first_warning": "पहली चेतावनी",
 	"banner.second_warning": "दूसरी चेतावनी",
@@ -329,10 +320,6 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"download.failed": "फ़ाइल डाउनलोड नहीं हो सकी",
 	"download.download_file": "फ़ाइल डाउनलोड करें",
 
-	// images
-	"images.generated_image": "जनरेट की गई इमेज",
-	"images.generated_images": "जनरेट की गई इमेज",
-
 	// models
 	"models.opus_notice": "Opus अन्य मॉडलों की तुलना में उपयोग सीमा तेज़ी से खर्च करता है",
 	"models.think_longer": "जटिल कार्यों के लिए ज़्यादा देर सोचता है",
@@ -369,6 +356,8 @@ Object.assign((globalThis.CLAUDE_EXT_I18N ??= {})['hi'] ??= {}, {
 	"settings.full_load_hint": "चैट खुलते ही सभी संदेश लोड करता है, ताकि Ctrl+F, चैट खोज और बुकमार्क पुराने संदेशों तक पहुँच सकें। अगर लंबी चैट धीमी लगें तो इसे बंद करें।",
 	"settings.project_prefix": "चैट शीर्षकों में प्रोजेक्ट का नाम दिखाएँ",
 	"settings.project_prefix_hint": "किसी प्रोजेक्ट की चैट के आगे प्रोजेक्ट का नाम जोड़ता है, साइडबार और चैट के शीर्षक में। ऐसी चैट का नाम बदलने पर उपसर्ग नाम में बना रहता है।",
+	"settings.tool_images": "टूल की इमेज पूरे आकार में दिखाएँ",
+	"settings.tool_images_hint": "टूल से मिली इमेज (इमेज जनरेटर, MCP सर्वर) को छोटे थंबनेल के बजाय पूरे आकार में दिखाता है।",
 
 	// code_prompt
 	"code_prompt.title": "Claude Code सिस्टम प्रॉम्प्ट",
