@@ -140,9 +140,8 @@
 			log('Found encryption key skill:', keySkill.id);
 			rawKey = Uint8Array.from(atob(keySkill.description.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 		} else {
-			// No skill: this org's data is unreadable (its key is gone). Start over with a new key.
-			log('No encryption key skill found, wiping this org\'s data...');
-			await Promise.all([cacheDB.conversations.clear(), phantomDB.phantomMessages.clear()]);
+			// No skill: start over with a new key. Rows with another key are left alone (see readRow).
+			log('No encryption key skill found, creating one...');
 			rawKey = await _createKeySkill(orgId);
 			if (!rawKey) return null;
 		}
@@ -155,12 +154,13 @@
 		return org;
 	}
 
-	// The org's key skill, null if it has none, undefined if the skills couldn't be listed.
+	// The org's key skill, null if it has none, undefined if the skills couldn't be listed. Null only when
+	// both lists loaded: either one can be missing it (see listLibrarySkills).
 	async function _fetchKeySkill(orgId) {
 		for (let attempt = 0; attempt < 10; attempt++) {
 			try {
-				const skillsData = await listSkills(orgId);
-				return (skillsData.skills || []).find(s => s.name === ENCRYPTION_SKILL_NAME) ?? null;
+				const isKey = (s) => s.name === ENCRYPTION_SKILL_NAME;
+				return (await listSkills(orgId)).skills.find(isKey) ?? (await listLibrarySkills(orgId)).find(isKey) ?? null;
 			} catch (e) {
 				if (attempt < 9) {
 					log.warn(`Failed to fetch skills (attempt ${attempt + 1}/10), retrying...`);
@@ -229,8 +229,8 @@
 		return JSON.parse(new TextDecoder().decode(decrypted));
 	}
 
-	// Row `id` with row[field] decrypted, or null. A row that won't decrypt (its key was replaced) is
-	// deleted.
+	// Row `id` with row[field] decrypted, or null. A row that won't decrypt (another key's) is deleted if
+	// it's only cache; phantoms are kept, in case their key comes back.
 	async function readRow(table, id, field) {
 		const org = await getOrg();
 		const row = org && await table(org).get(id);
@@ -238,8 +238,8 @@
 		try {
 			return { ...row, [field]: await decryptData(row[field], org) };
 		} catch (e) {
-			log.warn(`Decryption failed for ${id}, deleting entry`);
-			await table(org).delete(id);
+			log.warn(`Decryption failed for ${id}:`, e.message);
+			if (table === cacheTable) await table(org).delete(id);
 			return null;
 		}
 	}

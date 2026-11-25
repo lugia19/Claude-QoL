@@ -1839,6 +1839,26 @@ async function listSkills(orgId) {
 	return await response.json();
 }
 
+// The skills in the user's library. Unlike listSkills, it has the user's own skills whatever the client:
+// list-skills leaves them out for requests with claude.ai's anthropic-client-platform header, which the
+// desktop client's all seem to carry.
+async function listLibrarySkills(orgId) {
+	const skills = [];
+	let cursor = null;
+	do {
+		const response = await fetch(`/api/organizations/${orgId}/library/mine${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+		if (!response.ok) {
+			throw new Error(`Failed to list the library: ${response.status}`);
+		}
+		const page = await response.json();
+		for (const item of page.items) {
+			skills.push(...(item.components ?? []).filter(c => c.type === 'skill'));
+		}
+		cursor = page.next_cursor;
+	} while (cursor);
+	return skills;
+}
+
 async function createSkill(orgId, name, description) {
 	const response = await fetch(`/api/organizations/${orgId}/skills/create-simple-skill`, {
 		method: 'POST',
