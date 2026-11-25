@@ -1,1 +1,2 @@
-Per-message buttons (fork, bookmark, advanced edit, navigation arrows) now always stay in the same order and position.
+Fixed stored data (copied messages in forked chats, export cache) being cleared on every load in the desktop client.
+Images from tools show at full size again, after a claude.ai change broke the galleries. The images-per-gallery limit is gone.
