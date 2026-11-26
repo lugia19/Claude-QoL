@@ -1,2 +1,2 @@
-Fixed stored data (copied messages in forked chats, export cache) being cleared on every load in the desktop client.
-Images from tools show at full size again, after a claude.ai change broke the galleries. The images-per-gallery limit is gone.
+Claude QoL now comes in all 48 languages claude.ai offers: 38 new ones, including Chinese (Simplified and Traditional), Russian, Polish, Dutch, Turkish, Ukrainian, Vietnamese, Thai, Arabic and Hebrew. It follows your claude.ai language automatically, or pick one in the extension settings.
+The new translations are machine-made: if something reads wrong in your language, please open an issue on GitHub.
