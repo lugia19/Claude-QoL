@@ -341,6 +341,5 @@
 		"code_prompt.launch_empty": "Launch empty session",
 		"code_prompt.launching": "Starting session...",
 		"code_prompt.launch_failed": "Couldn't start the session. Please try again."
-	},
-	"stale": {}
+	}
 }
